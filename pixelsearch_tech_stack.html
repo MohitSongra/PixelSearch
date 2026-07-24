@@ -1,0 +1,349 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans)}
+.section{margin-bottom:1.5rem}
+.section-header{display:flex;align-items:center;gap:8px;padding:.5rem .75rem;border-radius:8px;margin-bottom:.6rem}
+.section-title{font-size:13px;font-weight:500}
+.section-sub{font-size:12px;opacity:.75;margin-left:auto}
+.s-purple{background:#EEEDFE;color:#3C3489}
+.s-blue{background:#E6F1FB;color:#0C447C}
+.s-teal{background:#E1F5EE;color:#085041}
+.s-green{background:#EAF3DE;color:#27500A}
+.s-amber{background:#FAEEDA;color:#633806}
+.s-coral{background:#FAECE7;color:#712B13}
+.s-gray{background:var(--surface-1);color:var(--text-secondary);border:0.5px solid var(--border)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem}
+.item{background:var(--surface-1);border:0.5px solid var(--border);border-radius:10px;padding:.65rem .85rem}
+.item-name{font-size:13px;font-weight:500;color:var(--text-primary);margin-bottom:2px}
+.item-desc{font-size:12px;color:var(--text-secondary);line-height:1.5}
+.item-pkg{font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-top:3px}
+.badge{display:inline-block;font-size:10px;font-weight:500;padding:1px 7px;border-radius:10px;margin-top:4px}
+.b-local{background:#EAF3DE;color:#27500A}
+.b-cloud{background:#E6F1FB;color:#0C447C}
+.b-core{background:#EEEDFE;color:#3C3489}
+.b-opt{background:#FAEEDA;color:#633806}
+.divider{border-top:0.5px solid var(--border);margin:.75rem 0}
+</style>
+
+<h2 class="sr-only">PixelSearch Android app — complete tech stack organized by layer</h2>
+
+<div class="section">
+  <div class="section-header s-purple">
+    <i class="ti ti-device-mobile" style="font-size:15px" aria-hidden="true"></i>
+    <span class="section-title">Core framework</span>
+    <span class="section-sub">the app itself</span>
+  </div>
+  <div class="grid3">
+    <div class="item">
+      <div class="item-name">Flutter 3.x</div>
+      <div class="item-desc">Android-first, iOS-ready. Single Dart codebase compiles to native ARM.</div>
+      <div class="item-pkg">flutter SDK</div>
+    </div>
+    <div class="item">
+      <div class="item-name">Dart 3</div>
+      <div class="item-desc">Language. Null-safe, async/await, isolates for heavy background work.</div>
+      <div class="item-pkg">dart SDK</div>
+    </div>
+    <div class="item">
+      <div class="item-name">Riverpod 2</div>
+      <div class="item-desc">State management. Providers for async data, notifiers for UI state.</div>
+      <div class="item-pkg">flutter_riverpod</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header s-blue">
+    <i class="ti ti-brain" style="font-size:15px" aria-hidden="true"></i>
+    <span class="section-title">AI / ML models</span>
+    <span class="section-sub">on-device inference</span>
+  </div>
+  <div class="grid">
+    <div class="item">
+      <div class="item-name">MobileCLIP-S1 / S2</div>
+      <div class="item-desc">Apple's mobile-optimised CLIP variant. Converts images and text queries into the same 512-dim embedding space so they can be compared directly. The core of all semantic search.</div>
+      <div class="item-pkg">exported to ONNX → onnxruntime_flutter</div>
+      <span class="badge b-local">on-device</span> <span class="badge b-core">core model</span>
+    </div>
+    <div class="item">
+      <div class="item-name">CLIP ViT-B/32 (fallback)</div>
+      <div class="item-desc">OpenAI's original CLIP model, also ONNX-exported. Used if MobileCLIP accuracy needs a boost, or for benchmark comparison. Same 512-dim output.</div>
+      <div class="item-pkg">openai/CLIP → ONNX</div>
+      <span class="badge b-local">on-device</span>
+    </div>
+    <div class="item">
+      <div class="item-name">Google ML Kit — Image Labeling</div>
+      <div class="item-desc">Runs on-device at index time. Generates object/scene tags per photo (e.g. beach, food, dog). These tags boost keyword recall in hybrid search alongside CLIP vectors.</div>
+      <div class="item-pkg">google_mlkit_image_labeling</div>
+      <span class="badge b-local">on-device</span>
+    </div>
+    <div class="item">
+      <div class="item-name">Google ML Kit — Face Detection</div>
+      <div class="item-desc">Detects faces in photos at index time. Sets the has_faces flag in SQLite. Used for face-presence filter. Full face clustering is a stretch goal.</div>
+      <div class="item-pkg">google_mlkit_face_detection</div>
+      <span class="badge b-local">on-device</span> <span class="badge b-opt">stretch</span>
+    </div>
+    <div class="item">
+      <div class="item-name">Whisper.cpp (optional)</div>
+      <div class="item-desc">On-device speech-to-text for voice search. The tiny or base model runs locally — no audio leaves the phone. Transcribed text feeds into the normal CLIP search pipeline.</div>
+      <div class="item-pkg">whisper_flutter_new</div>
+      <span class="badge b-local">on-device</span> <span class="badge b-opt">post-MVP</span>
+    </div>
+    <div class="item">
+      <div class="item-name">GPT-4o Vision / Gemini Vision</div>
+      <div class="item-desc">Cloud caption generation. User selects photos, sees consent prompt, confirms upload. Caption returned, stored locally, never re-uploaded. Used to improve BM25 recall.</div>
+      <div class="item-pkg">http + OpenAI / Google API</div>
+      <span class="badge b-cloud">cloud opt-in</span>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header s-teal">
+    <i class="ti ti-search" style="font-size:15px" aria-hidden="true"></i>
+    <span class="section-title">Search & vector engine</span>
+    <span class="section-sub">the retrieval core</span>
+  </div>
+  <div class="grid">
+    <div class="item">
+      <div class="item-name">Brute-force cosine (Dart isolate)</div>
+      <div class="item-desc">MVP search: load all 512-dim BLOB vectors from SQLite into memory in a background isolate, compute dot-product similarity against the query vector. Fast enough for 5,000–10,000 photos.</div>
+      <div class="item-pkg">pure Dart, dart:isolate</div>
+      <span class="badge b-local">on-device</span> <span class="badge b-core">MVP</span>
+    </div>
+    <div class="item">
+      <div class="item-name">sqlite-vec / ObjectBox (scale)</div>
+      <div class="item-desc">Drop-in upgrade when gallery exceeds 10,000 photos. sqlite-vec adds ANN vector search as a SQLite extension. ObjectBox has native vector support. Same API surface, faster at scale.</div>
+      <div class="item-pkg">sqlite_vec or objectbox_flutter</div>
+      <span class="badge b-local">on-device</span> <span class="badge b-opt">post-MVP</span>
+    </div>
+    <div class="item">
+      <div class="item-name">SQLite FTS5 (BM25)</div>
+      <div class="item-desc">Keyword search over ML Kit labels and cloud captions stored as text. Result scores fused with CLIP cosine scores at 0.3 weight. Built into SQLite — no extra library.</div>
+      <div class="item-pkg">drift FTS5 extension</div>
+      <span class="badge b-local">on-device</span>
+    </div>
+    <div class="item">
+      <div class="item-name">Score fusion</div>
+      <div class="item-desc">Combines CLIP dense score and BM25 sparse score: Final = 0.7 × clip_score + 0.3 × bm25_score. Both normalised to [0,1] before fusion. Written in pure Dart.</div>
+      <div class="item-pkg">pure Dart</div>
+      <span class="badge b-local">on-device</span>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header s-green">
+    <i class="ti ti-database" style="font-size:15px" aria-hidden="true"></i>
+    <span class="section-title">Database & storage</span>
+    <span class="section-sub">local persistence</span>
+  </div>
+  <div class="grid3">
+    <div class="item">
+      <div class="item-name">drift</div>
+      <div class="item-desc">Type-safe ORM over SQLite for Flutter. Defines all 14 tables as Dart classes. Generates DAOs, migrations, and reactive streams.</div>
+      <div class="item-pkg">drift + drift_flutter</div>
+    </div>
+    <div class="item">
+      <div class="item-name">SQLite 3</div>
+      <div class="item-desc">Underlying DB engine. Zero server setup. Handles the 14-table schema: photos, embeddings (512-dim BLOB), labels, events, places, captions, kv_settings, etc.</div>
+      <div class="item-pkg">sqlite3_flutter_libs</div>
+    </div>
+    <div class="item">
+      <div class="item-name">shared_preferences</div>
+      <div class="item-desc">Lightweight key-value store for app settings: theme, consent flags, indexing config, last-indexed folder path.</div>
+      <div class="item-pkg">shared_preferences</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header s-amber">
+    <i class="ti ti-photo" style="font-size:15px" aria-hidden="true"></i>
+    <span class="section-title">Gallery & media access</span>
+    <span class="section-sub">reading photos from the device</span>
+  </div>
+  <div class="grid">
+    <div class="item">
+      <div class="item-name">photo_manager</div>
+      <div class="item-desc">Reads the Android (and iOS) camera roll. Lists albums, fetches photo assets with metadata, loads thumbnails and full-size images. Core of M1.</div>
+      <div class="item-pkg">photo_manager</div>
+    </div>
+    <div class="item">
+      <div class="item-name">permission_handler</div>
+      <div class="item-desc">Requests READ_MEDIA_IMAGES (Android 13+) and READ_EXTERNAL_STORAGE (Android 12). Shows rationale dialog if denied. Required before photo_manager can load anything.</div>
+      <div class="item-pkg">permission_handler</div>
+    </div>
+    <div class="item">
+      <div class="item-name">EXIF extraction</div>
+      <div class="item-desc">Reads GPS coordinates, date taken, camera model, and dimensions from photo EXIF metadata at index time. GPS lat/lng stored in the places table for map view.</div>
+      <div class="item-pkg">exif (pub.dev)</div>
+    </div>
+    <div class="item">
+      <div class="item-name">image / flutter_image_compress</div>
+      <div class="item-desc">Resizes photos to 224×224px before feeding into CLIP (required input size). Compression reduces memory during batch indexing.</div>
+      <div class="item-pkg">flutter_image_compress</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header s-coral">
+    <i class="ti ti-map" style="font-size:15px" aria-hidden="true"></i>
+    <span class="section-title">Maps & location</span>
+    <span class="section-sub">GPS photo view</span>
+  </div>
+  <div class="grid3">
+    <div class="item">
+      <div class="item-name">flutter_map</div>
+      <div class="item-desc">Leaflet.js-inspired open-source map widget for Flutter. No API key needed. Renders GPS photo pins over OpenStreetMap tiles.</div>
+      <div class="item-pkg">flutter_map</div>
+    </div>
+    <div class="item">
+      <div class="item-name">OpenStreetMap tiles</div>
+      <div class="item-desc">Free map tile provider. Works offline if tiles are cached. No account or billing required — aligns with privacy-first principle.</div>
+      <div class="item-pkg">tile.openstreetmap.org</div>
+    </div>
+    <div class="item">
+      <div class="item-name">Nominatim (opt-in)</div>
+      <div class="item-desc">OSM reverse geocoding API. Converts GPS coords to human-readable place names (e.g. "Baga Beach, Goa"). Sends coordinates only, never photos.</div>
+      <div class="item-pkg">http → nominatim.openstreetmap.org</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header s-purple">
+    <i class="ti ti-calendar" style="font-size:15px" aria-hidden="true"></i>
+    <span class="section-title">Clustering & timeline</span>
+    <span class="section-sub">grouping photos into events</span>
+  </div>
+  <div class="grid">
+    <div class="item">
+      <div class="item-name">DBSCAN (Dart port)</div>
+      <div class="item-desc">Density-based clustering on photo timestamps. Groups nearby-in-time photos into "events" without needing to specify how many clusters. Written in pure Dart, runs in an isolate.</div>
+      <div class="item-pkg">pure Dart implementation</div>
+      <span class="badge b-local">on-device</span>
+    </div>
+    <div class="item">
+      <div class="item-name">Groq API — smart event names</div>
+      <div class="item-desc">Sends event caption summaries (text only, no photos) to llama-3.1-8b-instant on Groq. Returns human-readable event label: "Goa trip — Dec 2023". Cached locally.</div>
+      <div class="item-pkg">http → api.groq.com</div>
+      <span class="badge b-cloud">cloud opt-in</span>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header s-blue">
+    <i class="ti ti-layout" style="font-size:15px" aria-hidden="true"></i>
+    <span class="section-title">UI & navigation</span>
+    <span class="section-sub">screens, routing, components</span>
+  </div>
+  <div class="grid3">
+    <div class="item">
+      <div class="item-name">Material 3</div>
+      <div class="item-desc">Flutter's built-in Material 3 design system. Dynamic colour theming, modern components, adaptive layouts.</div>
+      <div class="item-pkg">flutter/material.dart</div>
+    </div>
+    <div class="item">
+      <div class="item-name">go_router</div>
+      <div class="item-desc">Declarative routing. Handles deep links, nested navigation, and the bottom tab shell without boilerplate.</div>
+      <div class="item-pkg">go_router</div>
+    </div>
+    <div class="item">
+      <div class="item-name">cached_network_image</div>
+      <div class="item-desc">For cloud caption API responses that return image thumbnails. Local thumbnails use photo_manager directly.</div>
+      <div class="item-pkg">cached_network_image</div>
+    </div>
+    <div class="item">
+      <div class="item-name">flutter_staggered_grid_view</div>
+      <div class="item-desc">Masonry/staggered grid layout for the photo results screen. Handles variable-height thumbnails without fixed-size cells.</div>
+      <div class="item-pkg">flutter_staggered_grid_view</div>
+    </div>
+    <div class="item">
+      <div class="item-name">Hero animation</div>
+      <div class="item-desc">Flutter built-in. Animates photo from grid thumbnail to full-screen viewer with a smooth shared-element transition.</div>
+      <div class="item-pkg">flutter/widgets.dart</div>
+    </div>
+    <div class="item">
+      <div class="item-name">shimmer</div>
+      <div class="item-desc">Loading skeleton placeholders shown in the photo grid while indexing is in progress or thumbnails are loading.</div>
+      <div class="item-pkg">shimmer</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header s-green">
+    <i class="ti ti-settings" style="font-size:15px" aria-hidden="true"></i>
+    <span class="section-title">Background processing</span>
+    <span class="section-sub">indexing without freezing the UI</span>
+  </div>
+  <div class="grid">
+    <div class="item">
+      <div class="item-name">Dart Isolates</div>
+      <div class="item-desc">All heavy work runs in a separate isolate: CLIP embedding, cosine search computation, DBSCAN clustering, thumbnail decoding. UI thread never blocks.</div>
+      <div class="item-pkg">dart:isolate</div>
+    </div>
+    <div class="item">
+      <div class="item-name">WorkManager</div>
+      <div class="item-desc">Android background task scheduler. Runs incremental re-indexing when the app is in the background or phone is charging. Survives app restarts.</div>
+      <div class="item-pkg">workmanager</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header s-gray">
+    <i class="ti ti-cloud" style="font-size:15px" aria-hidden="true"></i>
+    <span class="section-title">Optional cloud backend</span>
+    <span class="section-sub">FastAPI — consent-gated, never breaks local search</span>
+  </div>
+  <div class="grid3">
+    <div class="item">
+      <div class="item-name">FastAPI + Pydantic v2</div>
+      <div class="item-desc">Python backend for optional cloud features. Thin relay layer — validates requests, calls AI APIs, returns results. No user data stored server-side.</div>
+      <div class="item-pkg">fastapi + uvicorn</div>
+      <span class="badge b-cloud">cloud</span>
+    </div>
+    <div class="item">
+      <div class="item-name">Groq API</div>
+      <div class="item-desc">llama-3.1-8b-instant for conversational search assistant and event naming. Text queries only — no photos ever sent. Free tier: 30 req/min.</div>
+      <div class="item-pkg">groq-python</div>
+      <span class="badge b-cloud">cloud</span>
+    </div>
+    <div class="item">
+      <div class="item-name">OpenAI / Gemini Vision</div>
+      <div class="item-desc">GPT-4o Vision or Gemini 1.5 Flash for photo captioning. Only triggered by explicit user consent per photo. Result cached locally after first call.</div>
+      <div class="item-pkg">openai / google-generativeai</div>
+      <span class="badge b-cloud">cloud</span>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-header s-teal">
+    <i class="ti ti-test-pipe" style="font-size:15px" aria-hidden="true"></i>
+    <span class="section-title">Testing & tooling</span>
+  </div>
+  <div class="grid3">
+    <div class="item">
+      <div class="item-name">flutter_test</div>
+      <div class="item-desc">Unit tests for search engine logic, score fusion, DBSCAN clustering, and DB DAOs. Widget tests for UI components.</div>
+      <div class="item-pkg">flutter_test (built-in)</div>
+    </div>
+    <div class="item">
+      <div class="item-name">integration_test</div>
+      <div class="item-desc">End-to-end tests on a real Android device or emulator. Tests the full index → search → result flow.</div>
+      <div class="item-pkg">integration_test (built-in)</div>
+    </div>
+    <div class="item">
+      <div class="item-name">mocktail / mockito</div>
+      <div class="item-desc">Mocking framework for unit tests. Mocks the repository layer so search logic can be tested without a real DB or ONNX model.</div>
+      <div class="item-pkg">mocktail</div>
+    </div>
+  </div>
+</div>
