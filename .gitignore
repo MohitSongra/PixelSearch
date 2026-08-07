@@ -1,13 +1,37 @@
-# Flutter / Dart
+# PixelSearch — repository-root ignore (each subproject also has its own .gitignore)
+
+# ---- Flutter / Dart ----
 app/.dart_tool/
 app/.flutter-plugins-dependencies
 app/build/
 app/.pub-cache/
 app/.pub/
+pixelsearch_app/build/
+pixelsearch_app/.dart_tool/
+pixelsearch_app/.flutter-plugins
+pixelsearch_app/.flutter-plugins-dependencies
+pixelsearch_app/android/local.properties
+pixelsearch_app/android/.gradle/
+pixelsearch_app/ios/Pods/
+pixelsearch_app/.idea/
+**/ephemeral/
+*.iml
 
-# OS / IDE
+# ---- OS / IDE ----
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
 *.log
+
+# ---- ModelKit large regenerable artifacts (regenerate: python prepare_model.py) ----
+model_kit/out/*.onnx
+
+# ---- Python ----
+**/__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ---- Secrets / local ----
+.env

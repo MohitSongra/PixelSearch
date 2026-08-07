@@ -1,0 +1,312 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/sample_data.dart';
+import '../../models/photo.dart';
+import '../../state/providers.dart';
+import '../../widgets/empty_state.dart';
+import '../../widgets/photo_grid.dart';
+
+class SearchScreen extends ConsumerStatefulWidget {
+  const SearchScreen({super.key});
+
+  @override
+  ConsumerState<SearchScreen> createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends ConsumerState<SearchScreen> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _runQuery(String q) {
+    _controller.text = q;
+    _controller.selection =
+        TextSelection.fromPosition(TextPosition(offset: q.length));
+    ref.read(searchQueryProvider.notifier).state = q;
+  }
+
+  Future<void> _loadDevicePhotos() async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(
+      duration: Duration(milliseconds: 900),
+      content: Text('Requesting photo access…'),
+    ));
+    final added =
+        await ref.read(photoLibraryProvider.notifier).loadDevicePhotos();
+    if (!mounted) return;
+    messenger.showSnackBar(SnackBar(
+      content: Text(added > 0
+          ? 'Added $added photos from your device.'
+          : 'No device photos added (permission denied or none found).'),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = ref.watch(searchQueryProvider);
+    final resultsAsync = ref.watch(searchResultsProvider);
+    final results = resultsAsync.valueOrNull ?? const <Photo>[];
+    final isSearching = resultsAsync.isLoading;
+    final semantic =
+        ref.watch(searchBackendProvider).valueOrNull?.isSemantic ?? false;
+    final deviceSupported =
+        ref.read(photoLibraryProvider.notifier).deviceSupported;
+    final scheme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(
+                children: [
+                  Text('PixelSearch',
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                  const Spacer(),
+                  _ModeBadge(semantic: semantic),
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: 'On-device · private',
+                    child: Icon(Icons.shield_outlined, color: scheme.primary),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: _SearchField(
+                controller: _controller,
+                onChanged: (v) =>
+                    ref.read(searchQueryProvider.notifier).state = v,
+                onClear: () {
+                  _controller.clear();
+                  ref.read(searchQueryProvider.notifier).state = '';
+                },
+              ),
+            ),
+            Expanded(
+              child: query.trim().isEmpty
+                  ? _EmptySearch(
+                      onQueryTap: _runQuery,
+                      onLoadDevice: deviceSupported ? _loadDevicePhotos : null,
+                      total: ref.watch(photoLibraryProvider).length,
+                    )
+                  : results.isEmpty
+                      ? (isSearching
+                          ? const _Searching()
+                          : const EmptyState(
+                              icon: Icons.search_off,
+                              title: 'No matches',
+                              message:
+                                  'Try simpler words like “beach”, “dog”, or “night”.',
+                            ))
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '${results.length} result${results.length == 1 ? '' : 's'} for “$query”',
+                                      style: TextStyle(
+                                          color: scheme.onSurfaceVariant),
+                                    ),
+                                  ),
+                                  if (isSearching)
+                                    const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            Expanded(child: PhotoGrid(photos: results)),
+                          ],
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+  const _SearchField({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: 'Search your memories…',
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: controller.text.isEmpty
+            ? const Icon(Icons.mic_none)
+            : IconButton(icon: const Icon(Icons.close), onPressed: onClear),
+        filled: true,
+        fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(30),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(vertical: 4),
+      ),
+    );
+  }
+}
+
+class _EmptySearch extends StatelessWidget {
+  final ValueChanged<String> onQueryTap;
+  final VoidCallback? onLoadDevice;
+  final int total;
+  const _EmptySearch({
+    required this.onQueryTap,
+    required this.onLoadDevice,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      children: [
+        Text('Try searching',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: suggestedQueries
+              .map((q) => ActionChip(
+                    label: Text(q),
+                    onPressed: () => onQueryTap(q),
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 24),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.photo_library_outlined, color: scheme.primary),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('$total photos in library',
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      Text(
+                        onLoadDevice != null
+                            ? 'Browsing a sample set. Add your real gallery to search it too.'
+                            : 'Running on the bundled sample set (web demo).',
+                        style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                if (onLoadDevice != null)
+                  FilledButton.tonal(
+                    onPressed: onLoadDevice,
+                    child: const Text('Add mine'),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Compact pill showing which search engine is live: real CLIP semantic search,
+/// or the lexical fallback (web / model not yet provisioned).
+class _ModeBadge extends StatelessWidget {
+  const _ModeBadge({required this.semantic});
+  final bool semantic;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final bg = semantic
+        ? scheme.primaryContainer
+        : scheme.surfaceContainerHighest.withValues(alpha: 0.7);
+    final fg = semantic ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
+    return Tooltip(
+      message: semantic
+          ? 'CLIP semantic search (on-device)'
+          : 'Keyword search (semantic model not loaded)',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(semantic ? Icons.auto_awesome : Icons.abc, size: 15, color: fg),
+            const SizedBox(width: 4),
+            Text(
+              semantic ? 'Semantic' : 'Keyword',
+              style: TextStyle(
+                  color: fg, fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown while the query is being embedded and ranked (first result set).
+class _Searching extends StatelessWidget {
+  const _Searching();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+              width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3)),
+          const SizedBox(height: 14),
+          Text('Searching your photos…',
+              style: TextStyle(color: scheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}

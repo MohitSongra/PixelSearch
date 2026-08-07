@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  flutter:
+    name: Flutter analyze + unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pixelsearch_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.7'
+          channel: stable
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter analyze
+      - run: flutter test test/
+      # NOTE: integration_test/ (image/text parity, golden, benchmark) needs a real
+      # ONNX Runtime host (desktop/emulator) and the model artifacts. Run those on a
+      # self-hosted runner or device:  xvfb-run flutter test integration_test -d linux
+
+  modelkit:
+    name: ModelKit metric tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: model_kit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python eval/test_metrics.py

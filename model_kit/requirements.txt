@@ -1,0 +1,17 @@
+# PixelSearch ModelKit — Python dependencies (versions verified in the build sandbox).
+# Used only to (re)generate the ONNX model artifacts + parity references; NOT needed to run the app.
+# Python 3.11 recommended.
+#
+# NOTE on torch/torchvision: the sandbox used the CPU build (2.13.0+cpu). On your
+# machine install the normal wheels below (CPU is fine — export runs on CPU). For a
+# CUDA build follow https://pytorch.org/get-started/locally/ instead of pinning here.
+
+torch==2.13.0
+torchvision==0.28.0
+open_clip_torch==3.3.0
+onnx==1.22.0
+onnxruntime==1.25.0
+onnxconverter-common==1.16.0
+numpy==2.4.4
+pillow==12.2.0
+scikit-image==0.26.0
