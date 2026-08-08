@@ -52,8 +52,13 @@ Testing scales with the milestone. Principle: every milestone lands with the tes
 - `test/indexing_service_test.dart` (9) — full index + embed-once, incremental (no duplicate work), new-only,
   deleted (+embedding removed), changed re-embed, model-version migration, cancel→resume, per-asset failure
   isolation, 200-asset stress + checkpoint.
+- `test/indexing_integration_test.dart` (3, added 2026-08-08) — **regression cover for the two integration
+  bugs** the M1 demo loader caused (ADR-015): a 1500-asset gallery indexes 1500 (no cap anywhere; `fraction`
+  reaches 1.0), ML Kit labels survive store → `Photo.labels`/`displayTags` while the demo's synthesized tags
+  (`photo`/`portrait`/`landscape`/`travel`) are absent from `searchBlob`, and the generated thumbnail path
+  reaches `Photo.thumbPath` for display.
 - **On device (pending):** device adapters (photo_manager, ML Kit, WorkManager, EXIF, thumbnail),
-  WorkManager reboot/backoff, and real latency/memory.
+  WorkManager reboot/backoff, permission prompt + "Selected Photos" (KI-7), and real latency/memory.
 
 ## M6 — semantic search (added 2026-08-07)
 Unit (in-sandbox, no ONNX):
@@ -72,6 +77,9 @@ Integration (real Flutter ORT, `-d linux` via xvfb):
 ## Tracked follow-ups
 - A drift **schema-migration test** (v1→v2) using drift's schema-verification harness (not yet added).
 - A widget test asserting the async search states (spinner → results, Semantic/Keyword badge).
+- A widget test over `IndexingController` with an overridden `index_bridge` (Index → progress → Cancel →
+  library refresh). Needs the bridge behind a provider so it can be overridden; today it is a top-level
+  conditional-import function.
 
 ## Deferred (need a physical device — tracked in BENCHMARK_RESULTS as PENDING)
 On-device latency, indexing throughput, memory, and end-to-end search quality on real libraries (M5/M6 runtime).

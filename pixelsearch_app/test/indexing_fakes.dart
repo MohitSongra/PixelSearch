@@ -1,11 +1,17 @@
 import 'dart:typed_data';
 
+import 'package:image/image.dart' as img;
 import 'package:pixelsearch/indexing/model/asset_ref.dart';
 import 'package:pixelsearch/indexing/ports/asset_embedder.dart';
 import 'package:pixelsearch/indexing/ports/gallery_source.dart';
 import 'package:pixelsearch/indexing/ports/image_enricher.dart';
 import 'package:pixelsearch/indexing/ports/metadata_extractor.dart';
 import 'package:pixelsearch/indexing/ports/thumbnail_generator.dart';
+
+/// A real, decodable 2x2 PNG. `AssetProcessor` decodes every asset centrally
+/// now, so the fake gallery must hand back bytes that actually decode.
+final Uint8List fakeImageBytes =
+    Uint8List.fromList(img.encodePng(img.Image(width: 2, height: 2)));
 
 /// In-memory gallery. Mutate [assets] to simulate add/remove/change between runs.
 class FakeGallery implements GallerySource {
@@ -18,7 +24,7 @@ class FakeGallery implements GallerySource {
 
   @override
   Future<Uint8List?> loadBytes(String assetId) async =>
-      missingBytes.contains(assetId) ? null : Uint8List.fromList([1, 2, 3, 4]);
+      missingBytes.contains(assetId) ? null : fakeImageBytes;
 }
 
 class FakeMetadata implements MetadataExtractor {
@@ -34,7 +40,7 @@ class FakeMetadata implements MetadataExtractor {
 
 class FakeThumbnails implements ThumbnailGenerator {
   @override
-  Future<String> generate(String assetId, Uint8List bytes) async =>
+  Future<String> generate(String assetId, img.Image image) async =>
       'thumb/$assetId.jpg';
 }
 
@@ -52,7 +58,7 @@ class CountingEmbedder implements AssetEmbedder {
   int total = 0;
 
   @override
-  Future<Float32List> embed(Uint8List imageBytes) async {
+  Future<Float32List> embed(img.Image image) async {
     total++;
     onEmbed?.call(total);
     final v = Float32List(512);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,8 +12,6 @@ class OnboardingScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
-    final deviceSupported =
-        ref.read(photoLibraryProvider.notifier).deviceSupported;
 
     return Scaffold(
       body: SafeArea(
@@ -60,27 +60,21 @@ class OnboardingScreen extends ConsumerWidget {
               _point(context, Icons.auto_awesome_outlined, 'Optional cloud extras',
                   'AI captions & assistant — only with your consent.'),
               const Spacer(),
-              if (deviceSupported)
+              if (indexingSupported)
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: () async {
-                      final messenger = ScaffoldMessenger.of(context);
-                      final router = GoRouter.of(context);
-                      final added = await ref
-                          .read(photoLibraryProvider.notifier)
-                          .loadDevicePhotos();
-                      messenger.showSnackBar(SnackBar(
-                        content: Text(added > 0
-                            ? 'Indexed $added of your photos.'
-                            : 'Continuing with sample photos.'),
-                      ));
-                      router.go('/home/search');
+                    // Kick off the real pipeline and move on immediately — a full
+                    // gallery takes minutes, and Search shows live progress.
+                    onPressed: () {
+                      unawaited(
+                          ref.read(indexingControllerProvider.notifier).start());
+                      context.go('/home/search');
                     },
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    child: const Text('Use my photos'),
+                    child: const Text('Index my photos'),
                   ),
                 ),
               const SizedBox(height: 10),
@@ -91,9 +85,8 @@ class OnboardingScreen extends ConsumerWidget {
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: Text(deviceSupported
-                      ? 'Explore with sample photos'
-                      : 'Explore the demo'),
+                  child: Text(
+                      indexingSupported ? 'Not now' : 'Continue'),
                 ),
               ),
                     ],

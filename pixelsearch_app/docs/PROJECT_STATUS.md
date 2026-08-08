@@ -1,27 +1,30 @@
 # PROJECT_STATUS
 
-**As of:** 2026-08-07 · **Phase:** M6 — semantic search **complete & verified** (real-ORT **6/6** retrieval; CLIP + hybrid re-ranking; async search path behind the `SearchBackend`/`VectorIndex` seams). Next: M9 (filters). · **Build:** analyzer 0 issues, **46 unit tests** + golden + 2 parity + **M6 semantic** + benchmark suites green, web+linux OK.
+**As of:** 2026-08-08 · **Phase:** M5 indexing **wired to the app** (ADR-015) on top of a complete & verified M6. The M1 demo gallery loader is deleted; the library is now the on-device index. Next: M12 (model manager — indexing needs the provisioned encoder, KI-8) or M9 (filters). · **Build:** analyzer 0 issues, **49 unit tests** + golden + 2 parity + **M6 semantic** + benchmark suites green, web + **Android debug APK** build OK.
 
 **Architectural improvements landed (2026-08-06):** interface versioning + migration policy (schema v2);
 `VectorIndex` search seam (brute-force now, ANN-swappable); benchmark + eval framework. All verified, no fabricated results.
 
 ## One-line status
-The app now runs **real on-device semantic search**: the CLIP text encoder is wired end-to-end behind the
-`SearchBackend` seam, ranking photos by embedding cosine + hybrid signals, with a keyword fallback. Verified
-in-sandbox on a real ONNX Runtime (6/6). On-device provisioning of the fp16 model + live DB index warm-up is
-the remaining runtime step (shared with the M5 indexer), tracked like the other device-runtime items.
+The app now runs **real on-device semantic search over a real on-device index**: the M5 pipeline is invoked
+from the UI (`IndexingController` → `index_bridge` → `IndexingService`), persists ML Kit labels + CLIP
+embeddings + thumbnail paths, and the photo library reads straight from that store — no demo data, no import
+cap anywhere on the path. Search ranks by embedding cosine + hybrid signals with a keyword fallback, verified
+in-sandbox on a real ONNX Runtime (6/6). Runtime provisioning of the fp16 image encoder is the remaining
+blocker for indexing on a device (KI-8, M12); photo_manager/ML Kit runtime behaviour is still device-verified
+only (TD-11).
 
 ## Milestone ledger
 | ID | Milestone | Status | Evidence |
 |----|-----------|--------|----------|
 | M0 | Flutter scaffold, theme, routing, shell | ✅ done | `lib/core`, `lib/app.dart`, analyzer clean |
-| M1 | Gallery: device photos (Android) + bundled samples | ✅ done | `lib/data/device_gallery*`, `sample_data.dart` |
+| M1 | Gallery: device photos (Android) + bundled samples | ⚠️ superseded | the demo loader + `samplePhotos` were **deleted** in the M5 wiring (ADR-015); gallery access now runs through `PhotoManagerGallerySource` |
 | M3 | UI shell: search, viewer, timeline, map, settings, onboarding | ✅ done | `lib/features/*` |
 | — | Mock keyword search (stand-in, now the M6 lexical fallback) | ✅ done | `lib/data/search_engine.dart` |
 | — | ModelKit spike: export + verify MobileCLIP | ✅ done | `PixelSearch_ModelKit/SPIKE_REPORT.md` (6/6, cos 1.0) |
 | M2 | SQLite/drift store for photos + embeddings | ✅ done | `lib/data/local/*`, `photo_repository.dart`; 5 DB tests; native + web-stub connection |
 | **M4** | **Flutter ONNX (preflight -> ImageEmbedder -> parity gate)** | ✅ done | M4.2–M4.6 COMPLETE (parity, golden 100%, benchmarks, review APPROVED) |
-| **M5** | **Production indexing engine (reconcile, batch, resume, incremental, versioned)** | ✅ code-complete: core (16 tests) + 6 adapters compile; on-device runtime pending | ports+adapters; ADR-013; `INDEXING_ARCHITECTURE.md` |
+| **M5** | **Production indexing engine (reconcile, batch, resume, incremental, versioned)** | ✅ core (16 tests) + 6 adapters + **now wired to the UI** (19 tests); on-device runtime pending | ports+adapters; ADR-013, **ADR-015**; `INDEXING_ARCHITECTURE.md`; `test/indexing_integration_test.dart` |
 | **M6** | **Semantic search: real CLIP text→image cosine + hybrid re-rank, replacing the mock** | ✅ done | `SemanticSearchBackend`, `HybridScorer`; 14 unit tests + real-ORT **6/6**; ADR-014 |
 | M9 | Filters (date/place/album) over the store | ⏳ pending | |
 | M10 | Timeline backed by the DB | ⏳ pending | |

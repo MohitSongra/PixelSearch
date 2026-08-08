@@ -50,15 +50,22 @@ class IndexingService {
   bool _running = false;
   bool get isRunning => _running;
 
+  /// Wall-clock of the current run, reported in the completion log line.
+  final Stopwatch _runWatch = Stopwatch();
+
   void cancel() => _cancelRequested = true;
 
   Future<IndexProgress> run() async {
     if (_running) return _state;
     _running = true;
     _cancelRequested = false;
+    _runWatch
+      ..reset()
+      ..start();
     try {
       _emit(const IndexProgress(phase: IndexPhase.scanning));
       final assets = await gallery.listAssets();
+      log.info('scan: ${assets.length} gallery assets discovered');
 
       _emit(const IndexProgress(phase: IndexPhase.planning));
       final indexed = await store.indexedRecords();
@@ -67,6 +74,9 @@ class IndexingService {
         indexed: indexed,
         currentEmbeddingVersion: versionManager.currentVersion,
       );
+      log.info('plan: ${plan.toIndex.length} to index, ${plan.toDelete.length} '
+          'to delete, ${assets.length - plan.toIndex.length} already up to date '
+          '(${indexed.length} rows already in the store)');
 
       if (plan.toDelete.isNotEmpty) {
         await store.deleteAssets(plan.toDelete);
@@ -130,6 +140,9 @@ class IndexingService {
         completed: completed,
         failed: failed,
         deleted: deleted);
+    _runWatch.stop();
+    log.info('run ${phase.name}: sent=$total embedded=$completed failed=$failed '
+        'deleted=$deleted in ${_runWatch.elapsedMilliseconds}ms');
     _emit(p);
     return p;
   }

@@ -28,11 +28,19 @@ spec both sides implement against.
 | ONNX opset | **17**, legacy exporter (`dynamo=False`) |
 | fp16 conversion | `keep_io_types=True` → **graph I/O stays float32**; only internal weights are fp16 |
 
+> **fp16 remains the production artifact** (ADR-004). Note that the fp16 *image*
+> export produced by the current `onnxconverter_common` build does not load —
+> see KNOWN_ISSUES KI-9. Until ModelKit reissues it, the app's resolver falls
+> back to the fp32 export, which is verified at cosine 1.000000 against this
+> contract's reference. The contract itself is unchanged.
+
 ## 2. Artifacts
 | File | Role | Size | Disposition |
 |---|---|---|---|
-| `mobileclip_image_fp16.onnx` | image encoder | ~44 MB | provisioned to device at runtime (not in APK) |
-| `mobileclip_text_fp16.onnx` | text encoder | ~127 MB | provisioned to device at runtime |
+| `mobileclip_image_fp16.onnx` | image encoder | ~44 MB | **production** — provisioned to device at runtime (not in APK) |
+| `mobileclip_text_fp16.onnx` | text encoder | ~127 MB | **production** — provisioned to device at runtime |
+| `mobileclip_image.onnx` | image encoder, fp32 | ~87 MB | development / CPU-testing fallback; accepted by the app's model resolver, never the production target |
+| `mobileclip_text.onnx` | text encoder, fp32 | ~254 MB | development / CPU-testing fallback |
 | `bpe_simple_vocab_16e6.txt.gz` | CLIP BPE vocab | ~1.4 MB | bundled in app |
 | `preprocess_config.json` | constants + versions | <1 KB | bundled in app |
 | `reference_vectors.json` | Dart parity target | ~1 KB | test asset |

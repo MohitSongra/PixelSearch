@@ -5,6 +5,7 @@ import '../../data/sample_data.dart';
 import '../../models/photo.dart';
 import '../../state/providers.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/indexing_status.dart';
 import '../../widgets/photo_grid.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -30,22 +31,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref.read(searchQueryProvider.notifier).state = q;
   }
 
-  Future<void> _loadDevicePhotos() async {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(
-      duration: Duration(milliseconds: 900),
-      content: Text('Requesting photo access…'),
-    ));
-    final added =
-        await ref.read(photoLibraryProvider.notifier).loadDevicePhotos();
-    if (!mounted) return;
-    messenger.showSnackBar(SnackBar(
-      content: Text(added > 0
-          ? 'Added $added photos from your device.'
-          : 'No device photos added (permission denied or none found).'),
-    ));
-  }
-
   @override
   Widget build(BuildContext context) {
     final query = ref.watch(searchQueryProvider);
@@ -54,8 +39,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final isSearching = resultsAsync.isLoading;
     final semantic =
         ref.watch(searchBackendProvider).valueOrNull?.isSemantic ?? false;
-    final deviceSupported =
-        ref.read(photoLibraryProvider.notifier).deviceSupported;
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -96,11 +79,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ),
             Expanded(
               child: query.trim().isEmpty
-                  ? _EmptySearch(
-                      onQueryTap: _runQuery,
-                      onLoadDevice: deviceSupported ? _loadDevicePhotos : null,
-                      total: ref.watch(photoLibraryProvider).length,
-                    )
+                  ? _EmptySearch(onQueryTap: _runQuery)
                   : results.isEmpty
                       ? (isSearching
                           ? const _Searching()
@@ -182,17 +161,10 @@ class _SearchField extends StatelessWidget {
 
 class _EmptySearch extends StatelessWidget {
   final ValueChanged<String> onQueryTap;
-  final VoidCallback? onLoadDevice;
-  final int total;
-  const _EmptySearch({
-    required this.onQueryTap,
-    required this.onLoadDevice,
-    required this.total,
-  });
+  const _EmptySearch({required this.onQueryTap});
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       children: [
@@ -213,10 +185,31 @@ class _EmptySearch extends StatelessWidget {
               .toList(),
         ),
         const SizedBox(height: 24),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+        const _IndexCard(),
+      ],
+    );
+  }
+}
+
+/// Coverage + controls for the on-device index: how many photos are searchable,
+/// and a button to build or refresh the index (with live progress and cancel).
+class _IndexCard extends ConsumerWidget {
+  const _IndexCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final total = ref.watch(photoLibraryProvider).length;
+    final indexing = ref.watch(indexingControllerProvider);
+    final controller = ref.read(indexingControllerProvider.notifier);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
                 Icon(Icons.photo_library_outlined, color: scheme.primary),
                 const SizedBox(width: 14),
@@ -224,27 +217,41 @@ class _EmptySearch extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('$total photos in library',
+                      Text('$total photos indexed',
                           style: const TextStyle(fontWeight: FontWeight.w700)),
                       Text(
-                        onLoadDevice != null
-                            ? 'Browsing a sample set. Add your real gallery to search it too.'
-                            : 'Running on the bundled sample set (web demo).',
-                        style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
+                        !indexingSupported
+                            ? 'Indexing needs a device gallery (not available on web).'
+                            : total == 0
+                                ? 'Index your gallery to search it — nothing leaves this device.'
+                                : 'Re-indexing only picks up new and changed photos.',
+                        style: TextStyle(
+                            color: scheme.onSurfaceVariant, fontSize: 13),
                       ),
                     ],
                   ),
                 ),
-                if (onLoadDevice != null)
-                  FilledButton.tonal(
-                    onPressed: onLoadDevice,
-                    child: const Text('Add mine'),
-                  ),
+                if (indexingSupported) ...[
+                  const SizedBox(width: 8),
+                  indexing.running
+                      ? OutlinedButton(
+                          onPressed: controller.cancel,
+                          child: const Text('Cancel'),
+                        )
+                      : FilledButton.tonal(
+                          onPressed: controller.start,
+                          child: Text(total == 0 ? 'Index' : 'Re-index'),
+                        ),
+                ],
               ],
             ),
-          ),
+            if (statusLine(indexing) != null) ...[
+              const SizedBox(height: 14),
+              IndexingStatus(state: indexing),
+            ],
+          ],
         ),
-      ],
+      ),
     );
   }
 }

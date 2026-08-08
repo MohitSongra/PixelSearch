@@ -165,6 +165,22 @@ real device — it cannot execute in this Linux/CI sandbox:
   backoff, survive restart/reboot, progress notifications, cancellation. The isolate entrypoint wires the
   device adapters and calls `IndexingService.run()`.
 
+## 7b. How a run is triggered (added 2026-08-08, ADR-015)
+Two entry points, one pipeline:
+- **Foreground (user-initiated).** `IndexingController` (`lib/state/providers.dart`) → `runDeviceIndexing`
+  (`lib/state/index_bridge.dart`, conditional import: native impl / web `unsupported` stub) →
+  `buildDeviceIndexingService` → `IndexingService.run()`. The bridge requests media permission first —
+  `PhotoManagerGallerySource` returns an *empty* gallery, not an error, when access was never granted — and
+  fails fast with `modelMissing` if the CLIP image encoder hasn't been provisioned (KI-8). Progress is
+  relayed from `IndexingService.progress`; cancellation crosses the boundary via `IndexCancelToken`.
+  On completion the controller refreshes the photo library and invalidates `indexWarmupProvider`, so the run's
+  embeddings become searchable in the same session.
+- **Background.** `indexCallbackDispatcher` → `runBackgroundIndex()` (`indexing_wiring.dart`), unchanged.
+
+Neither path applies any limit: `IndexingService` indexes everything `GallerySource.listAssets()` returns, and
+pagination is the adapter's concern (§7). The M1 demo loader that previously fed the UI — capped at 80 photos
+and synthesizing tags from EXIF — has been deleted.
+
 ## 8. Verification status
 Passing **in-sandbox** (real drift DB + fakes): reconcile (added/changed/deleted/stale/skip), full index,
 incremental, dedup/embed-once, deleted, changed, model-version migration, cancellation+resume, per-asset

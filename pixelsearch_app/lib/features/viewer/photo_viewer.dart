@@ -58,7 +58,7 @@ class _PhotoViewerScreenState extends ConsumerState<PhotoViewerScreen> {
     if (!mounted) return;
     setState(() {
       _captions[_current.id] =
-          '“${_current.caption}” — a bright, candid moment; likely ${_current.tags.take(3).join(', ')}.';
+          '“${_current.caption}” — a bright, candid moment; likely ${_current.displayTags.take(3).join(', ')}.';
     });
   }
 
@@ -136,7 +136,7 @@ class _DetailsPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(photo.title,
+            Text(photo.displayTitle,
                 style: Theme.of(context)
                     .textTheme
                     .titleLarge
@@ -160,7 +160,7 @@ class _DetailsPanel extends StatelessWidget {
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: photo.tags
+              children: photo.displayTags
                   .map((t) => Chip(
                         label: Text(t),
                         visualDensity: VisualDensity.compact,

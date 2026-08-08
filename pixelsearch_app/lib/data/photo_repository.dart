@@ -67,6 +67,7 @@ PhotoRowsCompanion photoToRow(Photo p) => PhotoRowsCompanion.insert(
       lng: Value(p.lng),
       place: Value(p.place),
       album: Value(p.album),
+      thumbPath: Value(p.thumbPath),
       createdAtMs: Value(DateTime.now().millisecondsSinceEpoch),
     );
 
@@ -83,7 +84,9 @@ Photo rowToPhoto(PhotoRow r) => Photo(
       album: r.album,
       source: PhotoSource
           .values[r.source.clamp(0, PhotoSource.values.length - 1)],
-      // M6 hybrid-ranking signals, written by the M5 indexer (read-only here).
+      // Written by the M5 indexer, read-only here: the cached thumbnail the grid
+      // renders, plus the M6 hybrid-ranking signals.
+      thumbPath: r.thumbPath,
       labels: _decodeLabels(r.labelsJson),
       faceCount: _decodeCount(r.facesJson),
     );

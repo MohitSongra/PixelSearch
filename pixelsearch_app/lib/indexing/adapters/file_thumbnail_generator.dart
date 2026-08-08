@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
@@ -15,11 +14,7 @@ class FileThumbnailGenerator implements ThumbnailGenerator {
   final int quality;
 
   @override
-  Future<String> generate(String assetId, Uint8List bytes) async {
-    final decoded = img.decodeImage(bytes);
-    if (decoded == null) {
-      throw const FormatException('cannot decode image for thumbnail');
-    }
+  Future<String> generate(String assetId, img.Image decoded) async {
     final landscape = decoded.width >= decoded.height;
     final thumb = img.copyResize(
       decoded,

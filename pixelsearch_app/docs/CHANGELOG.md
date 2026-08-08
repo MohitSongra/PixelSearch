@@ -3,6 +3,76 @@
 Format based on Keep a Changelog. Dates are ISO-8601.
 
 ## [Unreleased]
+### Performance — indexing throughput (measured on device, Realme RMX3092 / Android 12)
+First on-device profile of the M5 pipeline, per stage, over 40 assets at ~1200x1600:
+
+| stage | before | after |
+|---|---|---|
+| loadBytes | 75 ms | 75 ms |
+| exif | 1 ms | 1 ms |
+| JPEG decode | ~850 ms (**decoded twice**) | **465 ms (once)** |
+| thumbnail | 494 ms | **31 ms** |
+| embed (preprocess + ONNX) | 845 ms | **660 ms** |
+| ML Kit (labels + faces) | 493 ms | 462 ms |
+| **total** | **2325 ms/photo** | **1694 ms/photo** |
+
+**1.37x (23 → 35 photos/min).** Per-photo cost scales with resolution — the same build measures
+~1956 ms on 12 MP frames — so quote throughput with the resolution. Changes, all embedding-preserving:
+- **Decode once per photo.** `AssetProcessor` now decodes and hands the same `img.Image` to the thumbnail
+  and embed stages; `ThumbnailGenerator`/`AssetEmbedder` take a decoded image instead of bytes. Both stages
+  previously decoded the same JPEG independently. ML Kit still receives the original bytes.
+- **TD-9 paid down.** `preprocessForClip` reads the packed RGB buffer instead of calling `getPixel` for every
+  one of w×h pixels. Same uint8 samples, same Float64 accumulation, **fingerprint unchanged**
+  (`sum=100051.464714 a=0.623529 b=0.207843 c=0.956863`) — embeddings are bit-identical.
+- **ONNX intra-op threads** set to half the cores (clamped 1–4); the session was single-threaded on an
+  8-core device. Affects only summation order inside the graph.
+
+Deliberately **not** done, to protect quality: face detection still runs on every photo (it feeds M6
+people-query ranking), and full-resolution decode is retained rather than substituting a native downscaled
+thumbnail — that would change the pixels CLIP sees (TD-18, needs an `embedding_version` bump + re-index).
+### Fixed
+- **Every photo now gets tags.** ML Kit labelling used a hard 0.5 confidence floor, so photos where nothing
+  cleared it were stored with *no* labels — measured at **5 of 800 (0.62%)** on a real library, mostly
+  screenshots and documents, leaving them unsearchable by keyword. `selectLabels` keeps the ≥0.5 set exactly
+  as before and, only when that set is empty, falls back to the best 3 candidates. ML Kit is queried once at
+  the lower floor and the threshold is applied in Dart, so there is **no extra inference**. Confident photos
+  are bit-identically labelled. Re-measured on device: **0 of 512 newly-indexed photos unlabelled (0.00%)**,
+  with fallbacks like `["Paper","Screenshot","Poster"]`. 5 new unit tests.
+- **M5 indexing is now actually on the app's path — the two reported integration bugs.** The app was still
+  running the M1 demo loader (`lib/data/device_gallery*`), so the completed M5 pipeline was never invoked:
+  `buildDeviceIndexingService`/`IndexingService.run()` had no caller outside tests. Symptoms and causes:
+  **(1) only ~80 photos imported** — the demo loader hard-capped at `load({int limit = 80})` and issued a
+  single `getAssetListRange(0, 80)`; the real `PhotoManagerGallerySource` already paginates the whole
+  gallery (`getAssetListPaged`, 500/page) and `IndexingService` has no cap at all.
+  **(2) labels were `photo`/`portrait`/`landscape`/`<year>`** — those were synthesized by the demo loader's
+  `_deriveTags()` from EXIF dimensions and dates; ML Kit's real labels were being persisted to
+  `photo_rows.labelsJson` by `IndexStore` all along, but nothing read them back onto the display path.
+  **No file under `lib/indexing/**` or `lib/ai/**` changed** — the fix is wiring plus removal of the demo.
+  Regression cover: `test/indexing_integration_test.dart` (1500 assets → 1500 indexed; ML Kit labels
+  survive DB → `Photo.labels` and the synthetic tags are gone; thumbnail path reaches `Photo`).
+### Added
+- **Indexing on the UI path (M5 wiring).** `IndexingController` (`indexingControllerProvider`) runs one
+  incremental pass at a time with live `IndexProgress`, cancellation, and — on completion — a refresh of the
+  photo library and an invalidation of `indexWarmupProvider` so new embeddings become searchable in-session.
+  The native-only pipeline sits behind a conditional-import boundary (`lib/state/index_bridge*.dart` +
+  `IndexCancelToken`, ADR-015) that also requests media permission before scanning — `PhotoManagerGallerySource`
+  reports an *empty* gallery rather than an error when access was never granted, so an unprompted run would
+  have silently indexed zero photos. Web gets a `unsupported` stub, keeping the web build green.
+  UI: an index status card on the empty search screen and a Library section in Settings, both sharing
+  `IndexingStatus` (status line + determinate progress bar); onboarding's primary action is now
+  "Index my photos".
+### Changed
+- **`PhotoLibrary` is DB-backed.** It reads `PhotoRepository.loadPhotos()` (the M5 index) instead of seeding
+  from bundled samples, and is refreshed by `IndexingController`. `Photo` gained `thumbPath` (the indexed
+  thumbnail *file* — paths, never blobs) plus `displayTitle`/`displayTags` so indexed rows, which carry no
+  authored title or tags, render their ML Kit labels. `Photo.image` resolves the thumbnail file through a new
+  web-safe `fileImage()` boundary (`lib/core/platform_image*.dart`) and falls back to a transparent
+  placeholder instead of a bundled sample photo. Photo tiles prefer the top ML Kit label for their chip.
+### Removed
+- The M1 demo gallery loader — `lib/data/device_gallery.dart`, `device_gallery_io.dart`,
+  `device_gallery_stub.dart` — and the hardcoded `samplePhotos` list (`sample_data.dart` keeps only the
+  generic `suggestedQueries` search hints). Resolves TD-5.
+
 ### Added
 - **M6 Semantic Search — complete & real-ORT verified:** on-device CLIP semantic search wired end-to-end
   behind the `SearchBackend` seam. New `SemanticSearchBackend` (`lib/data/search/`) = `OnnxTextEmbedder`

@@ -1,19 +1,27 @@
 import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 
+import '../core/placeholder_image.dart';
+import '../core/platform_image.dart';
+
 /// Where a photo came from.
 enum PhotoSource { sample, device }
 
 /// A single photo in the library. Deliberately free of any platform-specific
-/// (photo_manager) types so this model compiles on web as well as mobile.
+/// (photo_manager, dart:io) types so this model compiles on web as well as
+/// mobile — file access goes through [fileImage].
 class Photo {
   final String id;
 
-  /// For bundled sample photos, e.g. 'assets/samples/beach_sunset.jpg'.
+  /// The asset's own name as reported by the gallery (or a bundled asset path).
   final String? assetName;
 
-  /// For real device photos: a decoded thumbnail (loaded on mobile only).
+  /// An already-decoded thumbnail held in memory, when a caller has one.
   final Uint8List? thumbBytes;
+
+  /// Path of the thumbnail file the M5 indexer generated, from `photo_rows.thumbPath`.
+  /// Thumbnails are files, never blobs — essential at 50k photos.
+  final String? thumbPath;
 
   final String title;
   final String caption;
@@ -26,9 +34,9 @@ class Photo {
   final PhotoSource source;
 
   /// On-device object labels from ML Kit image labeling (M5 indexing).
-  /// Empty for un-indexed photos (bundled samples, web). Read-only for search:
-  /// the indexer writes `labelsJson`; [PhotoRepository.rowToPhoto] surfaces it
-  /// here so M6 hybrid ranking can use it. See INDEXING_ARCHITECTURE.md.
+  /// Empty for un-indexed photos (web). Read-only for search: the indexer writes
+  /// `labelsJson`; [PhotoRepository.rowToPhoto] surfaces it here so M6 hybrid
+  /// ranking and the UI can use it. See INDEXING_ARCHITECTURE.md.
   final List<String> labels;
 
   /// Number of faces detected by ML Kit face detection (M5 indexing); 0 if none
@@ -39,6 +47,7 @@ class Photo {
     required this.id,
     this.assetName,
     this.thumbBytes,
+    this.thumbPath,
     required this.title,
     required this.caption,
     required this.tags,
@@ -54,13 +63,32 @@ class Photo {
 
   bool get hasLocation => lat != null && lng != null;
 
-  /// The image to display for this photo (memory thumbnail or bundled asset).
+  /// The image to display: in-memory thumbnail, then the indexed thumbnail file,
+  /// then a bundled asset. Falls back to a transparent placeholder so a photo
+  /// that has no usable image never throws mid-build.
   ImageProvider get image {
     if (thumbBytes != null) return MemoryImage(thumbBytes!);
-    if (assetName != null) return AssetImage(assetName!);
-    // Fallback: transparent 1x1 so the UI never crashes.
-    return const AssetImage('assets/samples/beach_sunset.jpg');
+    if (thumbPath != null) {
+      final file = fileImage(thumbPath!); // null on web
+      if (file != null) return file;
+    }
+    if (assetName != null && assetName!.startsWith('assets/')) {
+      return AssetImage(assetName!);
+    }
+    return placeholderImage;
   }
+
+  /// A name to show. Indexed photos carry no authored title, so fall back to the
+  /// gallery's own asset name.
+  String get displayTitle {
+    if (title.isNotEmpty) return title;
+    final name = assetName;
+    return (name == null || name.isEmpty) ? 'Photo' : name;
+  }
+
+  /// Descriptors to show in the UI: authored tags if present, otherwise the real
+  /// ML Kit labels written by the indexer.
+  List<String> get displayTags => tags.isNotEmpty ? tags : labels;
 
   /// Lower-cased text used by lexical/keyword scoring (title, caption, tags,
   /// ML Kit labels, place, album).

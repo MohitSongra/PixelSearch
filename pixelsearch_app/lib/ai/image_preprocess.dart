@@ -32,16 +32,19 @@ PreprocessedImage preprocessForClip(
   final w = rgb.width, h = rgb.height;
 
   // Extract channels as float (0..255).
+  //
+  // Read straight out of the packed RGB buffer rather than calling getPixel()
+  // per pixel: `getPixel` materialises a Pixel accessor for every one of the
+  // w*h coordinates, which at 1200x1600 measured ~445 ms per photo on device and
+  // dominated indexing throughput (TECHNICAL_DEBT TD-9). The values are the same
+  // uint8 channel samples widened to double, so the tensor is **bit-identical** —
+  // guarded by the preprocessing fingerprint in preprocessing_golden_test.dart.
   final r = Float64List(w * h), g = Float64List(w * h), b = Float64List(w * h);
-  var idx = 0;
-  for (var y = 0; y < h; y++) {
-    for (var x = 0; x < w; x++) {
-      final p = rgb.getPixel(x, y);
-      r[idx] = p.r.toDouble();
-      g[idx] = p.g.toDouble();
-      b[idx] = p.b.toDouble();
-      idx++;
-    }
+  final packed = rgb.getBytes(order: img.ChannelOrder.rgb);
+  for (var idx = 0, p = 0; idx < w * h; idx++, p += 3) {
+    r[idx] = packed[p].toDouble();
+    g[idx] = packed[p + 1].toDouble();
+    b[idx] = packed[p + 2].toDouble();
   }
 
   // 2. Resize shortest side to `size`, preserving aspect ratio. torchvision's

@@ -9,7 +9,10 @@ class PhotoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tag = photo.tags.isNotEmpty ? photo.tags.first : photo.album;
+    // Prefer the top ML Kit label — for an indexed photo that is the real
+    // on-device recognition result, not authored metadata.
+    final labels = photo.labels.isNotEmpty ? photo.labels : photo.tags;
+    final tag = labels.isNotEmpty ? labels.first : photo.album;
     return GestureDetector(
       onTap: onTap,
       child: Hero(

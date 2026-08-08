@@ -2,6 +2,37 @@
 
 Format: each record is a decision, its context, and its consequences. Newest first.
 
+## ADR-015 — Indexing reaches the UI through a conditional-import bridge; the library is DB-backed
+**Context:** M5 shipped a complete indexing engine that nothing called. The app still ran the M1 demo loader
+(in-memory, capped at 80 photos, tags synthesized from EXIF), which shadowed the real pipeline and produced
+both reported integration bugs. Wiring it up is not trivially "call `run()`": the composition root
+(`buildDeviceIndexingService`) pulls in photo_manager, ML Kit, ONNX and `dart:io`, and `providers.dart` is
+reachable from the web build.
+**Decision:**
+- Add a **conditional-import bridge**, `lib/state/index_bridge.dart` (+ `_io` / `_stub`), exactly mirroring
+  `semantic_wiring.dart` (ADR-014): native assembles and runs the unmodified pipeline; web returns
+  `IndexRunStatus.unsupported`. `providers.dart` never imports an indexing adapter, so the web build stays
+  green. The bridge is *wiring only* — it contains no indexing logic, and `lib/indexing/**` was not touched.
+- Cancellation crosses the boundary via a platform-free **`IndexCancelToken`**. The UI cannot hold an
+  `IndexingService` (native-only type), and the service does not exist until the ONNX encoder has loaded —
+  long enough for a user to press Cancel first — so the token records an early cancel and replays it on
+  `bind()`.
+- **Media permission is requested in the bridge**, before the scan. `PhotoManagerGallerySource` (correctly,
+  as a port implementation) reports an empty gallery rather than an error when access was never granted, so
+  an unprompted run would silently index zero photos. Permission is a platform concern of the composition
+  layer, not of the port — this keeps `GallerySource` free of a permission API.
+- **`PhotoLibrary` becomes a view of the store** (`PhotoRepository.loadPhotos()`), refreshed by
+  `IndexingController` when a run ends; the indexer is the only writer. On completion the controller also
+  invalidates `indexWarmupProvider`, so photos indexed this session become semantically searchable without a
+  restart.
+- `Photo` gains `thumbPath` and resolves it through a web-safe `fileImage()` boundary
+  (`lib/core/platform_image*.dart`), keeping the domain model free of `dart:io`.
+**Consequences:** one pipeline, one source of truth, and no cap anywhere on the path (`IndexingService`
+indexes whatever `listAssets()` returns — pagination lives in the adapter). The cost is a fourth
+conditional-import seam and a UI that must handle four non-running outcomes (unsupported, permission denied,
+model missing, finished-with-phase). Runtime behaviour of photo_manager/ML Kit is still device-only
+(TD-11); the wiring and persistence are covered by `test/indexing_integration_test.dart`.
+
 ## ADR-014 — Semantic search: async SearchBackend + hybrid re-ranking (M6)
 **Context:** M6 makes search real — query text must be CLIP-embedded (ONNX) and scored against stored image
 embeddings. Two frictions with the existing seam: (1) `SearchBackend.search` was **synchronous**, but text

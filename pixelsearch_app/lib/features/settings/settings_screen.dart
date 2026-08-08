@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../state/providers.dart';
+import '../../widgets/indexing_status.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -11,9 +12,8 @@ class SettingsScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final privacy = ref.watch(privacyModeProvider);
     final total = ref.watch(photoLibraryProvider).length;
-    final deviceLoaded = ref.watch(deviceLoadedProvider);
-    final deviceSupported =
-        ref.read(photoLibraryProvider.notifier).deviceSupported;
+    final indexing = ref.watch(indexingControllerProvider);
+    final controller = ref.read(indexingControllerProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -58,35 +58,44 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.photo_library_outlined),
             title: Text('$total photos indexed'),
-            subtitle: Text(deviceLoaded
-                ? 'Sample set + your device photos'
-                : 'Bundled sample set'),
+            subtitle: Text(total == 0
+                ? 'Nothing indexed yet'
+                : 'Searchable on this device'),
           ),
-          if (deviceSupported)
+          if (indexingSupported)
             ListTile(
-              leading: const Icon(Icons.add_photo_alternate_outlined),
-              title: const Text('Add my device photos'),
-              subtitle: const Text('Grant photo access and index them'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () async {
-                final messenger = ScaffoldMessenger.of(context);
-                final added = await ref
-                    .read(photoLibraryProvider.notifier)
-                    .loadDevicePhotos();
-                messenger.showSnackBar(SnackBar(
-                  content: Text(added > 0
-                      ? 'Added $added photos.'
-                      : 'No photos added (permission denied or none found).'),
-                ));
-              },
+              leading: Icon(indexing.running
+                  ? Icons.hourglass_top
+                  : Icons.refresh_outlined),
+              title: Text(indexing.running
+                  ? 'Indexing…'
+                  : total == 0
+                      ? 'Index my photos'
+                      : 'Re-index my photos'),
+              subtitle: const Text(
+                  'Labels and embeddings are computed on-device. Only new and '
+                  'changed photos are processed.'),
+              isThreeLine: true,
+              trailing: indexing.running
+                  ? TextButton(
+                      onPressed: controller.cancel,
+                      child: const Text('Cancel'),
+                    )
+                  : const Icon(Icons.chevron_right),
+              onTap: indexing.running ? null : controller.start,
+            ),
+          if (statusLine(indexing) != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: IndexingStatus(state: indexing),
             ),
           const Divider(),
           _header(context, 'About'),
           const ListTile(
             leading: Icon(Icons.info_outline),
-            title: Text('PixelSearch (demo build)'),
+            title: Text('PixelSearch'),
             subtitle: Text(
-                'Privacy-first semantic photo search.\nMilestones M0–M3 + mock search. CLIP indexing is next.'),
+                'Privacy-first semantic photo search.\nOn-device indexing (ML Kit + CLIP) and semantic search.'),
           ),
           const ListTile(
             leading: Icon(Icons.tag),
