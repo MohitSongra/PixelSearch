@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: pixelsearch-enhancements
+    runtime: python
+    plan: free
+    rootDir: enhancement_backend
+    buildCommand: pip install -r requirements.txt -c requirements.lock
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT --no-access-log
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.9
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PIXELSEARCH_TOKEN_HASHES
+        sync: false
+      - key: GROQ_ZDR_CONFIRMED
+        value: "false"
