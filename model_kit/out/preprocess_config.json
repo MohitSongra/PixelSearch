@@ -3,7 +3,7 @@
   "pretrained": "datacompdr",
   "model_version": "1.0",
   "embedding_version": "1",
-  "artifact_version": "2",
+  "artifact_version": "3",
   "embed_dim": 512,
   "image_size": 256,
   "resize_mode": "shortest",
@@ -11,8 +11,16 @@
   "interpolation": "bilinear",
   "antialias": true,
   "pixel_scale": "0..1",
-  "mean": [0, 0, 0],
-  "std": [1, 1, 1],
+  "mean": [
+    0,
+    0,
+    0
+  ],
+  "std": [
+    1,
+    1,
+    1
+  ],
   "channel_order": "RGB",
   "layout": "CHW",
   "context_length": 77,

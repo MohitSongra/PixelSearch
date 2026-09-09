@@ -63,6 +63,24 @@ class Photo {
 
   bool get hasLocation => lat != null && lng != null;
 
+  Photo withLabels(List<String> correctedLabels) => Photo(
+    id: id,
+    assetName: assetName,
+    thumbBytes: thumbBytes,
+    thumbPath: thumbPath,
+    title: title,
+    caption: caption,
+    tags: tags,
+    date: date,
+    lat: lat,
+    lng: lng,
+    place: place,
+    album: album,
+    source: source,
+    labels: correctedLabels,
+    faceCount: faceCount,
+  );
+
   /// The image to display: in-memory thumbnail, then the indexed thumbnail file,
   /// then a bundled asset. Falls back to a transparent placeholder so a photo
   /// that has no usable image never throws mid-build.
@@ -90,10 +108,19 @@ class Photo {
   /// ML Kit labels written by the indexer.
   List<String> get displayTags => tags.isNotEmpty ? tags : labels;
 
-  /// Lower-cased text used by lexical/keyword scoring (title, caption, tags,
+  /// Lower-cased text used by semantic-hybrid lexical scoring, where ML Kit
+  /// labels are intentionally excluded.
+  String get metadataSearchBlob =>
+      [title, caption, ...tags, place ?? '', album].join(' ').toLowerCase();
+
+  /// Lower-cased text used by keyword-only scoring (title, caption, tags,
   /// ML Kit labels, place, album).
-  String get searchBlob =>
-      [title, caption, ...tags, ...labels, place ?? '', album]
-          .join(' ')
-          .toLowerCase();
+  String get searchBlob => [
+    title,
+    caption,
+    ...tags,
+    ...labels,
+    place ?? '',
+    album,
+  ].join(' ').toLowerCase();
 }

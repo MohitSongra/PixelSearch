@@ -3,7 +3,7 @@ import 'query_terms.dart';
 
 /// One search candidate handed to the [HybridScorer]: a photo plus its raw
 /// signals for the current query. [cosine] is the CLIP text↔image similarity
-/// (null when the photo has no stored embedding — e.g. not yet indexed, or web);
+/// (also null when top-K selection or the gate excluded its stored embedding);
 /// [lexicalRaw] is the [keywordScore] over tags/labels/caption/place/album.
 class ScoredCandidate {
   const ScoredCandidate({
@@ -66,8 +66,8 @@ class HybridWeights {
 /// * **Semantic** — the CLIP cosine is mapped to `[0,1]` against a *fixed*
 ///   reference band `[kSemanticFloor, kSemanticCeil]` (absolute strength, so a
 ///   genuinely strong match scores high even when it is the only candidate).
-/// * **Lexical** — the keyword score is **min-max** normalized across the
-///   candidate set (counts have no natural ceiling, so relative is fairer).
+/// * **Lexical** — the keyword score is divided by the maximum candidate score
+///   (zero-anchored max scaling, not observed min-max normalization).
 /// * **Face intent** — only when the query asks for people/portraits, scaled by
 ///   the detected face count (saturating at [kFaceSaturation]).
 ///
@@ -78,9 +78,9 @@ class HybridScorer {
 
   final HybridWeights weights;
 
-  /// Reference band for turning a CLIP cosine into a `[0,1]` strength. MobileCLIP
-  /// text↔image cosines for relevant pairs typically land well inside `[0,0.35]`;
-  /// values are clamped, so the exact ceiling only affects scaling, not order.
+  /// Reference band for turning a CLIP cosine into a `[0,1]` strength.
+  /// Clamping at the ceiling collapses higher cosines to ties. Neither this band
+  /// nor its interaction with lexical/face boosts is calibrated on scene queries.
   static const double kSemanticFloor = 0.0;
   static const double kSemanticCeil = 0.35;
 
@@ -89,24 +89,40 @@ class HybridScorer {
 
   /// Query tokens that express "I'm looking for people".
   static const Set<String> _faceIntentTerms = {
-    'people', 'person', 'portrait', 'selfie', 'selfies', 'group', 'face',
-    'faces', 'crowd', 'family', 'friends', 'wedding', 'team', 'us', 'everyone',
+    'people',
+    'person',
+    'portrait',
+    'selfie',
+    'selfies',
+    'group',
+    'face',
+    'faces',
+    'crowd',
+    'family',
+    'friends',
+    'wedding',
+    'team',
+    'us',
+    'everyone',
   };
 
   /// Rank [candidates] for [query], returning photos best-first. Candidates with
   /// no signal at all (no semantic strength, no lexical hit, no face boost) are
-  /// dropped, so a non-empty query never returns irrelevant photos.
+  /// dropped. A nonzero signal is not proof of relevance.
   List<Photo> rank(String query, List<ScoredCandidate> candidates) =>
       rankDetailed(query, candidates).map((r) => r.photo).toList();
 
   /// As [rank], but keeps the score breakdown for each surviving candidate.
-  List<RankedPhoto> rankDetailed(String query, List<ScoredCandidate> candidates) {
+  List<RankedPhoto> rankDetailed(
+    String query,
+    List<ScoredCandidate> candidates,
+  ) {
     if (candidates.isEmpty) return const [];
 
     final terms = queryTerms(query);
     final wantsFaces = terms.any(_faceIntentTerms.contains);
 
-    // Lexical min-max reference (relative normalization).
+    // Lexical maximum reference (zero-anchored relative normalization).
     var maxLex = 0.0;
     for (final c in candidates) {
       if (c.lexicalRaw > maxLex) maxLex = c.lexicalRaw;
@@ -115,23 +131,28 @@ class HybridScorer {
     final ranked = <RankedPhoto>[];
     for (final c in candidates) {
       final semantic = c.cosine == null ? 0.0 : _semanticStrength(c.cosine!);
-      final lexical = maxLex == 0.0 ? 0.0 : (c.lexicalRaw / maxLex).clamp(0.0, 1.0);
+      final lexical = maxLex == 0.0
+          ? 0.0
+          : (c.lexicalRaw / maxLex).clamp(0.0, 1.0);
       final face = (wantsFaces && c.photo.faceCount > 0)
           ? (c.photo.faceCount.clamp(0, kFaceSaturation) / kFaceSaturation)
           : 0.0;
 
-      final score = weights.semantic * semantic +
+      final score =
+          weights.semantic * semantic +
           weights.lexical * lexical +
           weights.face * face;
 
       if (score <= 0.0) continue; // no signal → not a result
-      ranked.add(RankedPhoto(
-        photo: c.photo,
-        score: score,
-        semantic: semantic,
-        lexical: lexical,
-        face: face,
-      ));
+      ranked.add(
+        RankedPhoto(
+          photo: c.photo,
+          score: score,
+          semantic: semantic,
+          lexical: lexical,
+          face: face,
+        ),
+      );
     }
 
     ranked.sort((a, b) {

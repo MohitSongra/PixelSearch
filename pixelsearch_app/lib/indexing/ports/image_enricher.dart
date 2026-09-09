@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-/// A detected face region (normalized 0..1 coordinates).
+/// A detected face region in source-image pixel coordinates.
 class FaceBox {
   const FaceBox(this.x, this.y, this.w, this.h);
   final double x, y, w, h;

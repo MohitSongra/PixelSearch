@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "dataset_id": "vivo-scene-queries-v1",
+  "queries": [
+    {"id":"object_dog","category":"object","query":"a dog","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"object_car","category":"object","query":"a car","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"object_cat","category":"object","query":"a cat","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"object_flower","category":"object","query":"a flower","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"context_dog","category":"object_context","query":"a dog on a beach","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"context_car","category":"object_context","query":"a car on a road","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"context_person","category":"object_context","query":"a person in a garden","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"context_cat","category":"object_context","query":"a cat on a sofa","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"action_dog","category":"action","query":"a dog running","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"action_bicycle","category":"action","query":"a person riding a bicycle","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"action_people","category":"action","query":"people sitting together","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"action_cooking","category":"action","query":"a person cooking food","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"composition_beach","category":"composition","query":"a dog running on a beach at sunset","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"composition_people","category":"composition","query":"two people sitting together indoors","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"composition_child","category":"composition","query":"a child playing with a dog in a garden","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"composition_dinner","category":"composition","query":"friends having dinner at a restaurant at night","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"relation_car","category":"relationship","query":"a person standing beside a red car","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"relation_people","category":"relationship","query":"two people sitting next to each other","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"relation_child","category":"relationship","query":"a child holding a dog","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"relation_table","category":"relationship","query":"people sitting around a table","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"natural_beach","category":"natural_language","query":"photos from a day at the beach with friends","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"natural_indoor","category":"natural_language","query":"people relaxing together indoors","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"natural_dinner","category":"natural_language","query":"friends having dinner at night","relevant":[],"partially_relevant":[],"irrelevant":[]},
+    {"id":"natural_group","category":"natural_language","query":"a group of people sitting together indoors","relevant":[],"partially_relevant":[],"irrelevant":[]}
+  ]
+}

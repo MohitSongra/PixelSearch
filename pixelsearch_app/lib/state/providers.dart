@@ -6,11 +6,14 @@ import '../ai/ai_logger.dart';
 import '../core/ai_contract.dart';
 import '../data/local/app_database.dart';
 import '../data/photo_repository.dart';
+import '../data/user_preferences.dart';
+import '../data/indexing_preferences_repository.dart';
 import '../data/search/brute_force_vector_index.dart';
 import '../data/search/keyword_search_backend.dart';
 import '../domain/search/search_backend.dart';
 import '../domain/search/vector_index.dart';
 import '../indexing/model/index_progress.dart';
+import '../indexing/model/folder_selection.dart';
 import '../models/photo.dart';
 import 'index_bridge.dart';
 import 'index_cancel_token.dart';
@@ -24,6 +27,17 @@ final privacyModeProvider = StateProvider<bool>((ref) => true);
 
 /// The current search text.
 final searchQueryProvider = StateProvider<String>((ref) => '');
+
+final userPreferencesProvider = Provider<UserPreferences>(
+  (ref) => UserPreferences(),
+);
+
+final skipOnboardingProvider = FutureProvider<bool>((ref) async {
+  final preferences = ref.watch(userPreferencesProvider);
+  return preferences.shouldSkipOnboarding(
+    () async => kIsWeb ? 0 : ref.read(photoRepositoryProvider).photoCount(),
+  );
+});
 
 /// Whether this platform can index a device gallery at all. Web has no gallery,
 /// no ML Kit and no local database, so its UI hides the indexing controls.
@@ -47,15 +61,20 @@ class PhotoLibrary extends StateNotifier<List<Photo>> {
     if (!indexingSupported) return;
     try {
       final photos = await _ref.read(photoRepositoryProvider).loadPhotos();
-      if (mounted) state = photos;
+      final preferences = _ref.read(userPreferencesProvider);
+      await preferences.load();
+      if (mounted) {
+        state = photos.map(preferences.applyLabelCorrection).toList();
+      }
     } catch (_) {
       // No store on this platform / not opened yet → stay empty.
     }
   }
 }
 
-final photoLibraryProvider =
-    StateNotifierProvider<PhotoLibrary, List<Photo>>((ref) => PhotoLibrary(ref));
+final photoLibraryProvider = StateNotifierProvider<PhotoLibrary, List<Photo>>(
+  (ref) => PhotoLibrary(ref),
+);
 
 // --- M5: indexing on the UI path ------------------------------------------
 // The pipeline itself is untouched; what follows only *drives* it: start, stream
@@ -81,12 +100,11 @@ class IndexingUiState {
     IndexProgress? progress,
     bool? running,
     String? message,
-  }) =>
-      IndexingUiState(
-        progress: progress ?? this.progress,
-        running: running ?? this.running,
-        message: message ?? this.message,
-      );
+  }) => IndexingUiState(
+    progress: progress ?? this.progress,
+    running: running ?? this.running,
+    message: message ?? this.message,
+  );
 }
 
 /// Drives one indexing run at a time and republishes its results.
@@ -104,7 +122,7 @@ class IndexingController extends StateNotifier<IndexingUiState> {
   /// Runs a full incremental pass: new and changed photos are indexed, deleted
   /// ones are dropped. Safe to call repeatedly — a second call while a run is in
   /// flight is ignored.
-  Future<void> start() async {
+  Future<void> start({required FolderSelection selection}) async {
     if (state.running) return;
     final token = _token = IndexCancelToken();
     state = const IndexingUiState(
@@ -115,6 +133,7 @@ class IndexingController extends StateNotifier<IndexingUiState> {
       final result = await runDeviceIndexing(
         db: _ref.read(appDatabaseProvider),
         cancel: token,
+        selection: selection,
         onProgress: (p) {
           if (mounted) state = state.copyWith(progress: p);
         },
@@ -158,12 +177,15 @@ class IndexingController extends StateNotifier<IndexingUiState> {
     final thumbed = photos.where((p) => p.thumbPath != null).length;
     final located = photos.where((p) => p.hasLocation).length;
     const AiLog('Indexing').info(
-        'store now holds ${photos.length} photos: $labelled with ML Kit labels, '
-        '$thumbed with thumbnails, $located with GPS');
+      'store now holds ${photos.length} photos: $labelled with ML Kit labels, '
+      '$thumbed with thumbnails, $located with GPS',
+    );
   }
 
   String _describe(IndexRunResult result) {
     switch (result.status) {
+      case IndexRunStatus.noFoldersSelected:
+        return 'No folders selected.';
       case IndexRunStatus.unsupported:
         return 'Indexing needs a device gallery — not available on web.';
       case IndexRunStatus.permissionDenied:
@@ -194,7 +216,16 @@ class IndexingController extends StateNotifier<IndexingUiState> {
 
 final indexingControllerProvider =
     StateNotifierProvider<IndexingController, IndexingUiState>(
-        (ref) => IndexingController(ref));
+      (ref) => IndexingController(ref),
+    );
+
+final indexingPreferencesProvider = Provider<IndexingPreferencesRepository>(
+  (ref) => IndexingPreferencesRepository(ref.watch(appDatabaseProvider)),
+);
+
+final indexFoldersProvider = FutureProvider.autoDispose<FolderCatalog>(
+  (ref) => loadIndexFolders(),
+);
 
 // --- M6: semantic search wiring ------------------------------------------
 // The pieces below assemble the real search path behind the same
@@ -232,7 +263,7 @@ final indexWarmupProvider = FutureProvider<int>((ref) async {
 final searchBackendProvider = FutureProvider<SearchBackend>((ref) async {
   final index = ref.watch(vectorIndexProvider);
   if (!kIsWeb) {
-    ref.watch(indexWarmupProvider); // trigger DB→index population (non-blocking)
+    await ref.watch(indexWarmupProvider.future);
   }
   final semantic = await buildSemanticBackend(index); // null on web / not ready
   return semantic ?? const KeywordSearchBackend();
@@ -251,8 +282,9 @@ final debouncedQueryProvider = FutureProvider.autoDispose<String>((ref) async {
 /// Ranked results for the current (debounced) query over the library. Async
 /// because semantic ranking runs the text encoder; the UI renders its
 /// [AsyncValue] (spinner while embedding, previous results kept).
-final searchResultsProvider =
-    FutureProvider.autoDispose<List<Photo>>((ref) async {
+final searchResultsProvider = FutureProvider.autoDispose<List<Photo>>((
+  ref,
+) async {
   final corpus = ref.watch(photoLibraryProvider);
   final backend = await ref.watch(searchBackendProvider.future);
   final query = await ref.watch(debouncedQueryProvider.future);

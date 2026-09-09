@@ -10,8 +10,7 @@ torch==2.13.0
 torchvision==0.28.0
 open_clip_torch==3.3.0
 onnx==1.22.0
-onnxruntime==1.25.0
-onnxconverter-common==1.16.0
+onnxruntime==1.28.0
 numpy==2.4.4
 pillow==12.2.0
 scikit-image==0.26.0

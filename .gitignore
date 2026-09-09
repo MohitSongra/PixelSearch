@@ -41,3 +41,7 @@ venv/
 
 # ---- Secrets / local ----
 .env
+
+# Private device search traces: filenames, labels and relevance judgments.
+pixelsearch_app/local_evaluation/
+pixelsearch_app/docs/RAW_SEMANTIC_DIAGNOSIS.md

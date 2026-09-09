@@ -7,6 +7,7 @@ import 'package:pixelsearch/data/photo_repository.dart';
 import 'package:pixelsearch/indexing/asset_processor.dart';
 import 'package:pixelsearch/indexing/index_store.dart';
 import 'package:pixelsearch/indexing/indexing_service.dart';
+import 'package:pixelsearch/indexing/model/index_config.dart';
 import 'package:pixelsearch/indexing/model/index_progress.dart';
 import 'package:pixelsearch/indexing/model_version_manager.dart';
 import 'package:pixelsearch/indexing/ports/image_enricher.dart';
@@ -34,10 +35,7 @@ void main() {
   setUp(() => db = AppDatabase(NativeDatabase.memory()));
   tearDown(() async => db.close());
 
-  IndexingService service(
-    FakeGallery gallery, {
-    ImageEnricher? enricher,
-  }) {
+  IndexingService service(FakeGallery gallery, {ImageEnricher? enricher}) {
     final processor = AssetProcessor(
       gallery: gallery,
       metadata: FakeMetadata(),
@@ -50,6 +48,7 @@ void main() {
       processor: processor,
       store: IndexStore(db),
       versionManager: const ModelVersionManager(),
+      config: const IndexConfig(profileEvery: 0),
       nowMs: () => 111,
     );
   }
@@ -70,8 +69,10 @@ void main() {
 
   test('real labels survive the store and reach Photo.labels', () async {
     final gallery = FakeGallery([asset('dog1')]);
-    await service(gallery, enricher: LabellingEnricher(['Dog', 'Pet', 'Animal']))
-        .run();
+    await service(
+      gallery,
+      enricher: LabellingEnricher(['Dog', 'Pet', 'Animal']),
+    ).run();
 
     final photos = await PhotoRepository(db).loadPhotos();
     expect(photos, hasLength(1));
@@ -85,8 +86,11 @@ void main() {
     // …and none of the demo loader's synthesized tags come back.
     expect(photo.tags, isEmpty);
     for (final synthetic in ['photo', 'portrait', 'landscape', 'travel']) {
-      expect(photo.searchBlob, isNot(contains(synthetic)),
-          reason: '"$synthetic" was a demo-loader tag, not an ML Kit label');
+      expect(
+        photo.searchBlob,
+        isNot(contains(synthetic)),
+        reason: '"$synthetic" was a demo-loader tag, not an ML Kit label',
+      );
     }
   });
 

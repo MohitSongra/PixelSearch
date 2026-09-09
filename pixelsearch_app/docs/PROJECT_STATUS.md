@@ -1,18 +1,34 @@
 # PROJECT_STATUS
 
-**As of:** 2026-08-08 · **Phase:** M5 indexing **wired to the app** (ADR-015) on top of a complete & verified M6. The M1 demo gallery loader is deleted; the library is now the on-device index. Next: M12 (model manager — indexing needs the provisioned encoder, KI-8) or M9 (filters). · **Build:** analyzer 0 issues, **49 unit tests** + golden + 2 parity + **M6 semantic** + benchmark suites green, web + **Android debug APK** build OK.
+**Latest retrieval follow-up (2026-09-08):** unlabelled raw-versus-final diagnostics and a 24-query
+evaluation harness are implemented; analyzer is clean and 93 host tests pass. No default model/ranking
+policy changed and no semantic-quality improvement is claimed. See [retrieval diagnosis](SEARCH_QUALITY_DIAGNOSIS_2026-09-08.md).
+**Current-device correction:** a test-runner cleanup uninstalled the app and removed its 144-photo private
+index. App and identical FP32 models were restored, but those embeddings were not recovered. The user
+will choose folders to re-index. Counts below are historical, not claims about the restored installation.
+Use in-app diagnostics or the backup-first wrapper, not bare Flutter device tests.
+
+**Latest feature follow-up (2026-09-08):** folder selection is implemented and verified on the Vivo.
+All 76 tests pass; analyzer is clean; updated debug APK builds and is installed. A 6-photo selection
+skipped 2 existing photos and indexed only 4 new ones. Restart restored the choice; deselecting Canva
+and rerunning preserved all 144 saved photos and embedding bytes. Schema v4 stores folder preferences;
+AI/model/ranking contracts are unchanged. See [folder-indexing evidence](FOLDER_INDEXING.md).
+The earlier smoke-test counts below describe the preceding provisioning run.
+
+**As of:** 2026-09-08 · **Phase:** Android integration testing. A physical Vivo I2214 smoke test provisioned both FP32 encoders, discovered all **19,260** MediaStore images, and saved **140** indexed photos with labels and thumbnails across two intentionally cancelled runs. Cold restart/resume skipped all 103 previously saved photos and added 37; a semantic sentence query then displayed 118 results and the viewer displayed ML Kit labels. See [the device report](ANDROID_SMOKE_TEST_2026-09-08.md). **Earlier host evidence:** analyzer 0 issues, **58 unit tests** pass, and the debug APK builds; these were not rerun for the documentation-only device follow-up. Full-library completion, retrieval-quality evaluation, and FP16 acceptance remain open. The phone reconnected successfully after a brief USB disconnection.
 
 **Architectural improvements landed (2026-08-06):** interface versioning + migration policy (schema v2);
 `VectorIndex` search seam (brute-force now, ANN-swappable); benchmark + eval framework. All verified, no fabricated results.
 
 ## One-line status
-The app now runs **real on-device semantic search over a real on-device index**: the M5 pipeline is invoked
-from the UI (`IndexingController` → `index_bridge` → `IndexingService`), persists ML Kit labels + CLIP
-embeddings + thumbnail paths, and the photo library reads straight from that store — no demo data, no import
-cap anywhere on the path. Search ranks by embedding cosine + hybrid signals with a keyword fallback, verified
-in-sandbox on a real ONNX Runtime (6/6). Runtime provisioning of the fp16 image encoder is the remaining
-blocker for indexing on a device (KI-8, M12); photo_manager/ML Kit runtime behaviour is still device-verified
-only (TD-11).
+The production code path is wired from the UI (`IndexingController` → `index_bridge` → `IndexingService`),
+persists ML Kit labels + CLIP embeddings + thumbnail paths, and reads the photo library from that store. The
+former 80-photo demo limit and its synthetic tags are not on that path. Search uses CLIP cosine plus hybrid
+signals with a keyword fallback. The FP32 Android smoke test now confirms model loading and inference,
+full gallery enumeration, sample indexing, ML Kit persistence/display, cancellation, cold restart/resume,
+and displayed semantic results.
+It does not establish full-library completion, sustained performance, numerical parity on Android, or
+background execution. The current session implementation uses CPU execution; NNAPI/XNNPACK is not enabled.
 
 ## Milestone ledger
 | ID | Milestone | Status | Evidence |
@@ -24,8 +40,8 @@ only (TD-11).
 | — | ModelKit spike: export + verify MobileCLIP | ✅ done | `PixelSearch_ModelKit/SPIKE_REPORT.md` (6/6, cos 1.0) |
 | M2 | SQLite/drift store for photos + embeddings | ✅ done | `lib/data/local/*`, `photo_repository.dart`; 5 DB tests; native + web-stub connection |
 | **M4** | **Flutter ONNX (preflight -> ImageEmbedder -> parity gate)** | ✅ done | M4.2–M4.6 COMPLETE (parity, golden 100%, benchmarks, review APPROVED) |
-| **M5** | **Production indexing engine (reconcile, batch, resume, incremental, versioned)** | ✅ core (16 tests) + 6 adapters + **now wired to the UI** (19 tests); on-device runtime pending | ports+adapters; ADR-013, **ADR-015**; `INDEXING_ARCHITECTURE.md`; `test/indexing_integration_test.dart` |
-| **M6** | **Semantic search: real CLIP text→image cosine + hybrid re-rank, replacing the mock** | ✅ done | `SemanticSearchBackend`, `HybridScorer`; 14 unit tests + real-ORT **6/6**; ADR-014 |
+| **M5** | **Production indexing engine (reconcile, batch, resume, incremental, versioned)** | ✅ core + adapters + UI path; **physical Android acceptance pending** | source + **58 current unit tests**; ADR-013, ADR-015; `INDEXING_ARCHITECTURE.md`; `test/indexing_integration_test.dart` |
+| **M6** | **Semantic search: real CLIP text→image cosine + hybrid re-rank, replacing the mock** | ✅ implementation; host real-ORT evidence recorded; supported-runner rerun + device acceptance pending | `SemanticSearchBackend`, `HybridScorer`; ADR-014; `ModelKitPaths` resolves fixtures portably |
 | M9 | Filters (date/place/album) over the store | ⏳ pending | |
 | M10 | Timeline backed by the DB | ⏳ pending | |
 | M11 | Real map tiles (flutter_map + OSM) | ⏳ pending | |
@@ -46,7 +62,8 @@ Delivered: `AppDatabase` (3 tables), conditional connection (native + web stub),
 bit-faithful preprocessing. A **real Flutter ONNX Runtime** integration test (run on Linux desktop
 via xvfb) reproduces the open_clip/fp32-ONNX reference at **cosine 1.000000** on all 6 probe images
 (max-abs-err ≤ 1.3e-4), retrieval ranking 6/6 — all four acceptance criteria met. The gate uses the
-fp32 model (the CPU EP cannot run fp16; fp16 is the on-device artifact).
+fp32 model. The historical CPU/fp16 limitation is not a universal provider claim:
+the current Android app also uses FP32 on CPU; FP16 device execution remains unaccepted (KI-2/KI-9).
 
 ## M4.3 outcome (done) — TextEmbedder + text parity GATE PASSED
 CLIP BPE tokenizer in Dart (token ids match open_clip on 19 cases) + `OnnxTextEmbedder` on a shared
@@ -81,7 +98,9 @@ All six adapters + WorkManager isolate entrypoint + DI wiring are in `lib/indexi
 clean (web + linux builds unaffected): `PhotoManagerGallerySource`, `ExifMetadataExtractor`,
 `FileThumbnailGenerator`, `MlKitImageEnricher`, `WorkManagerScheduler`, `OnnxAssetEmbedder`, plus
 `buildDeviceIndexingService` + `indexCallbackDispatcher`. Only their **runtime** (Android + plugin native
-side: reboot/backoff, ML Kit inference, MediaStore scale, latency/memory) is exercised on a device.
+side: reboot/backoff, ML Kit inference, MediaStore scale, latency/memory) is exercised on a device. The app
+now registers the Android WorkManager callback at startup through a conditional import, but it does not yet
+schedule background work from the UI; that does not resolve the screen-off issue on its own.
 
 ## M6 outcome (done) — Semantic search, real-ORT verified
 Query → `OnnxTextEmbedder` (CLIP text) → cosine over stored image embeddings (`VectorIndex`, brute-force
@@ -97,10 +116,14 @@ distractor 0.146; end-to-end **35 ms/query**; brute-force scan+rank **3.4 ms @1k
 Plus **14 new unit tests** (`hybrid_scorer_test.dart`, `semantic_search_backend_test.dart`) covering fusion,
 normalization, face-intent, min-cosine gating, browse, and keyword degradation. No fabricated results.
 
-## Next milestone — M9 (Filters over the store)
-Date / place / album / people facets layered on top of M6 results (and browse), sourced from the DB and the
-M5 indexing metadata. Then M10 (timeline-from-DB), M11 (real map). See `ROADMAP.md`.
+## Immediate priority — device and model acceptance
+Cold restart and incremental resume passed on the Vivo using the installed FP32 models.
+Continue `DEVICE_TEST_CHECKLIST.md`: record sustained responsiveness/memory, full completion,
+new/deleted-photo reconciliation, screen-off behavior, and query-quality evidence.
+For FP16, first validate an explicitly configured compatible execution provider, then run the v3
+load/inference/parity gate before mixing its embeddings into the existing FP32 index.
 
 ## Risks currently tracked
-See `KNOWN_ISSUES.md`. No blocking risks open. M6 precision threshold is a measured, recall-favoring default;
-principled tuning on a larger labeled set is deferred to M14 eval (tracked, not fabricated).
+See `KNOWN_ISSUES.md`. Blocking device risks remain: FP16 Android acceptance (KI-9), missing model
+provisioning (KI-8), and OEM screen-off suspension (KI-10). M6 precision threshold is a small-sample,
+recall-favoring default; principled tuning on a larger labeled set is deferred to M14 evaluation.

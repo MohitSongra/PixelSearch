@@ -9,18 +9,26 @@ export '../domain/search/query_terms.dart' show queryTerms;
 /// [KeywordSearchBackend] (the fallback) and the M6 [HybridScorer] (the lexical
 /// component of the hybrid blend). Higher is better; 0 means "no lexical match".
 ///
+/// Keyword-only fallback keeps ML Kit labels by default. Semantic-hybrid
+/// ranking passes [includeLabels] as false because labels are enrichment, not
+/// evidence strong enough to override image/text similarity.
+///
 /// Signal priority per term: an exact tag hit (3) beats a partial tag hit or an
 /// exact ML Kit label hit (2), which beats a substring hit anywhere in the
 /// caption/place/album/label blob (1).
-double keywordScore(Photo p, List<String> terms) {
+double keywordScore(
+  Photo p,
+  List<String> terms, {
+  bool includeLabels = true,
+}) {
   var score = 0.0;
-  final blob = p.searchBlob; // includes tags + ML Kit labels + caption/place/album
+  final blob = includeLabels ? p.searchBlob : p.metadataSearchBlob;
   for (final t in terms) {
     if (p.tags.contains(t)) {
       score += 3; // exact tag hit
     } else if (p.tags.any((tag) => tag.contains(t))) {
       score += 2; // partial tag hit
-    } else if (p.labels.contains(t)) {
+    } else if (includeLabels && p.labels.contains(t)) {
       score += 2; // exact ML Kit object-label hit
     } else if (blob.contains(t)) {
       score += 1; // caption/place/album/label substring hit

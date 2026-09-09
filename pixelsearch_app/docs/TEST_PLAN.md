@@ -2,6 +2,15 @@
 
 Testing scales with the milestone. Principle: every milestone lands with the tests that prove it.
 
+## Folder Selection (2026-09-08)
+
+`photo_manager_gallery_test.dart`, `folder_indexing_test.dart`,
+`indexing_preferences_test.dart`, and `folder_picker_test.dart` add 18 tests.
+They cover multi-page scoped discovery, deduplication, image-only permissions,
+limited/denied access, missing/empty selections, retained search rows, true deletions,
+incremental reselection, saved choices, cancellation, schema migration, and compact layout.
+Physical-device evidence is recorded in `FOLDER_INDEXING.md`.
+
 ## Layers
 - **Unit** — pure logic and data. DB round-trip & migrations (M2), embedding-blob codec (M2),
   BPE tokenizer parity (M6), cosine ranking (M7), Photo⇆row mapper (M2).
@@ -45,6 +54,12 @@ Testing scales with the milestone. Principle: every milestone lands with the tes
 - **Benchmark suite:** `integration_test/benchmark_test.dart` — model load, embed latency, throughput
   on real Flutter ORT (build host); auto-writes `BENCHMARK_REPORT.md` (BENCHMARK_RESULTS §8).
 - **On-device fp16 golden** (device): the fp16 artifacts on NNAPI/XNNPACK (the CPU EP cannot execute fp16).
+
+### Real-ORT fixture resolution
+The host integration tests resolve the sibling `model_kit` directory by default. Set
+`PIXELSEARCH_MODELKIT` to an alternate ModelKit root. They still require a supported Flutter runner:
+Linux desktop or a connected Android device for this Android-first project; this checkout does not include a
+Windows desktop target.
 
 ## M5 indexing tests (core — real drift DB + fakes, in-sandbox)
 - `test/index_planner_test.dart` (7) — reconcile: added / changed / deleted / stale-version / no-embedding /

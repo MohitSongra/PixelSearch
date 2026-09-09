@@ -43,9 +43,13 @@ class AssetProcessor {
   // --- stage profile (instrumentation only; no effect on behaviour) ---------
   // Cumulative wall-clock per stage, logged every [_profileEvery] assets so a
   // device run reports where its time actually goes instead of being guessed at.
-  static const int _profileEvery = 20;
   int _n = 0;
-  int _msLoad = 0, _msMeta = 0, _msDecode = 0, _msThumb = 0, _msEmbed = 0, _msEnrich = 0;
+  int _msLoad = 0,
+      _msMeta = 0,
+      _msDecode = 0,
+      _msThumb = 0,
+      _msEmbed = 0,
+      _msEnrich = 0;
 
   Future<IndexedItem> process(AssetRef asset, IndexConfig config) async {
     try {
@@ -75,8 +79,9 @@ class AssetProcessor {
       final embedding = await embedder.embed(decoded);
       final tEmbed = sw.elapsedMilliseconds;
 
-      final enrichment =
-          config.enrich ? await enricher.enrich(bytes) : EnrichmentResult.empty;
+      final enrichment = config.enrich
+          ? await enricher.enrich(bytes)
+          : EnrichmentResult.empty;
       final tEnrich = sw.elapsedMilliseconds;
 
       _n++;
@@ -86,20 +91,22 @@ class AssetProcessor {
       _msThumb += tThumb - tDecode;
       _msEmbed += tEmbed - tThumb;
       _msEnrich += tEnrich - tEmbed;
-      if (_n % _profileEvery == 0) {
+      if (config.profileEvery > 0 && _n % config.profileEvery == 0) {
         final total =
             _msLoad + _msMeta + _msDecode + _msThumb + _msEmbed + _msEnrich;
         String avg(int ms) => (ms / _n).toStringAsFixed(0);
         String pct(int ms) =>
             total == 0 ? '0' : (100 * ms / total).toStringAsFixed(0);
-        log.info('profile over $_n assets (${(total / _n).toStringAsFixed(0)} ms/photo, '
-            '${decoded.width}x${decoded.height}): '
-            'loadBytes ${avg(_msLoad)}ms/${pct(_msLoad)}% · '
-            'exif ${avg(_msMeta)}ms/${pct(_msMeta)}% · '
-            'decode ${avg(_msDecode)}ms/${pct(_msDecode)}% · '
-            'thumbnail ${avg(_msThumb)}ms/${pct(_msThumb)}% · '
-            'embed ${avg(_msEmbed)}ms/${pct(_msEmbed)}% · '
-            'mlkit ${avg(_msEnrich)}ms/${pct(_msEnrich)}%');
+        log.info(
+          'profile over $_n assets (${(total / _n).toStringAsFixed(0)} ms/photo, '
+          '${decoded.width}x${decoded.height}): '
+          'loadBytes ${avg(_msLoad)}ms/${pct(_msLoad)}% · '
+          'exif ${avg(_msMeta)}ms/${pct(_msMeta)}% · '
+          'decode ${avg(_msDecode)}ms/${pct(_msDecode)}% · '
+          'thumbnail ${avg(_msThumb)}ms/${pct(_msThumb)}% · '
+          'embed ${avg(_msEmbed)}ms/${pct(_msEmbed)}% · '
+          'mlkit ${avg(_msEnrich)}ms/${pct(_msEnrich)}%',
+        );
       }
 
       return IndexedItem(

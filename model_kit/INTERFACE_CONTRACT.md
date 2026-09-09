@@ -16,8 +16,8 @@ spec both sides implement against.
 |---|---|---|---|
 | `model_version` | `1.0` | model architecture + weights (MobileCLIP-S1/datacompdr) | full re-index |
 | `embedding_version` | `1` | the **stored image-embedding** pipeline = model + image preprocessing | full re-index |
-| `artifact_version` | `2` | the physical exported files (ONNX + vocab), even if numerically identical | re-provision model, no re-index |
-| `schema_version` | `2` | the on-device SQLite schema | DB migration, no re-index |
+| `artifact_version` | `3` | the physical exported files (ONNX + vocab), even if numerically identical | re-provision model, no re-index |
+| `schema_version` | `4` | the on-device SQLite schema | DB migration, no re-index |
 
 ## 1. Model identity *(frozen)*
 | Field | Value |
@@ -26,13 +26,24 @@ spec both sides implement against.
 | Weights (open_clip `pretrained`) | `datacompdr` |
 | Embedding dimension | **512** |
 | ONNX opset | **17**, legacy exporter (`dynamo=False`) |
-| fp16 conversion | `keep_io_types=True` → **graph I/O stays float32**; only internal weights are fp16 |
+| fp16 conversion | ONNX Runtime converter with `keep_io_types=True`; graph I/O stays float32 and every Cast output type is validated |
+
+> **FP16 artifact v3 (2026-09-08):** the prior converter produced invalid Cast
+> metadata and failed during session creation. ModelKit now rebuilds from the
+> preserved fp32 exports using ONNX Runtime's converter, topological sorting,
+> ONNX checking, and explicit Cast type validation. Both v3 graphs pass the
+> checker and the image session now creates on the host CPU runtime. CPU cannot
+> execute fp16 inference; Android NNAPI/XNNPACK image and text parity remain
+> required before v3 replaces a populated fp32 index. The app keeps its fp32
+> fallback and no frozen model or preprocessing value changed.
 
 ## 2. Artifacts
 | File | Role | Size | Disposition |
 |---|---|---|---|
-| `mobileclip_image_fp16.onnx` | image encoder | ~44 MB | provisioned to device at runtime (not in APK) |
-| `mobileclip_text_fp16.onnx` | text encoder | ~127 MB | provisioned to device at runtime |
+| `mobileclip_image_fp16.onnx` | image encoder | ~44 MB | Android NNAPI/XNNPACK candidate; physical acceptance pending |
+| `mobileclip_text_fp16.onnx` | text encoder | ~127 MB | Android NNAPI/XNNPACK candidate; physical acceptance pending |
+| `mobileclip_image.onnx` | image encoder, fp32 | ~87 MB | development / CPU-testing fallback; accepted by the app's model resolver, never the production target |
+| `mobileclip_text.onnx` | text encoder, fp32 | ~254 MB | development / CPU-testing fallback |
 | `bpe_simple_vocab_16e6.txt.gz` | CLIP BPE vocab | ~1.4 MB | bundled in app |
 | `preprocess_config.json` | constants + versions | <1 KB | bundled in app |
 | `reference_vectors.json` | Dart parity target | ~1 KB | test asset |
@@ -89,6 +100,11 @@ Two levels, both runnable off-device except where noted:
 - Load each session **once**; never reload per query (see `CLAUDE.md` performance rules).
 
 ## 8. Version history
+- **v1.3** (2026-09-08) — rebuilt invalid fp16 exports with ONNX Runtime's
+  converter, topological sorting, ONNX checking, and explicit Cast-type
+  validation. **artifact_version → 3**; model weights and preprocessing are
+  unchanged. Device fp16 numerical parity is still required before deployment
+  over an existing fp32 index; no `embedding_version` change is declared yet.
 - **v1.2** (2026-08-06) — text model patched with `Cast(int64→int32)` before the internal ArgMax for
   onnxruntime-1.15 compatibility (the Flutter plugin's runtime). **artifact_version → 2**; external I/O
   and embeddings unchanged (no re-index). CLIP BPE tokenizer implemented in Dart and verified id-exact

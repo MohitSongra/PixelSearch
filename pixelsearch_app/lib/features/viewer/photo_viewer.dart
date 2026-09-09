@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
 import '../../models/photo.dart';
 import '../../state/providers.dart';
+import 'label_editor.dart';
 
 /// Full-screen viewer with pinch-zoom, swipe between results, a details sheet,
 /// and a consent-gated (mock) cloud caption — demonstrating the privacy model.
@@ -21,8 +22,9 @@ class PhotoViewerScreen extends ConsumerStatefulWidget {
 }
 
 class _PhotoViewerScreenState extends ConsumerState<PhotoViewerScreen> {
-  late final PageController _controller =
-      PageController(initialPage: widget.initialIndex);
+  late final PageController _controller = PageController(
+    initialPage: widget.initialIndex,
+  );
   late int _index = widget.initialIndex;
   final Map<String, String> _captions = {};
 
@@ -32,14 +34,37 @@ class _PhotoViewerScreenState extends ConsumerState<PhotoViewerScreen> {
     super.dispose();
   }
 
-  Photo get _current => widget.photos[_index];
+  Photo get _current {
+    final original = widget.photos[_index];
+    final latest = ref
+        .read(photoLibraryProvider)
+        .where((p) => p.id == original.id);
+    return ref
+        .read(userPreferencesProvider)
+        .applyLabelCorrection(latest.isEmpty ? original : latest.first);
+  }
+
+  Future<void> _editLabels() async {
+    final saved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => LabelEditor(photo: _current),
+    );
+    if (saved != true || !mounted) return;
+    await ref.read(photoLibraryProvider.notifier).refresh();
+    if (mounted) setState(() {});
+  }
 
   Future<void> _generateCaption() async {
     final privacyMode = ref.read(privacyModeProvider);
     if (privacyMode) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Privacy mode is on — turn it off in Settings to use cloud features.'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Privacy mode is on — turn it off in Settings to use cloud features.',
+          ),
+        ),
+      );
       return;
     }
     final ok = await showModalBottomSheet<bool>(
@@ -50,10 +75,12 @@ class _PhotoViewerScreenState extends ConsumerState<PhotoViewerScreen> {
     if (ok != true || !mounted) return;
 
     // Simulate an opt-in cloud round-trip (the real backend is Milestone M13).
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      duration: Duration(milliseconds: 900),
-      content: Text('Uploading 1 photo · generating caption…'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        duration: Duration(milliseconds: 900),
+        content: Text('Uploading 1 photo · generating caption…'),
+      ),
+    );
     await Future.delayed(const Duration(milliseconds: 1100));
     if (!mounted) return;
     setState(() {
@@ -75,7 +102,11 @@ class _PhotoViewerScreenState extends ConsumerState<PhotoViewerScreen> {
           IconButton(
             icon: const Icon(Icons.ios_share),
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Share — wired to the OS share sheet next milestone.')),
+              const SnackBar(
+                content: Text(
+                  'Share — wired to the OS share sheet next milestone.',
+                ),
+              ),
             ),
           ),
         ],
@@ -94,7 +125,9 @@ class _PhotoViewerScreenState extends ConsumerState<PhotoViewerScreen> {
                   child: InteractiveViewer(
                     minScale: 1,
                     maxScale: 4,
-                    child: Center(child: Image(image: p.image, fit: BoxFit.contain)),
+                    child: Center(
+                      child: Image(image: p.image, fit: BoxFit.contain),
+                    ),
                   ),
                 );
               },
@@ -104,6 +137,10 @@ class _PhotoViewerScreenState extends ConsumerState<PhotoViewerScreen> {
             photo: _current,
             caption: _captions[_current.id],
             onGenerateCaption: _generateCaption,
+            onEditLabels: _editLabels,
+            corrected: ref
+                .read(userPreferencesProvider)
+                .hasLabelCorrection(_current),
           ),
         ],
       ),
@@ -115,10 +152,14 @@ class _DetailsPanel extends StatelessWidget {
   final Photo photo;
   final String? caption;
   final VoidCallback onGenerateCaption;
+  final VoidCallback onEditLabels;
+  final bool corrected;
   const _DetailsPanel({
     required this.photo,
     required this.caption,
     required this.onGenerateCaption,
+    required this.onEditLabels,
+    required this.corrected,
   });
 
   @override
@@ -136,38 +177,70 @@ class _DetailsPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(photo.displayTitle,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              photo.displayTitle,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.calendar_today, size: 14, color: scheme.onSurfaceVariant),
+                Icon(
+                  Icons.calendar_today,
+                  size: 14,
+                  color: scheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 6),
-                Text(Dates.short(photo.date),
-                    style: TextStyle(color: scheme.onSurfaceVariant)),
+                Text(
+                  Dates.short(photo.date),
+                  style: TextStyle(color: scheme.onSurfaceVariant),
+                ),
                 if (photo.place != null) ...[
                   const SizedBox(width: 14),
                   Icon(Icons.place, size: 14, color: scheme.onSurfaceVariant),
                   const SizedBox(width: 4),
-                  Text(photo.place!, style: TextStyle(color: scheme.onSurfaceVariant)),
+                  Text(
+                    photo.place!,
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
                 ],
               ],
             ),
             const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(corrected ? 'Your labels' : 'Automatic labels'),
+                ),
+                IconButton(
+                  tooltip: 'Edit labels',
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: onEditLabels,
+                ),
+              ],
+            ),
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: photo.displayTags
-                  .map((t) => Chip(
-                        label: Text(t),
-                        visualDensity: VisualDensity.compact,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ))
+              children: photo.labels
+                  .map(
+                    (t) => Chip(
+                      label: Text(t),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  )
                   .toList(),
             ),
+            if (photo.labels.isEmpty) const Text('No labels'),
+            if (photo.tags.isNotEmpty)
+              Wrap(
+                spacing: 6,
+                children: [
+                  for (final tag in photo.tags) Chip(label: Text(tag)),
+                ],
+              ),
             if (caption != null) ...[
               const SizedBox(height: 12),
               Container(
@@ -216,11 +289,12 @@ class _ConsentSheet extends StatelessWidget {
             children: [
               Icon(Icons.lock_outline, color: scheme.primary),
               const SizedBox(width: 10),
-              Text('Cloud caption',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                'Cloud caption',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ],
           ),
           const SizedBox(height: 12),

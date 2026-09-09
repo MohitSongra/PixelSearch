@@ -21,7 +21,7 @@ import os, json, glob, shutil, warnings
 import numpy as np
 import torch, torch.nn as nn, open_clip
 import onnx, onnxruntime as ort
-from onnxconverter_common import float16
+from fp16_conversion import ARTIFACT_VERSION, rebuild_fp16_artifacts
 warnings.filterwarnings("ignore")
 
 MODEL, PRE, IMG, DIM = "MobileCLIP-S1", "datacompdr", 256, 512
@@ -98,28 +98,7 @@ except Exception as e:
     print("      (self-test skipped:", e, ")")
 
 print("[5/6] Converting to fp16 for on-device deployment …")
-for base in ["mobileclip_image", "mobileclip_text"]:
-    m16 = float16.convert_float_to_float16(onnx.load(f"{OUT}/{base}.onnx"), keep_io_types=True)
-    onnx.save(m16, f"{OUT}/{base}_fp16.onnx")
-
-# [5b] onnxruntime 1.15 (bundled in the Flutter plugin) has no int64 ArgMax CPU
-# kernel. CLIP's text encoder does argmax over input_ids (int64) to find EOT, so
-# insert Cast(int64->int32) before it. External I/O unchanged; embeddings identical.
-print("[5b/6] Patching text ArgMax int64->int32 for onnxruntime 1.15 …")
-from onnx import helper, TensorProto as _TP  # noqa: E402
-for base in ["mobileclip_text", "mobileclip_text_fp16"]:
-    _m = onnx.load(f"{OUT}/{base}.onnx"); _g = _m.graph; _ch = 0
-    for _n in _g.node:
-        if _n.op_type == "ArgMax" and _n.input:
-            _src = _n.input[0]; _co = _src + "_i32"
-            if any(x.op_type == "Cast" and x.output and x.output[0] == _co for x in _g.node):
-                _n.input[0] = _co; continue
-            _c = helper.make_node("Cast", [_src], [_co], to=_TP.INT32,
-                                  name=(_n.name or "am") + "_ci32")
-            _n.input[0] = _co; _g.node.insert(0, _c); _ch += 1
-    if _ch:
-        onnx.save(_m, f"{OUT}/{base}.onnx")
-    print(f"      {base}: +{_ch} cast(s)")
+rebuild_fp16_artifacts(OUT)
 
 print("[6/6] Saving tokenizer vocab + config …")
 vocab = glob.glob(os.path.join(os.path.dirname(open_clip.__file__), "**",
@@ -127,7 +106,7 @@ vocab = glob.glob(os.path.join(os.path.dirname(open_clip.__file__), "**",
 if vocab:
     shutil.copy(vocab[0], f"{OUT}/bpe_simple_vocab_16e6.txt.gz")
 json.dump({"model": MODEL, "pretrained": PRE,
-           "model_version": "1.0", "embedding_version": "1", "artifact_version": "1",
+           "model_version": "1.0", "embedding_version": "1", "artifact_version": ARTIFACT_VERSION,
            "embed_dim": DIM, "image_size": IMG,
            "resize_mode": "shortest", "center_crop": True,
            "interpolation": "bilinear", "antialias": True,

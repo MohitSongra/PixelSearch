@@ -5,6 +5,8 @@ class IndexConfig {
     this.batchSize = 32,
     this.enrich = true,
     this.generateThumbnails = true,
+    this.yieldBetweenAssets = true,
+    this.profileEvery = 20,
   });
 
   /// Items persisted per transaction (batch commit — never one txn per image).
@@ -15,6 +17,16 @@ class IndexConfig {
 
   /// Generate + store thumbnails during indexing.
   final bool generateThumbnails;
+
+  /// Give the event loop a turn after each asset. The expensive work inside one
+  /// asset is still bounded by that asset, but this lets the UI paint, process a
+  /// cancel tap, and deliver progress before the next photo begins.
+  final bool yieldBetweenAssets;
+
+  /// Emit a cumulative per-stage profile after this many assets. Set to zero in
+  /// automated tests to keep their output focused; the device default remains
+  /// every 20 photos.
+  final int profileEvery;
 
   static const IndexConfig defaults = IndexConfig();
 }

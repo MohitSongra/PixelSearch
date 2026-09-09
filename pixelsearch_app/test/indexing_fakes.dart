@@ -10,8 +10,9 @@ import 'package:pixelsearch/indexing/ports/thumbnail_generator.dart';
 
 /// A real, decodable 2x2 PNG. `AssetProcessor` decodes every asset centrally
 /// now, so the fake gallery must hand back bytes that actually decode.
-final Uint8List fakeImageBytes =
-    Uint8List.fromList(img.encodePng(img.Image(width: 2, height: 2)));
+final Uint8List fakeImageBytes = Uint8List.fromList(
+  img.encodePng(img.Image(width: 2, height: 2)),
+);
 
 /// In-memory gallery. Mutate [assets] to simulate add/remove/change between runs.
 class FakeGallery implements GallerySource {
@@ -20,7 +21,8 @@ class FakeGallery implements GallerySource {
   final Set<String> missingBytes = {}; // ids that fail to load (failure path)
 
   @override
-  Future<List<AssetRef>> listAssets() async => List.of(assets);
+  Future<GallerySnapshot> listAssets() async =>
+      GallerySnapshot(List.of(assets));
 
   @override
   Future<Uint8List?> loadBytes(String assetId) async =>
@@ -31,11 +33,12 @@ class FakeMetadata implements MetadataExtractor {
   @override
   Future<PhotoMetadata> extract(AssetRef a, Uint8List bytes) async =>
       PhotoMetadata(
-          width: a.width,
-          height: a.height,
-          lat: a.lat,
-          lng: a.lng,
-          dateTakenMs: a.dateTakenMs);
+        width: a.width,
+        height: a.height,
+        lat: a.lat,
+        lng: a.lng,
+        dateTakenMs: a.dateTakenMs,
+      );
 }
 
 class FakeThumbnails implements ThumbnailGenerator {

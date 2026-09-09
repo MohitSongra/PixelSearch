@@ -72,8 +72,8 @@ class ModelLocator {
   ///
   /// Callers should try them in order and fall through on a *load* failure, not
   /// just on absence: the realistic failure is an artifact that is present but
-  /// unusable — fp16 without an fp16-capable EP (KI-2), or a bad fp16 conversion
-  /// (KI-9). Existence alone can't distinguish those.
+  /// unusable — fp16 without a compatible EP (KI-2), or an incompatible/corrupt
+  /// artifact (KI-9). Existence alone can't distinguish those.
   Future<List<ResolvedModel>> imageCandidatesPresent() =>
       _present('image', imageCandidates);
 

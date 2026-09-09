@@ -5,6 +5,15 @@ A fault-tolerant, resumable, incremental indexing pipeline for galleries of
 unit-tested orchestration core, with device capabilities (MediaStore, ML Kit,
 WorkManager, thumbnails/EXIF) behind interfaces.
 
+## Folder Scope (2026-09-08)
+
+Index actions now confirm saved folder selection before running. `GallerySource.listAssets()`
+returns a `GallerySnapshot`: selected candidate metadata, gallery-wide existence IDs, and
+whether the scan can authoritatively identify deletions. `IndexPlanner` only schedules selected
+candidates, but preserves indexed photos outside those folders while they still exist. Limited
+access never authorizes missing-photo deletion. Schema v4 stores preferences separately from
+checkpoints; both foreground and background composition use them. See `FOLDER_INDEXING.md`.
+
 ## 1. Architecture diagram
 ```mermaid
 flowchart TD
@@ -145,14 +154,16 @@ negligible beside embedding. Device fp16/NNAPI differs and is measured on hardwa
 | 25,000 | ~73 min | ~18 min |
 | 50,000 | ~146 min | ~37 min |
 
-**Memory / OOM-safety by design:** peak memory is dominated by the model (host RSS +612 MB fp32;
-device fp16 ~171 MB), **not** the gallery — the engine streams one asset at a time and keeps only a
-bounded `batchSize` (default 32) of small results (a 512-d embedding is 2 KB; thumbnails are files, not
-blobs). Nothing scales memory with gallery size, so 50k is the same footprint as 100. Embeddings on
-disk: ~2 KB/photo ⇒ ~100 MB at 50k (ADR-008).
+**Memory / OOM-safety, current implementation:** pixel work is one asset at a time and the persistence
+buffer is bounded by `batchSize` (default 32); a 512-d embedding is 2 KB and thumbnails are files, not
+blobs. However, `PhotoManagerGallerySource.listAssets()` currently materializes a `List<AssetRef>` for the
+entire gallery before reconciliation, so metadata memory does grow with gallery count. This is materially
+smaller than retaining image bytes, but it means the current implementation is not constant-memory at 50k.
+Measure it on device and evolve the gallery port toward pagewise reconciliation if it becomes a real limit.
+Embeddings on disk: ~2 KB/photo ⇒ ~100 MB at 50k (ADR-008).
 
 ## 7. Device adapters — implemented (compile-verified); runtime on-device
-All five adapters + the WorkManager isolate entrypoint and DI wiring are written in `lib/indexing/adapters/`
+All six adapters + the WorkManager isolate entrypoint and DI wiring are written in `lib/indexing/adapters/`
 and **compile clean** (analyzer 0 issues; web + linux builds unaffected). Each is a thin implementation of
 an already-tested port; only their *runtime* (needs Android + the plugins' native side) is exercised on a
 real device — it cannot execute in this Linux/CI sandbox:
@@ -175,7 +186,10 @@ Two entry points, one pipeline:
   relayed from `IndexingService.progress`; cancellation crosses the boundary via `IndexCancelToken`.
   On completion the controller refreshes the photo library and invalidates `indexWarmupProvider`, so the run's
   embeddings become searchable in the same session.
-- **Background.** `indexCallbackDispatcher` → `runBackgroundIndex()` (`indexing_wiring.dart`), unchanged.
+- **Background.** `main()` registers `indexCallbackDispatcher` through an Android-only conditional bootstrap;
+  when a task is scheduled, it calls `runBackgroundIndex()` (`indexing_wiring.dart`). The callback and its
+  model selection are wired, but no current UI schedules work, so Android background behavior is still
+  unverified and the foreground screen-off limitation remains open (KI-10).
 
 Neither path applies any limit: `IndexingService` indexes everything `GallerySource.listAssets()` returns, and
 pagination is the adapter's concern (§7). The M1 demo loader that previously fed the UI — capped at 80 photos

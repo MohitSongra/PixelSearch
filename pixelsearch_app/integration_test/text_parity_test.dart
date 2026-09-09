@@ -8,6 +8,8 @@ import 'package:pixelsearch/ai/clip_tokenizer.dart';
 import 'package:pixelsearch/ai/embedding_math.dart';
 import 'package:pixelsearch/ai/text_embedder.dart';
 
+import 'support/modelkit_paths.dart';
+
 /// M4.3 numerical parity GATE (text path).
 ///
 /// Complete production pipeline through a real Flutter ONNX Runtime session:
@@ -15,28 +17,31 @@ import 'package:pixelsearch/ai/text_embedder.dart';
 /// compared against the Python (open_clip + fp32 ONNX) reference.
 ///
 /// Acceptance: identical dims (512), cosine ≥ 0.9999.
-const String kModel =
-    '/home/claude/PixelSearch_ModelKit/out/mobileclip_text.onnx';
-const String kVocab =
-    '/home/claude/PixelSearch_ModelKit/out/bpe_simple_vocab_16e6.txt.gz';
-const String kRef =
-    '/home/claude/PixelSearch_ModelKit/parity/reference_embeddings.json';
-
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('TEXT parity: Flutter ONNX Runtime vs Python reference',
-      (tester) async {
+  testWidgets('TEXT parity: Flutter ONNX Runtime vs Python reference', (
+    tester,
+  ) async {
+    final paths = ModelKitPaths.resolve();
+    paths.requireFiles();
     final ref =
-        jsonDecode(File(kRef).readAsStringSync()) as Map<String, dynamic>;
+        jsonDecode(File(paths.referenceEmbeddings).readAsStringSync())
+            as Map<String, dynamic>;
     final queries = (ref['queries'] as List).cast<String>();
     final refText = (ref['text_embeds'] as List)
-        .map((r) => Float32List.fromList(
-            (r as List).map((e) => (e as num).toDouble()).toList()))
+        .map(
+          (r) => Float32List.fromList(
+            (r as List).map((e) => (e as num).toDouble()).toList(),
+          ),
+        )
         .toList();
 
-    final tokenizer = await ClipTokenizer.fromGzipFile(kVocab);
-    final embedder = OnnxTextEmbedder(modelPath: kModel, tokenizer: tokenizer);
+    final tokenizer = await ClipTokenizer.fromGzipFile(paths.vocab);
+    final embedder = OnnxTextEmbedder(
+      modelPath: paths.textModel,
+      tokenizer: tokenizer,
+    );
     await embedder.load();
     expect(embedder.isLoaded, isTrue);
 
@@ -53,7 +58,9 @@ void main() {
         if (d > maxAbs) maxAbs = d;
       }
       // ignore: avoid_print
-      print('TEXTPARITY "${queries[i]}"  cos=${cos.toStringAsFixed(6)}  maxAbs=${maxAbs.toStringAsFixed(5)}');
+      print(
+        'TEXTPARITY "${queries[i]}"  cos=${cos.toStringAsFixed(6)}  maxAbs=${maxAbs.toStringAsFixed(5)}',
+      );
       expect(cos, greaterThan(0.9999), reason: 'cosine for "${queries[i]}"');
     }
 

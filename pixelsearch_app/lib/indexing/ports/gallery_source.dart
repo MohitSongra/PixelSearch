@@ -8,6 +8,19 @@ import '../model/asset_ref.dart';
 /// tests use an in-memory fake. Enumeration returns only cheap metadata so a
 /// 50k-photo scan stays light; bytes are loaded lazily, per asset, during indexing.
 abstract interface class GallerySource {
-  Future<List<AssetRef>> listAssets();
+  Future<GallerySnapshot> listAssets();
   Future<Uint8List?> loadBytes(String assetId);
+}
+
+/// Candidates are scoped to the user's folders. Existence is gallery-wide so
+/// deselection never masquerades as deletion. Limited access is non-authoritative.
+class GallerySnapshot {
+  const GallerySnapshot(
+    this.assets, {
+    this.existingAssetIds,
+    this.canDeleteMissing = true,
+  });
+  final List<AssetRef> assets;
+  final Set<String>? existingAssetIds;
+  final bool canDeleteMissing;
 }

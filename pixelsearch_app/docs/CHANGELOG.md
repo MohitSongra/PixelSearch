@@ -3,6 +3,32 @@
 Format based on Keep a Changelog. Dates are ISO-8601.
 
 ## [Unreleased]
+### Scene retrieval diagnostics (2026-09-08)
+- Added raw cosine versus unchanged production ranking, score breakdowns, candidate/gate sweeps, a non-default whole-word lexical experiment, 24 unlabelled queries and private relevance-feedback JSON. No default weights, model, embedding version or indexing behavior changed.
+- Host verification: analyzer clean and 93 tests pass. No quality improvement is claimed without user judgments. See `SEARCH_EVALUATION.md` and `SEARCH_QUALITY_DIAGNOSIS_2026-09-08.md`.
+- Device-test incident: Flutter's default post-test uninstall removed the existing 144-photo private index and models. Original gallery photos were untouched. App/models were restored with identical model hashes; the index was not recovered and the user will select folders to rebuild it. A backup-first `--no-uninstall` wrapper was added; full corrected device evaluation remains pending.
+
+### Folder-scoped indexing (2026-09-08)
+- Every foreground Index/Re-index action now opens a folder picker with checkboxes, photo counts, an explicit All folders option, and saved selection. Duplicate Android folder names include relative paths. No choice is preselected on first use.
+- Folder IDs and all-folders mode persist in a new schema-v4 preferences table; background indexing reads the same preference. Existing photos/embeddings survive migration unchanged.
+- As requested, deselected folders' indexed photos remain searchable. Reconciliation separates selected candidates from gallery-wide existence metadata; original photo bytes are loaded only for selected candidates. Limited photo access disables missing-photo deletion, and unavailable selected folders never fall back to indexing everything.
+- Permission requests/checks now explicitly use images, avoiding a false limited-access state caused by checking unrequested video access.
+- See `FOLDER_INDEXING.md` for behavior, verification, and limits. Model artifacts, preprocessing, embedding version, ML Kit and search ranking are unchanged.
+
+### Android provisioning smoke test (2026-09-08)
+- Manually provisioned both FP32 models on Vivo I2214/API 36 and verified their SHA-256 checksums. Both image and text inference ran with 512-d, unit-normalized outputs. The current app configures CPU execution; NNAPI/XNNPACK is not registered.
+- Discovered 19,260 photos, matching MediaStore; indexed 103 before intentional cancellation. After USB reconnection and a cold app restart, reconciliation skipped those 103 and added 37 more before a second cancellation: 140 saved photos with labels, thumbnails, and embeddings; zero failures. The same full-sentence semantic query displayed 118 results, and the photo viewer displayed ML Kit labels. Full completion and retrieval-quality scoring remain untested.
+- Verified SQLite integrity and all 140 vector shapes/norms, removed temporary model transfer copies, and recorded that onboarding reappears after a cold restart despite the saved index. No source fix was attempted during this test.
+- Recorded measured timings, database checks, and limits in `ANDROID_SMOKE_TEST_2026-09-08.md`. Application code and ranking policy were unchanged.
+
+### Current engineering iteration (2026-09-08)
+- **Verified on this checkout:** `flutter analyze` reports no issues, `flutter test` passes **58** tests, and the Android debug APK builds successfully. Real-ORT tests now resolve the sibling `model_kit` checkout by default or honor `PIXELSEARCH_MODELKIT`; this Windows checkout has no desktop project and no Android device attached, so their fresh execution remains pending a supported runner.
+- **FP16 artifact repair:** ModelKit v3 replaces the invalid `onnxconverter_common` conversion with ONNX Runtime's converter, topological sorting, ONNX checking, and explicit Cast-type validation. Both rebuilt graphs pass the checker, the image graph creates a CPU session, and the ModelKit regression suite passes. The desktop custom-image tester now deliberately uses its verified fp32 CPU path; Android NNAPI/XNNPACK fp16 inference and parity are still device work.
+- **Foreground responsiveness:** `IndexingService` now yields once between assets. This gives Flutter an opportunity to paint, deliver progress, and process a cancel action before the next photo begins. It deliberately does not change the frozen MobileCLIP preprocessing, per-photo ordering, or transactional persistence, and it does not remove the measured synchronous work within one asset.
+- **Native resource lifecycle:** the device composition root now disposes ML Kit detectors and the ONNX image session after an indexing service is disposed. Profiling cadence is configurable; automated tests disable profile log emission while the device default remains every 20 assets.
+- **Background bootstrap:** Android startup now registers the existing WorkManager callback through a conditional native boundary, and the background path uses the same fp16-then-fp32 load-and-fallback policy as foreground indexing. No job is scheduled automatically yet; screen-off, retry, and OEM behavior remain physical-device validation work.
+- **Repository hygiene:** removed the tracked generated Gradle problems report.
+
 ### Performance — indexing throughput (measured on device, Realme RMX3092 / Android 12)
 First on-device profile of the M5 pipeline, per stage, over 40 assets at ~1200x1600:
 

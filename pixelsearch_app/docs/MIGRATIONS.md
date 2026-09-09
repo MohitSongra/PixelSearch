@@ -17,6 +17,13 @@ Keyed on `AppDatabase.schemaVersion` via a `MigrationStrategy`.
 | From → To | Change | Migration step |
 |---|---|---|
 | 1 → 2 | add `EmbeddingRows.embeddingVersion` (default `'1'`) | `m.addColumn(embeddingRows, embeddingRows.embeddingVersion)` |
+| 2 → 3 | add M5 photo metadata, labels, faces, thumbnails and change fingerprints | additive photo columns |
+| 3 → 4 | persist folder selection separately from checkpoints | `m.createTable(indexingPreferencesRows)`; no photo/embedding rewrite |
+
+Schema v4 defaults to no selected folders until the user confirms a choice. Existing
+indexed photos remain searchable. Folder IDs (not display names) and explicit all-folders
+mode persist across restarts and are shared with background indexing. The migration and
+byte-preserving embedding readback are covered in `test/indexing_preferences_test.dart`.
 
 Rules: migrations are **additive and reversible-in-spirit** (never drop data on upgrade without a backup
 path); every new `schema_version` gets a row here and a drift migration test (tracked in `TEST_PLAN.md`).
@@ -40,6 +47,10 @@ re-downloads the ONNX/vocab files and updates the stored `artifact_version`. Thi
 
 Applied history: **v1 → v2** (2026-08-06) — text model patched with `Cast(int64→int32)` before ArgMax
 for onnxruntime-1.15 compatibility. Embeddings identical; **no re-index** (ADR-012).
+
+**v2 → v3** (2026-09-08) — fp16 exports rebuilt with ONNX Runtime's converter after the prior converter
+left invalid Cast metadata. Graph validation passes, but device fp16 parity remains required before the new
+artifact is deployed over a populated fp32 index. `embedding_version` remains `1` pending that acceptance.
 
 ## D. Checklist when changing anything model-shaped
 1. Update `INTERFACE_CONTRACT.md` (ModelKit) + bump the right version(s); mirror to Flutter.

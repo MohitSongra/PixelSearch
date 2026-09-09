@@ -1,13 +1,27 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../state/providers.dart';
+import '../indexing/folder_picker.dart';
 
 class OnboardingScreen extends ConsumerWidget {
   const OnboardingScreen({super.key});
+
+  Future<void> _finish(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(userPreferencesProvider).completeOnboarding();
+      if (context.mounted) context.go('/home/search');
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save setup. Please try again.'),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -25,70 +39,95 @@ class OnboardingScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-              const Spacer(),
-              Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [scheme.primary, scheme.tertiary],
-                  ),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: const Icon(Icons.search, color: Colors.white, size: 40),
-              ),
-              const SizedBox(height: 28),
-              Text('Search your\nmemories',
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        height: 1.05,
-                        letterSpacing: -1,
-                      )),
-              const SizedBox(height: 16),
-              Text(
-                'Find any photo with natural language — “beach at sunset”, '
-                '“my dog”, “birthday cake”. Everything runs on your device. '
-                'Nothing is uploaded.',
-                style: TextStyle(
-                    color: scheme.onSurfaceVariant, fontSize: 16, height: 1.4),
-              ),
-              const SizedBox(height: 28),
-              _point(context, Icons.lock_outline, 'Private by design',
-                  'Indexing and search happen fully offline.'),
-              _point(context, Icons.bolt_outlined, 'Fast semantic search',
-                  'Results in under two seconds.'),
-              _point(context, Icons.auto_awesome_outlined, 'Optional cloud extras',
-                  'AI captions & assistant — only with your consent.'),
-              const Spacer(),
-              if (indexingSupported)
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    // Kick off the real pipeline and move on immediately — a full
-                    // gallery takes minutes, and Search shows live progress.
-                    onPressed: () {
-                      unawaited(
-                          ref.read(indexingControllerProvider.notifier).start());
-                      context.go('/home/search');
-                    },
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: const Text('Index my photos'),
-                  ),
-                ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => context.go('/home/search'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: Text(
-                      indexingSupported ? 'Not now' : 'Continue'),
-                ),
-              ),
+                      const Spacer(),
+                      Container(
+                        width: 76,
+                        height: 76,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [scheme.primary, scheme.tertiary],
+                          ),
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        child: const Icon(
+                          Icons.search,
+                          color: Colors.white,
+                          size: 40,
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      Text(
+                        'Search your\nmemories',
+                        style: Theme.of(context).textTheme.displaySmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              height: 1.05,
+                              letterSpacing: -1,
+                            ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Find any photo with natural language — “beach at sunset”, '
+                        '“my dog”, “birthday cake”. Everything runs on your device. '
+                        'Nothing is uploaded.',
+                        style: TextStyle(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 16,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      _point(
+                        context,
+                        Icons.lock_outline,
+                        'Private by design',
+                        'Indexing and search happen fully offline.',
+                      ),
+                      _point(
+                        context,
+                        Icons.bolt_outlined,
+                        'Fast semantic search',
+                        'Results in under two seconds.',
+                      ),
+                      _point(
+                        context,
+                        Icons.auto_awesome_outlined,
+                        'Optional cloud extras',
+                        'AI captions & assistant — only with your consent.',
+                      ),
+                      const Spacer(),
+                      if (indexingSupported)
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: () async {
+                              final started = await chooseFoldersAndIndex(
+                                context,
+                                ref,
+                              );
+                              if (started && context.mounted) {
+                                await _finish(context, ref);
+                              }
+                            },
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: const Text('Index my photos'),
+                          ),
+                        ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () => _finish(context, ref),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: Text(
+                            indexingSupported ? 'Not now' : 'Continue',
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -113,10 +152,17 @@ class OnboardingScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-                Text(sub,
-                    style: TextStyle(
-                        color: scheme.onSurfaceVariant, fontSize: 13)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  sub,
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 13,
+                  ),
+                ),
               ],
             ),
           ),

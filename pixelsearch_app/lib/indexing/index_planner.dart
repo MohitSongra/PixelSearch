@@ -16,6 +16,8 @@ class IndexPlanner {
     required List<AssetRef> gallery,
     required List<IndexRecord> indexed,
     required String currentEmbeddingVersion,
+    Set<String>? existingAssetIds,
+    bool canDeleteMissing = true,
   }) {
     final byId = {for (final r in indexed) r.id: r};
     final galleryIds = <String>{};
@@ -38,8 +40,9 @@ class IndexPlanner {
     }
 
     final toDelete = [
-      for (final record in indexed)
-        if (!galleryIds.contains(record.id)) record.id
+      if (canDeleteMissing)
+        for (final record in indexed)
+          if (!(existingAssetIds ?? galleryIds).contains(record.id)) record.id,
     ];
 
     return IndexPlan(toIndex: toIndex, toDelete: toDelete, upToDate: upToDate);

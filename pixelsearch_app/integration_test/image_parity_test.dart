@@ -8,6 +8,8 @@ import 'package:integration_test/integration_test.dart';
 import 'package:pixelsearch/ai/embedding_math.dart';
 import 'package:pixelsearch/ai/image_embedder.dart';
 
+import 'support/modelkit_paths.dart';
+
 /// M4 numerical parity GATE (image path).
 ///
 /// Runs the COMPLETE production pipeline through a real Flutter ONNX Runtime
@@ -19,36 +21,40 @@ import 'package:pixelsearch/ai/image_embedder.dart';
 ///   2. cosine similarity > 0.999
 ///   3. max absolute error within tolerance
 ///   4. identical retrieval ranking (reference_vectors structure, 6/6)
-const String kModel =
-    '/home/claude/PixelSearch_ModelKit/out/mobileclip_image.onnx';
-const String kRefDir = '/home/claude/PixelSearch_ModelKit/parity';
 const double kMaxAbsTolerance = 0.02; // fp32-vs-fp32; residual = interpolation
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('IMAGE parity: Flutter ONNX Runtime vs Python reference',
-      (tester) async {
-    final ref = jsonDecode(
-      File('$kRefDir/reference_embeddings.json').readAsStringSync(),
-    ) as Map<String, dynamic>;
+  testWidgets('IMAGE parity: Flutter ONNX Runtime vs Python reference', (
+    tester,
+  ) async {
+    final paths = ModelKitPaths.resolve();
+    paths.requireFiles(includeImages: true);
+    final ref =
+        jsonDecode(File(paths.referenceEmbeddings).readAsStringSync())
+            as Map<String, dynamic>;
     final names = (ref['image_names'] as List).cast<String>();
     final refImg = ref['image_embeds'] as Map<String, dynamic>;
     final textEmbeds = (ref['text_embeds'] as List)
-        .map((r) => Float32List.fromList(
-            (r as List).map((e) => (e as num).toDouble()).toList()))
+        .map(
+          (r) => Float32List.fromList(
+            (r as List).map((e) => (e as num).toDouble()).toList(),
+          ),
+        )
         .toList();
 
     Float32List refVec(String n) => Float32List.fromList(
-        (refImg[n] as List).map((e) => (e as num).toDouble()).toList());
+      (refImg[n] as List).map((e) => (e as num).toDouble()).toList(),
+    );
 
-    final embedder = OnnxImageEmbedder(modelPath: kModel);
+    final embedder = OnnxImageEmbedder(modelPath: paths.imageModel);
     await embedder.load();
     expect(embedder.isLoaded, isTrue);
 
     final flutterEmbeds = <String, Float32List>{};
     for (final n in names) {
-      final bytes = File('$kRefDir/images/$n.png').readAsBytesSync();
+      final bytes = File('${paths.imagesDir}/$n.png').readAsBytesSync();
       final image = img.decodeImage(bytes)!;
       final e = await embedder.embed(image);
       flutterEmbeds[n] = e;
@@ -64,7 +70,9 @@ void main() {
         if (d > maxAbs) maxAbs = d;
       }
       // ignore: avoid_print
-      print('PARITY $n  cos=${cos.toStringAsFixed(6)}  maxAbs=${maxAbs.toStringAsFixed(5)}');
+      print(
+        'PARITY $n  cos=${cos.toStringAsFixed(6)}  maxAbs=${maxAbs.toStringAsFixed(5)}',
+      );
 
       // (2) cosine, (3) max abs error
       expect(cos, greaterThan(0.999), reason: '$n: cosine vs Python reference');
@@ -82,8 +90,12 @@ void main() {
           best = i;
         }
       }
-      expect(best, q,
-          reason: 'query "${(ref['queries'] as List)[q]}" should retrieve image "${names[q]}"');
+      expect(
+        best,
+        q,
+        reason:
+            'query "${(ref['queries'] as List)[q]}" should retrieve image "${names[q]}"',
+      );
     }
 
     await embedder.dispose();

@@ -64,35 +64,50 @@ class IndexStateRows extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [PhotoRows, EmbeddingRows, IndexStateRows])
+/// User-selected MediaStore folder IDs, independent of indexing checkpoints.
+class IndexingPreferencesRows extends Table {
+  IntColumn get id => integer().withDefault(const Constant(0))();
+  BoolColumn get allFolders => boolean().withDefault(const Constant(false))();
+  TextColumn get folderIdsJson => text().withDefault(const Constant('[]'))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DriftDatabase(
+  tables: [PhotoRows, EmbeddingRows, IndexStateRows, IndexingPreferencesRows],
+)
 class AppDatabase extends _$AppDatabase {
   /// The app passes nothing (uses the platform connection); tests inject an
   /// in-memory executor via `AppDatabase(NativeDatabase.memory())`.
   AppDatabase([QueryExecutor? executor]) : super(executor ?? openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onUpgrade: (m, from, to) async {
-          // v1 → v2: tag each embedding with the embedding_version that produced it.
-          if (from < 2) {
-            await m.addColumn(embeddingRows, embeddingRows.embeddingVersion);
-          }
-          // v2 → v3: M5 indexing metadata columns on photo_rows.
-          if (from < 3) {
-            await m.addColumn(photoRows, photoRows.mtimeMs);
-            await m.addColumn(photoRows, photoRows.byteSize);
-            await m.addColumn(photoRows, photoRows.width);
-            await m.addColumn(photoRows, photoRows.height);
-            await m.addColumn(photoRows, photoRows.thumbPath);
-            await m.addColumn(photoRows, photoRows.labelsJson);
-            await m.addColumn(photoRows, photoRows.facesJson);
-            await m.addColumn(photoRows, photoRows.indexedAtMs);
-          }
-        },
-      );
+    onUpgrade: (m, from, to) async {
+      // v1 → v2: tag each embedding with the embedding_version that produced it.
+      if (from < 2) {
+        await m.addColumn(embeddingRows, embeddingRows.embeddingVersion);
+      }
+      // v2 → v3: M5 indexing metadata columns on photo_rows.
+      if (from < 3) {
+        await m.addColumn(photoRows, photoRows.mtimeMs);
+        await m.addColumn(photoRows, photoRows.byteSize);
+        await m.addColumn(photoRows, photoRows.width);
+        await m.addColumn(photoRows, photoRows.height);
+        await m.addColumn(photoRows, photoRows.thumbPath);
+        await m.addColumn(photoRows, photoRows.labelsJson);
+        await m.addColumn(photoRows, photoRows.facesJson);
+        await m.addColumn(photoRows, photoRows.indexedAtMs);
+      }
+      if (from < 4) {
+        await m.createTable(indexingPreferencesRows);
+      }
+    },
+  );
 
   // --- Photos --------------------------------------------------------------
   Future<void> upsertPhotos(List<PhotoRowsCompanion> rows) =>
@@ -112,20 +127,26 @@ class AppDatabase extends _$AppDatabase {
       into(embeddingRows).insertOnConflictUpdate(row);
 
   Future<List<EmbeddingRow>> embeddingsFor(
-          String modelId, String embeddingVersion) =>
-      (select(embeddingRows)
-            ..where((t) =>
+    String modelId,
+    String embeddingVersion,
+  ) =>
+      (select(embeddingRows)..where(
+            (t) =>
                 t.modelId.equals(modelId) &
-                t.embeddingVersion.equals(embeddingVersion)))
+                t.embeddingVersion.equals(embeddingVersion),
+          ))
           .get();
 
   Future<int> embeddingCount(String modelId, String embeddingVersion) async {
     final c = countAll();
-    final row = await (selectOnly(embeddingRows)
-          ..addColumns([c])
-          ..where(embeddingRows.modelId.equals(modelId) &
-              embeddingRows.embeddingVersion.equals(embeddingVersion)))
-        .getSingle();
+    final row =
+        await (selectOnly(embeddingRows)
+              ..addColumns([c])
+              ..where(
+                embeddingRows.modelId.equals(modelId) &
+                    embeddingRows.embeddingVersion.equals(embeddingVersion),
+              ))
+            .getSingle();
     return row.read(c) ?? 0;
   }
 
@@ -133,7 +154,9 @@ class AppDatabase extends _$AppDatabase {
   /// indexer's work queue. A NOT EXISTS anti-join keyed on model + version, so a
   /// version bump makes every photo stale (see MIGRATIONS.md §B). Cheap at scale.
   Future<List<String>> photoIdsNeedingEmbedding(
-      String modelId, String embeddingVersion) async {
+    String modelId,
+    String embeddingVersion,
+  ) async {
     final rows = await customSelect(
       'SELECT p.id AS id FROM photo_rows p '
       'WHERE NOT EXISTS (SELECT 1 FROM embedding_rows e '
@@ -151,8 +174,10 @@ class AppDatabase extends _$AppDatabase {
 
   /// Reconciliation projection: every stored asset with its change-fingerprint
   /// and the embedding_version it currently holds for [modelId] (null if none).
-  Future<List<({String id, int mtimeMs, int byteSize, String? embeddingVersion})>>
-      indexRecords(String modelId) async {
+  Future<
+    List<({String id, int mtimeMs, int byteSize, String? embeddingVersion})>
+  >
+  indexRecords(String modelId) async {
     final rows = await customSelect(
       'SELECT p.id AS id, p.mtime_ms AS mtime_ms, p.byte_size AS byte_size, '
       'e.embedding_version AS ev FROM photo_rows p '
@@ -167,7 +192,7 @@ class AppDatabase extends _$AppDatabase {
           mtimeMs: r.read<int>('mtime_ms'),
           byteSize: r.read<int>('byte_size'),
           embeddingVersion: r.read<String?>('ev'),
-        )
+        ),
     ];
   }
 
@@ -186,13 +211,17 @@ class AppDatabase extends _$AppDatabase {
 
   // --- Index state (singleton row, id = 0) ---------------------------------
   Future<IndexStateRow> indexState() async {
-    final existing = await (select(indexStateRows)..where((t) => t.id.equals(0)))
-        .getSingleOrNull();
+    final existing = await (select(
+      indexStateRows,
+    )..where((t) => t.id.equals(0))).getSingleOrNull();
     if (existing != null) return existing;
-    await into(indexStateRows).insert(const IndexStateRowsCompanion(id: Value(0)));
+    await into(
+      indexStateRows,
+    ).insert(const IndexStateRowsCompanion(id: Value(0)));
     return (select(indexStateRows)..where((t) => t.id.equals(0))).getSingle();
   }
 
-  Future<void> putIndexState(IndexStateRowsCompanion row) =>
-      into(indexStateRows).insertOnConflictUpdate(row.copyWith(id: const Value(0)));
+  Future<void> putIndexState(IndexStateRowsCompanion row) => into(
+    indexStateRows,
+  ).insertOnConflictUpdate(row.copyWith(id: const Value(0)));
 }

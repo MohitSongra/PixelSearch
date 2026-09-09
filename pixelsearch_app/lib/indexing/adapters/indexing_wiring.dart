@@ -1,15 +1,14 @@
-import 'dart:io';
-
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:workmanager/workmanager.dart';
 
 import '../../ai/image_embedder.dart';
+import '../../core/model_locator.dart';
 import '../../data/local/app_database.dart';
+import '../../data/indexing_preferences_repository.dart';
 import '../asset_processor.dart';
 import '../index_store.dart';
 import '../indexing_service.dart';
 import '../model/index_progress.dart';
+import '../model/folder_selection.dart';
 import '../model_version_manager.dart';
 import 'exif_metadata_extractor.dart';
 import 'file_thumbnail_generator.dart';
@@ -20,27 +19,34 @@ import 'photo_manager_gallery.dart';
 /// Composition root (DI): assembles the production indexing pipeline from the
 /// device adapters + the (unmodified) AI core. **Device-only.**
 ///
-/// The app's `main()` registers the background entrypoint with
-/// `Workmanager().initialize(indexCallbackDispatcher)` (Android).
 Future<IndexingService> buildDeviceIndexingService({
   required AppDatabase db,
   required String imageModelPath,
+  required FolderSelection selection,
 }) async {
   final embedder = OnnxImageEmbedder(modelPath: imageModelPath);
   await embedder.load();
-  const gallery = PhotoManagerGallerySource();
+  final gallery = PhotoManagerGallerySource(selection: selection);
+  final enricher = MlKitImageEnricher();
   final processor = AssetProcessor(
     gallery: gallery,
     metadata: const ExifMetadataExtractor(),
     thumbnails: const FileThumbnailGenerator(),
     embedder: OnnxAssetEmbedder(embedder),
-    enricher: MlKitImageEnricher(),
+    enricher: enricher,
   );
   return IndexingService(
     gallery: gallery,
     processor: processor,
     store: IndexStore(db),
     versionManager: const ModelVersionManager(),
+    onDispose: () async {
+      try {
+        await enricher.dispose();
+      } finally {
+        await embedder.dispose();
+      }
+    },
   );
 }
 
@@ -55,14 +61,37 @@ void indexCallbackDispatcher() {
 Future<bool> runBackgroundIndex() async {
   final db = AppDatabase();
   try {
-    final support = await getApplicationSupportDirectory();
-    final modelPath = p.join(support.path, 'models', 'mobileclip_image.onnx');
-    if (!File(modelPath).existsSync()) return false;
-    final service =
-        await buildDeviceIndexingService(db: db, imageModelPath: modelPath);
-    final result = await service.run();
-    await service.dispose();
-    return result.phase == IndexPhase.done;
+    final selection = await IndexingPreferencesRepository(db).load();
+    if (selection.isEmpty) return true;
+    const locator = ModelLocator();
+    final candidates = await locator.imageCandidatesPresent();
+    if (candidates.isEmpty) return false;
+
+    // Match foreground behavior: fp16 is preferred, but a candidate is only
+    // selected after it actually creates a session. That keeps an unsupported
+    // or device-incompatible fp16 image artifact from blocking fp32 fallback.
+    for (final candidate in candidates) {
+      IndexingService? service;
+      try {
+        service = await buildDeviceIndexingService(
+          db: db,
+          imageModelPath: candidate.path,
+          selection: selection,
+        );
+        locator.log.info('background image encoder selected: $candidate');
+        final result = await service.run();
+        return result.phase == IndexPhase.done;
+      } catch (e, st) {
+        locator.log.error(
+          'background image encoder ${candidate.fileName} failed to load',
+          e,
+          st,
+        );
+      } finally {
+        await service?.dispose();
+      }
+    }
+    return false;
   } finally {
     await db.close();
   }

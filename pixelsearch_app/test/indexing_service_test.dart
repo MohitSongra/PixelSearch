@@ -15,7 +15,8 @@ void main() {
   setUp(() => db = AppDatabase(NativeDatabase.memory()));
   tearDown(() async => db.close());
 
-  IndexStore storeFor(String version) => IndexStore(db, embeddingVersion: version);
+  IndexStore storeFor(String version) =>
+      IndexStore(db, embeddingVersion: version);
 
   IndexingService service(
     FakeGallery g, {
@@ -36,21 +37,24 @@ void main() {
       processor: processor,
       store: store,
       versionManager: ModelVersionManager(currentVersion: version),
-      config: IndexConfig(batchSize: batchSize),
+      config: IndexConfig(batchSize: batchSize, profileEvery: 0),
       nowMs: () => 111,
     );
   }
 
-  test('full index persists all photos + embeddings; embeds once each', () async {
-    final g = FakeGallery([asset('a'), asset('b'), asset('c')]);
-    final emb = CountingEmbedder();
-    final p = await service(g, store: storeFor('1'), emb: emb).run();
-    expect(p.phase, IndexPhase.done);
-    expect(p.completed, 3);
-    expect(emb.total, 3);
-    expect(await db.photoCount(), 3);
-    expect(await db.embeddingCount('MobileCLIP-S1', '1'), 3);
-  });
+  test(
+    'full index persists all photos + embeddings; embeds once each',
+    () async {
+      final g = FakeGallery([asset('a'), asset('b'), asset('c')]);
+      final emb = CountingEmbedder();
+      final p = await service(g, store: storeFor('1'), emb: emb).run();
+      expect(p.phase, IndexPhase.done);
+      expect(p.completed, 3);
+      expect(emb.total, 3);
+      expect(await db.photoCount(), 3);
+      expect(await db.embeddingCount('MobileCLIP-S1', '1'), 3);
+    },
+  );
 
   test('incremental re-run does no duplicate work', () async {
     final g = FakeGallery([asset('a'), asset('b')]);
@@ -79,7 +83,11 @@ void main() {
     final g = FakeGallery([asset('a'), asset('b')]);
     await service(g, store: storeFor('1'), emb: CountingEmbedder()).run();
     g.assets = [asset('a')];
-    final p = await service(g, store: storeFor('1'), emb: CountingEmbedder()).run();
+    final p = await service(
+      g,
+      store: storeFor('1'),
+      emb: CountingEmbedder(),
+    ).run();
     expect(p.deleted, 1);
     expect(await db.photoCount(), 1);
     expect(await db.embeddingCount('MobileCLIP-S1', '1'), 1);
@@ -98,9 +106,19 @@ void main() {
 
   test('model version migration re-embeds everything', () async {
     final g = FakeGallery([asset('a'), asset('b')]);
-    await service(g, store: storeFor('1'), emb: CountingEmbedder(), version: '1').run();
+    await service(
+      g,
+      store: storeFor('1'),
+      emb: CountingEmbedder(),
+      version: '1',
+    ).run();
     final emb2 = CountingEmbedder();
-    final p = await service(g, store: storeFor('2'), emb: emb2, version: '2').run();
+    final p = await service(
+      g,
+      store: storeFor('2'),
+      emb: emb2,
+      version: '2',
+    ).run();
     expect(p.completed, 2);
     expect(emb2.total, 2);
     expect(await db.embeddingCount('MobileCLIP-S1', '2'), 2);
@@ -111,9 +129,11 @@ void main() {
     final g = FakeGallery([for (var i = 0; i < 5; i++) asset('a$i')]);
     final store = storeFor('1');
     late IndexingService svc;
-    final emb = CountingEmbedder(onEmbed: (n) {
-      if (n == 3) svc.cancel();
-    });
+    final emb = CountingEmbedder(
+      onEmbed: (n) {
+        if (n == 3) svc.cancel();
+      },
+    );
     svc = service(g, store: store, emb: emb, batchSize: 2);
     final p = await svc.run();
     expect(p.phase, IndexPhase.cancelled);
@@ -129,7 +149,11 @@ void main() {
   test('per-asset failure is isolated; the rest succeed', () async {
     final g = FakeGallery([asset('good1'), asset('bad'), asset('good2')]);
     g.missingBytes.add('bad');
-    final p = await service(g, store: storeFor('1'), emb: CountingEmbedder()).run();
+    final p = await service(
+      g,
+      store: storeFor('1'),
+      emb: CountingEmbedder(),
+    ).run();
     expect(p.phase, IndexPhase.done);
     expect(p.failed, 1);
     expect(p.completed, 2);
@@ -139,9 +163,36 @@ void main() {
   test('stress: 200 assets index, persist, and checkpoint', () async {
     final g = FakeGallery([for (var i = 0; i < 200; i++) asset('s$i')]);
     final store = storeFor('1');
-    final p = await service(g, store: store, emb: CountingEmbedder(), batchSize: 32).run();
+    final p = await service(
+      g,
+      store: store,
+      emb: CountingEmbedder(),
+      batchSize: 32,
+    ).run();
     expect(p.completed, 200);
     expect(await db.photoCount(), 200);
     expect((await store.loadCheckpoint()).embedded, 200);
+  });
+
+  test('dispose releases composed resources once', () async {
+    var releases = 0;
+    final svc = IndexingService(
+      gallery: FakeGallery(const []),
+      processor: AssetProcessor(
+        gallery: FakeGallery(const []),
+        metadata: FakeMetadata(),
+        thumbnails: FakeThumbnails(),
+        embedder: CountingEmbedder(),
+        enricher: FakeEnricher(),
+      ),
+      store: storeFor('1'),
+      versionManager: const ModelVersionManager(),
+      onDispose: () async => releases++,
+    );
+
+    await svc.dispose();
+    await svc.dispose();
+
+    expect(releases, 1);
   });
 }

@@ -7,6 +7,7 @@ import '../../state/providers.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/indexing_status.dart';
 import '../../widgets/photo_grid.dart';
+import '../indexing/folder_picker.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -26,8 +27,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _runQuery(String q) {
     _controller.text = q;
-    _controller.selection =
-        TextSelection.fromPosition(TextPosition(offset: q.length));
+    _controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: q.length),
+    );
     ref.read(searchQueryProvider.notifier).state = q;
   }
 
@@ -35,7 +37,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget build(BuildContext context) {
     final query = ref.watch(searchQueryProvider);
     final resultsAsync = ref.watch(searchResultsProvider);
-    final results = resultsAsync.valueOrNull ?? const <Photo>[];
+    final results = resultsAsync.isLoading
+        ? const <Photo>[]
+        : resultsAsync.valueOrNull ?? const <Photo>[];
     final isSearching = resultsAsync.isLoading;
     final semantic =
         ref.watch(searchBackendProvider).valueOrNull?.isSemantic ?? false;
@@ -50,11 +54,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(
                 children: [
-                  Text('PixelSearch',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+                  Text(
+                    'PixelSearch',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
                   const Spacer(),
                   _ModeBadge(semantic: semantic),
                   const SizedBox(width: 8),
@@ -81,41 +87,50 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: query.trim().isEmpty
                   ? _EmptySearch(onQueryTap: _runQuery)
                   : results.isEmpty
-                      ? (isSearching
-                          ? const _Searching()
-                          : const EmptyState(
-                              icon: Icons.search_off,
-                              title: 'No matches',
-                              message:
-                                  'Try simpler words like “beach”, “dog”, or “night”.',
-                            ))
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      '${results.length} result${results.length == 1 ? '' : 's'} for “$query”',
-                                      style: TextStyle(
-                                          color: scheme.onSurfaceVariant),
-                                    ),
+                  ? (isSearching
+                        ? const _Searching()
+                        : resultsAsync.hasError
+                        ? const EmptyState(
+                            icon: Icons.error_outline,
+                            title: 'Search unavailable',
+                            message:
+                                'Could not read the search index. Reopen the app to retry.',
+                          )
+                        : const EmptyState(
+                            icon: Icons.search_off,
+                            title: 'No close matches',
+                            message:
+                                'No photos met the search cutoff in your indexed folders.',
+                          ))
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '${results.length} result${results.length == 1 ? '' : 's'} for “$query”',
+                                  style: TextStyle(
+                                    color: scheme.onSurfaceVariant,
                                   ),
-                                  if (isSearching)
-                                    const SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2),
-                                    ),
-                                ],
+                                ),
                               ),
-                            ),
-                            Expanded(child: PhotoGrid(photos: results)),
-                          ],
+                              if (isSearching)
+                                const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
+                        Expanded(child: PhotoGrid(photos: results)),
+                      ],
+                    ),
             ),
           ],
         ),
@@ -168,20 +183,21 @@ class _EmptySearch extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       children: [
-        Text('Try searching',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700)),
+        Text(
+          'Try searching',
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: suggestedQueries
-              .map((q) => ActionChip(
-                    label: Text(q),
-                    onPressed: () => onQueryTap(q),
-                  ))
+              .map(
+                (q) =>
+                    ActionChip(label: Text(q), onPressed: () => onQueryTap(q)),
+              )
               .toList(),
         ),
         const SizedBox(height: 24),
@@ -217,16 +233,20 @@ class _IndexCard extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('$total photos indexed',
-                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      Text(
+                        '$total photos indexed',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
                       Text(
                         !indexingSupported
                             ? 'Indexing needs a device gallery (not available on web).'
                             : total == 0
-                                ? 'Index your gallery to search it — nothing leaves this device.'
-                                : 'Re-indexing only picks up new and changed photos.',
+                            ? 'Index your gallery to search it — nothing leaves this device.'
+                            : 'Re-indexing only picks up new and changed photos.',
                         style: TextStyle(
-                            color: scheme.onSurfaceVariant, fontSize: 13),
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
@@ -239,7 +259,7 @@ class _IndexCard extends ConsumerWidget {
                           child: const Text('Cancel'),
                         )
                       : FilledButton.tonal(
-                          onPressed: controller.start,
+                          onPressed: () => chooseFoldersAndIndex(context, ref),
                           child: Text(total == 0 ? 'Index' : 'Re-index'),
                         ),
                 ],
@@ -282,12 +302,19 @@ class _ModeBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(semantic ? Icons.auto_awesome : Icons.abc, size: 15, color: fg),
+            Icon(
+              semantic ? Icons.auto_awesome : Icons.abc,
+              size: 15,
+              color: fg,
+            ),
             const SizedBox(width: 4),
             Text(
               semantic ? 'Semantic' : 'Keyword',
               style: TextStyle(
-                  color: fg, fontSize: 12, fontWeight: FontWeight.w700),
+                color: fg,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),
@@ -308,10 +335,15 @@ class _Searching extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(
-              width: 26, height: 26, child: CircularProgressIndicator(strokeWidth: 3)),
+            width: 26,
+            height: 26,
+            child: CircularProgressIndicator(strokeWidth: 3),
+          ),
           const SizedBox(height: 14),
-          Text('Searching your photos…',
-              style: TextStyle(color: scheme.onSurfaceVariant)),
+          Text(
+            'Searching your photos…',
+            style: TextStyle(color: scheme.onSurfaceVariant),
+          ),
         ],
       ),
     );

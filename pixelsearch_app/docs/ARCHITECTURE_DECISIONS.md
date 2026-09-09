@@ -2,6 +2,36 @@
 
 Format: each record is a decision, its context, and its consequences. Newest first.
 
+## ADR-017 - Folder-scoped candidates with gallery-wide deletion reconciliation
+**Context:** the user wants to choose folders for new indexing and explicitly retain already-indexed
+photos when a folder is deselected. Treating a filtered gallery as the full gallery would delete those rows.
+**Decision:** persist stable MediaStore folder IDs and explicit All mode in schema-v4 SQLite preferences.
+Every foreground Index action confirms the scope; the existing background composition reads the same
+preference. `GallerySnapshot` separates candidate metadata from existence IDs for `IndexPlanner`.
+Only selected candidates reach decoding/CLIP/ML Kit. Full-access metadata scans identify true deletions;
+limited access does not authorize pruning. Empty/unavailable selections never fall back to All.
+**Consequences:** model/search contracts stay unchanged. Out-of-selection photos remain searchable but
+are not refreshed until reselected. Subset runs still enumerate gallery-wide metadata for deletion checks,
+with O(gallery size) ID memory. No WorkManager scheduling or automatic photo deletion is introduced.
+
+## ADR-016 - Repair FP16 artifact conversion without changing the embedding contract
+**Context:** the original fp16 image and text exports could not be loaded by ONNX Runtime: their declared
+`Cast` output types were `float16` while the corresponding `Cast.to` attributes remained `float`. The source
+was `onnxconverter_common.float16.convert_float_to_float16`, which changed value declarations without
+normalizing those `Cast` attributes. The defect affected the physical ONNX graphs, not MobileCLIP weights,
+tokenization, image preprocessing, or the public tensor contract.
+**Decision:** regenerate fp16 artifacts from the preserved fp32 exports with ONNX Runtime's FP16 converter,
+topologically sort the rewritten graph, normalize the existing internal ArgMax int32 cast idempotently, and
+gate output with `onnx.checker` plus a `Cast` output-type validator. Record the repaired physical artifacts as
+`artifact_version=3`; keep `embedding_version` unchanged until an Android fp16 session-load and numerical
+parity gate succeeds. The desktop CPU harness deliberately selects fp32, because fp16 CPU execution is not
+the Android target configuration.
+**Consequences:** the repaired graphs are structurally valid and the image graph loads in host ONNX Runtime.
+The model interface and indexed-vector compatibility have not been redefined. Android fp16 provider loading
+and fp16-to-fp32 embedding parity remain required device acceptance tests before v3 replaces a populated
+fp32 index. The reproducible repair path and its unit tests live in `model_kit/fp16_conversion.py`,
+`repair_fp16_exports.py`, and `test_fp16_conversion.py`.
+
 ## ADR-015 — Indexing reaches the UI through a conditional-import bridge; the library is DB-backed
 **Context:** M5 shipped a complete indexing engine that nothing called. The app still ran the M1 demo loader
 (in-memory, capped at 80 photos, tags synthesized from EXIF), which shadowed the real pipeline and produced

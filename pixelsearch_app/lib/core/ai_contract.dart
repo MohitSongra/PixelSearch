@@ -14,14 +14,14 @@ class AiContract {
   /// Bump ⇒ full, resumable re-index of every photo. See MIGRATIONS.md §B.
   static const String embeddingVersion = '1';
 
-  /// Version of the physical exported files (ONNX + vocab). v2: text model
-  /// patched with an int32 Cast before ArgMax for onnxruntime-1.15 compatibility
-  /// (embeddings unchanged — see ADR-012, MIGRATIONS.md).
-  static const String artifactVersion = '2';
+  /// Version of the physical exported files (ONNX + vocab). v3 repairs the
+  /// invalid fp16 Cast metadata emitted by the previous converter; model and
+  /// preprocessing contracts are unchanged (see MIGRATIONS.md).
+  static const String artifactVersion = '3';
 
-  /// The on-device SQLite schema version (AppDatabase.schemaVersion). v3 added
-  /// the M5 indexing-metadata columns (labels/faces/mtime/…) that M6 ranks on.
-  static const int schemaVersion = 3;
+  /// The on-device SQLite schema version (AppDatabase.schemaVersion). v4 adds
+  /// saved folder selection; model artifacts and embeddings are unchanged.
+  static const int schemaVersion = 4;
 
   // --- Model geometry (contract §1, §3, §4) ---
   static const int embeddingDim = 512;

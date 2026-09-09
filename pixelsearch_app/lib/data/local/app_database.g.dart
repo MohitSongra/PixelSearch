@@ -1894,12 +1894,276 @@ class IndexStateRowsCompanion extends UpdateCompanion<IndexStateRow> {
   }
 }
 
+class $IndexingPreferencesRowsTable extends IndexingPreferencesRows
+    with TableInfo<$IndexingPreferencesRowsTable, IndexingPreferencesRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $IndexingPreferencesRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _allFoldersMeta = const VerificationMeta(
+    'allFolders',
+  );
+  @override
+  late final GeneratedColumn<bool> allFolders = GeneratedColumn<bool>(
+    'all_folders',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("all_folders" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _folderIdsJsonMeta = const VerificationMeta(
+    'folderIdsJson',
+  );
+  @override
+  late final GeneratedColumn<String> folderIdsJson = GeneratedColumn<String>(
+    'folder_ids_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, allFolders, folderIdsJson];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'indexing_preferences_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<IndexingPreferencesRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('all_folders')) {
+      context.handle(
+        _allFoldersMeta,
+        allFolders.isAcceptableOrUnknown(data['all_folders']!, _allFoldersMeta),
+      );
+    }
+    if (data.containsKey('folder_ids_json')) {
+      context.handle(
+        _folderIdsJsonMeta,
+        folderIdsJson.isAcceptableOrUnknown(
+          data['folder_ids_json']!,
+          _folderIdsJsonMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  IndexingPreferencesRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return IndexingPreferencesRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      allFolders: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}all_folders'],
+      )!,
+      folderIdsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}folder_ids_json'],
+      )!,
+    );
+  }
+
+  @override
+  $IndexingPreferencesRowsTable createAlias(String alias) {
+    return $IndexingPreferencesRowsTable(attachedDatabase, alias);
+  }
+}
+
+class IndexingPreferencesRow extends DataClass
+    implements Insertable<IndexingPreferencesRow> {
+  final int id;
+  final bool allFolders;
+  final String folderIdsJson;
+  const IndexingPreferencesRow({
+    required this.id,
+    required this.allFolders,
+    required this.folderIdsJson,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['all_folders'] = Variable<bool>(allFolders);
+    map['folder_ids_json'] = Variable<String>(folderIdsJson);
+    return map;
+  }
+
+  IndexingPreferencesRowsCompanion toCompanion(bool nullToAbsent) {
+    return IndexingPreferencesRowsCompanion(
+      id: Value(id),
+      allFolders: Value(allFolders),
+      folderIdsJson: Value(folderIdsJson),
+    );
+  }
+
+  factory IndexingPreferencesRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return IndexingPreferencesRow(
+      id: serializer.fromJson<int>(json['id']),
+      allFolders: serializer.fromJson<bool>(json['allFolders']),
+      folderIdsJson: serializer.fromJson<String>(json['folderIdsJson']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'allFolders': serializer.toJson<bool>(allFolders),
+      'folderIdsJson': serializer.toJson<String>(folderIdsJson),
+    };
+  }
+
+  IndexingPreferencesRow copyWith({
+    int? id,
+    bool? allFolders,
+    String? folderIdsJson,
+  }) => IndexingPreferencesRow(
+    id: id ?? this.id,
+    allFolders: allFolders ?? this.allFolders,
+    folderIdsJson: folderIdsJson ?? this.folderIdsJson,
+  );
+  IndexingPreferencesRow copyWithCompanion(
+    IndexingPreferencesRowsCompanion data,
+  ) {
+    return IndexingPreferencesRow(
+      id: data.id.present ? data.id.value : this.id,
+      allFolders: data.allFolders.present
+          ? data.allFolders.value
+          : this.allFolders,
+      folderIdsJson: data.folderIdsJson.present
+          ? data.folderIdsJson.value
+          : this.folderIdsJson,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('IndexingPreferencesRow(')
+          ..write('id: $id, ')
+          ..write('allFolders: $allFolders, ')
+          ..write('folderIdsJson: $folderIdsJson')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, allFolders, folderIdsJson);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is IndexingPreferencesRow &&
+          other.id == this.id &&
+          other.allFolders == this.allFolders &&
+          other.folderIdsJson == this.folderIdsJson);
+}
+
+class IndexingPreferencesRowsCompanion
+    extends UpdateCompanion<IndexingPreferencesRow> {
+  final Value<int> id;
+  final Value<bool> allFolders;
+  final Value<String> folderIdsJson;
+  const IndexingPreferencesRowsCompanion({
+    this.id = const Value.absent(),
+    this.allFolders = const Value.absent(),
+    this.folderIdsJson = const Value.absent(),
+  });
+  IndexingPreferencesRowsCompanion.insert({
+    this.id = const Value.absent(),
+    this.allFolders = const Value.absent(),
+    this.folderIdsJson = const Value.absent(),
+  });
+  static Insertable<IndexingPreferencesRow> custom({
+    Expression<int>? id,
+    Expression<bool>? allFolders,
+    Expression<String>? folderIdsJson,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (allFolders != null) 'all_folders': allFolders,
+      if (folderIdsJson != null) 'folder_ids_json': folderIdsJson,
+    });
+  }
+
+  IndexingPreferencesRowsCompanion copyWith({
+    Value<int>? id,
+    Value<bool>? allFolders,
+    Value<String>? folderIdsJson,
+  }) {
+    return IndexingPreferencesRowsCompanion(
+      id: id ?? this.id,
+      allFolders: allFolders ?? this.allFolders,
+      folderIdsJson: folderIdsJson ?? this.folderIdsJson,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (allFolders.present) {
+      map['all_folders'] = Variable<bool>(allFolders.value);
+    }
+    if (folderIdsJson.present) {
+      map['folder_ids_json'] = Variable<String>(folderIdsJson.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('IndexingPreferencesRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('allFolders: $allFolders, ')
+          ..write('folderIdsJson: $folderIdsJson')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $PhotoRowsTable photoRows = $PhotoRowsTable(this);
   late final $EmbeddingRowsTable embeddingRows = $EmbeddingRowsTable(this);
   late final $IndexStateRowsTable indexStateRows = $IndexStateRowsTable(this);
+  late final $IndexingPreferencesRowsTable indexingPreferencesRows =
+      $IndexingPreferencesRowsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1908,6 +2172,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     photoRows,
     embeddingRows,
     indexStateRows,
+    indexingPreferencesRows,
   ];
 }
 
@@ -2840,6 +3105,185 @@ typedef $$IndexStateRowsTableProcessedTableManager =
       IndexStateRow,
       PrefetchHooks Function()
     >;
+typedef $$IndexingPreferencesRowsTableCreateCompanionBuilder =
+    IndexingPreferencesRowsCompanion Function({
+      Value<int> id,
+      Value<bool> allFolders,
+      Value<String> folderIdsJson,
+    });
+typedef $$IndexingPreferencesRowsTableUpdateCompanionBuilder =
+    IndexingPreferencesRowsCompanion Function({
+      Value<int> id,
+      Value<bool> allFolders,
+      Value<String> folderIdsJson,
+    });
+
+class $$IndexingPreferencesRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $IndexingPreferencesRowsTable> {
+  $$IndexingPreferencesRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get allFolders => $composableBuilder(
+    column: $table.allFolders,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get folderIdsJson => $composableBuilder(
+    column: $table.folderIdsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$IndexingPreferencesRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $IndexingPreferencesRowsTable> {
+  $$IndexingPreferencesRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get allFolders => $composableBuilder(
+    column: $table.allFolders,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get folderIdsJson => $composableBuilder(
+    column: $table.folderIdsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$IndexingPreferencesRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $IndexingPreferencesRowsTable> {
+  $$IndexingPreferencesRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<bool> get allFolders => $composableBuilder(
+    column: $table.allFolders,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get folderIdsJson => $composableBuilder(
+    column: $table.folderIdsJson,
+    builder: (column) => column,
+  );
+}
+
+class $$IndexingPreferencesRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $IndexingPreferencesRowsTable,
+          IndexingPreferencesRow,
+          $$IndexingPreferencesRowsTableFilterComposer,
+          $$IndexingPreferencesRowsTableOrderingComposer,
+          $$IndexingPreferencesRowsTableAnnotationComposer,
+          $$IndexingPreferencesRowsTableCreateCompanionBuilder,
+          $$IndexingPreferencesRowsTableUpdateCompanionBuilder,
+          (
+            IndexingPreferencesRow,
+            BaseReferences<
+              _$AppDatabase,
+              $IndexingPreferencesRowsTable,
+              IndexingPreferencesRow
+            >,
+          ),
+          IndexingPreferencesRow,
+          PrefetchHooks Function()
+        > {
+  $$IndexingPreferencesRowsTableTableManager(
+    _$AppDatabase db,
+    $IndexingPreferencesRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$IndexingPreferencesRowsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$IndexingPreferencesRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$IndexingPreferencesRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<bool> allFolders = const Value.absent(),
+                Value<String> folderIdsJson = const Value.absent(),
+              }) => IndexingPreferencesRowsCompanion(
+                id: id,
+                allFolders: allFolders,
+                folderIdsJson: folderIdsJson,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<bool> allFolders = const Value.absent(),
+                Value<String> folderIdsJson = const Value.absent(),
+              }) => IndexingPreferencesRowsCompanion.insert(
+                id: id,
+                allFolders: allFolders,
+                folderIdsJson: folderIdsJson,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$IndexingPreferencesRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $IndexingPreferencesRowsTable,
+      IndexingPreferencesRow,
+      $$IndexingPreferencesRowsTableFilterComposer,
+      $$IndexingPreferencesRowsTableOrderingComposer,
+      $$IndexingPreferencesRowsTableAnnotationComposer,
+      $$IndexingPreferencesRowsTableCreateCompanionBuilder,
+      $$IndexingPreferencesRowsTableUpdateCompanionBuilder,
+      (
+        IndexingPreferencesRow,
+        BaseReferences<
+          _$AppDatabase,
+          $IndexingPreferencesRowsTable,
+          IndexingPreferencesRow
+        >,
+      ),
+      IndexingPreferencesRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2850,4 +3294,9 @@ class $AppDatabaseManager {
       $$EmbeddingRowsTableTableManager(_db, _db.embeddingRows);
   $$IndexStateRowsTableTableManager get indexStateRows =>
       $$IndexStateRowsTableTableManager(_db, _db.indexStateRows);
+  $$IndexingPreferencesRowsTableTableManager get indexingPreferencesRows =>
+      $$IndexingPreferencesRowsTableTableManager(
+        _db,
+        _db.indexingPreferencesRows,
+      );
 }
