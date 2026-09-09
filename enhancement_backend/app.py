@@ -20,6 +20,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 app = FastAPI(title="PixelSearch enhancements", version="1.0.0")
 VISION_MODEL = "qwen/qwen3.6-27b"
 SPEECH_MODEL = "whisper-large-v3-turbo"
+# Short captions/search JSON must fit the observed 1,000 OTPM free-tier limit.
+MAX_COMPLETION_TOKENS = 512
 MAX_FILE = 4 * 1024 * 1024
 _requests = defaultdict(deque)
 _slots = asyncio.Semaphore(2)
@@ -85,11 +87,14 @@ async def completion(system: str, content):
     result = await groq("chat/completions", json={
         "model": VISION_MODEL, "messages": [{"role": "system", "content": system},
             {"role": "user", "content": content}],
-        "response_format": {"type": "json_object"}, "max_completion_tokens": 2048,
+        "response_format": {"type": "json_object"}, "max_completion_tokens": MAX_COMPLETION_TOKENS,
         "reasoning_effort": "none",
     })
     try:
-        return json.loads(result["choices"][0]["message"]["content"])
+        choice = result["choices"][0]
+        if choice.get("finish_reason") != "stop":
+            raise HTTPException(502, "Model response did not complete; shorten the request and retry explicitly")
+        return json.loads(choice["message"]["content"])
     except (KeyError, IndexError, TypeError, ValueError) as exc:
         raise HTTPException(502, "Invalid model response") from exc
 
@@ -140,7 +145,8 @@ async def health():
     configured = bool(os.getenv("GROQ_API_KEY")) and os.getenv("GROQ_ZDR_CONFIRMED") == "true"
     return {"status": "ok", "configured": configured, "availability_verified": False,
             "features": ["caption", "rewrite", "assistant", "transcribe"] if configured else [],
-            "vision_model": VISION_MODEL, "speech_model": SPEECH_MODEL}
+            "vision_model": VISION_MODEL, "speech_model": SPEECH_MODEL,
+            "max_completion_tokens": MAX_COMPLETION_TOKENS}
 
 
 @app.post("/caption", dependencies=[Depends(authorize)])
