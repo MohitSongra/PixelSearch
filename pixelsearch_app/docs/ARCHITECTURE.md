@@ -1,71 +1,124 @@
-# ARCHITECTURE
+# PixelSearch Architecture
 
-## Shape
-A **fat on-device client** with an **optional, privacy-gated cloud** (off by default).
-Everything required for search runs locally; the network is never on the critical path.
+Current source organization after the September 2026 integrations. Historical
+milestone plans are retained separately under [the documentation archive](../../docs/README.md).
 
-## Layers (clean architecture, feature-first)
+## Component boundaries
+
+```text
+pixelsearch_app/       Flutter UI, local AI, indexing, storage and Android bridges
+model_kit/             Model contracts, export/repair and reference validation
+enhancement_backend/  Optional consented request broker, not a gallery/search server
 ```
-Presentation   lib/features/*        screens + widgets, Riverpod-driven, no business logic
-State          lib/state/*          Riverpod providers (StateNotifier / Provider)
-Domain         lib/models/*         Photo (platform-free), value types
-Data           lib/data/*          repositories, device gallery, search, local DB (M2)
-Core           lib/core/*          theme, router, DI wiring
-```
-Cross-platform safety is enforced with **conditional imports** (`dart.library.io`):
-the same public API resolves to a native implementation on mobile/desktop and a stub on web.
-This is how the device gallery works today and how the M2 database connection works.
 
-## On-device data flow (target, once the AI core lands)
+The local app owns photo eligibility, identities, embeddings and ranking. The
+backend never replaces that decision path or receives the gallery database.
+
+## App layers
+
+| Folder | Ownership |
+| --- | --- |
+| `lib/features/` | Screens and feature widgets |
+| `lib/widgets/` | Reusable presentation elements |
+| `lib/state/` | Riverpod composition, controllers and lifecycle coordination |
+| `lib/domain/` | Search rules, person parsing/grouping, gallery and timeline logic |
+| `lib/models/` | Shared photo value model |
+| `lib/data/` | Repositories, Drift storage and optional online clients |
+| `lib/indexing/` | Reconciliation, processing, batches and device adapters |
+| `lib/ai/` | Tokenizer, preprocessing and ONNX encoders |
+| `lib/core/` | Router, theme, platform boundaries and model locator/contracts |
+| `lib/evaluation/` | Retrieval diagnostics, judgments and evaluation reports |
+
+Prefer pure domain functions for new deterministic rules. Screens observe
+providers; providers compose repositories and services. Do not move generated
+database code into the domain or let an online assistant execute database queries.
+
+## State ownership
+
+`providers.dart` contains only exports so existing screens and overrides retain
+the same provider objects. State implementations import their specific owners.
+
+| File in `lib/state/` | Responsibility |
+| --- | --- |
+| `storage_providers.dart` | Database lifetime and photo repository |
+| `preferences_providers.dart` | Preferences, theme and onboarding decision |
+| `online_providers.dart` | Consent policy and enhancement client |
+| `library_providers.dart` | Indexed-photo read model and suggestions |
+| `query_providers.dart` | Search text, filters and debounce |
+| `indexing_providers.dart` | Indexing progress, cancellation and post-run refresh |
+| `search_providers.dart` | Vector warmup, backend selection and ranked response |
+| `people_providers.dart` | People repository, name resolution and scan lifecycle |
+
+Indexing and People controllers intentionally coordinate: indexing suspends People;
+People observes indexing completion to resume. Their shared SQLite processing lease
+serializes heavy processing. Splitting files does not change that lifecycle contract.
+Conditional bridges isolate native gallery/model APIs from unsupported platforms.
+
+## Local indexing
+
 ```mermaid
 flowchart LR
-  subgraph Device
-    G[Gallery / MediaStore] --> IDX[Indexer (isolate, batched)]
-    IDX -->|image tensor 1x3x256x256| IMG[ONNX image encoder fp16]
-    IMG -->|512-d L2-normalized| DB[(drift / SQLite\nphotos + embeddings)]
-    Q[Query text] --> TOK[CLIP BPE tokenizer] --> TXT[ONNX text encoder fp16]
-    TXT -->|512-d| S[Cosine search]
-    DB --> S
-    S --> UI[Ranked results]
-  end
-  DB -. optional, privacy-gated .-> CLOUD[FastAPI backend]
+    Gallery[Selected gallery assets] --> Plan[Compare saved revisions]
+    Plan --> Process[Decode, thumbnail, image embedding, ML Kit]
+    Process --> Batch[Commit completed batches]
+    Batch --> DB[(SQLite / Drift)]
+    DB --> Library[Indexed gallery]
+    DB --> Vectors[In-memory current-version vectors]
 ```
 
-## Where each milestone plugs in
-- **M2 (now):** the `(photos + embeddings)` store — the spine everything else reads/writes.
-- **M4/M6:** the two ONNX encoders + tokenizer, implementing `INTERFACE_CONTRACT.md`.
-- **M5:** the indexer isolate that fills `EmbeddingRows` in the background, resumably.
-- **M6 (done):** real semantic cosine search (`SemanticSearchBackend` + `HybridScorer`) replacing `search_engine.dart`'s mock, with keyword fallback when the model isn't provisioned.
+The planner handles new, changed, stale and deleted records. Cancellation preserves
+committed work. Original photos remain gallery assets; the app stores metadata,
+thumbnail paths, vectors and additional user choices. Database schema 6 includes
+People records. See [migrations](MIGRATIONS.md).
 
-## Model provisioning
-The fp16 encoders total ~171 MB and are **not** bundled in the APK. They are provisioned to
-the device on first run (download or dev-push) and loaded **once** per session (`INTERFACE_CONTRACT.md` §7).
-Until they are present, the app runs in keyword-fallback mode — the product is always usable.
+Core image processing still contains synchronous work on the foreground path.
+Yielding between assets is not a completed worker migration. WorkManager adapters
+exist, but initialization alone does not schedule background indexing.
 
-## Persistence design (M2)
-- `PhotoRows` — one row per photo (id, source, assetName, title, caption, tagsCsv, dateMs, lat, lng, place, album, createdAtMs). Thumbnails are **not** stored; re-decoded from the asset on demand.
-- `EmbeddingRows` — `(photoId, modelId)` composite key; `dim`; `vector` BLOB (little-endian float32, 512×4 = 2048 bytes); `createdAtMs`. Keyed by `modelId` so a future model can coexist during migration.
-- `IndexStateRows` — single-row progress/coverage record for the M5 indexer and the settings UI.
+## Search
 
-## Search layer (swap-stable)
-Two seams keep search backends replaceable without disturbing the layers above them:
-
-```
-UI ── searchResultsProvider (AsyncValue) ── SearchBackend ─── (SemanticSearchBackend │ KeywordSearchBackend)
-                                                  │ semantic = TextEmbedder → VectorIndex → HybridScorer
-                                                  └── VectorIndex ── (BruteForceVectorIndex now │ SqliteVec/HNSW later)
+```mermaid
+flowchart LR
+    Query[Description and registered names] --> Resolve[Resolve people and filters]
+    Resolve --> Eligible[Eligible photo set]
+    Eligible --> Encode[Text embedding for scene queries]
+    Encode --> Scan[Exact cosine scan and candidate cutoff]
+    Scan --> Rank[Hybrid reranking]
+    Rank --> Results[Photos and score explanations]
 ```
 
-- `SearchBackend` (`domain/search/`, **async** since M6 — ADR-014) — app-level strategy. On device the
-  `SemanticSearchBackend` runs real CLIP; on web (or if the model isn't provisioned) `KeywordSearchBackend`
-  is the fallback, and the semantic backend itself degrades to lexical on any model failure. The UI only ever
-  watches `searchResultsProvider` (now an `AsyncValue`).
-- `HybridScorer` (`domain/search/`, pure) — fuses CLIP cosine ⊕ lexical (tags/ML Kit labels/…) ⊕ face-intent
-  into the final ranking (ADR-014). Fully unit-tested with no ONNX/IO.
-- `VectorIndex` (`domain/search/`) — the ANN-swappable primitive. `BruteForceVectorIndex` does an exact
-  cosine scan now; `SqliteVecVectorIndex`/ObjectBox can replace it behind the same interface with no
-  caller change. Vectors are L2-normalized, so similarity is a dot product (contract §5). See ADR-009.
+Names map to user-confirmed People identities. A query requiring two people uses
+the intersection of their photo memberships; it does not imply nobody else may
+appear. Name-only retrieval bypasses CLIP. Scene-plus-person queries rank within
+the eligible set. Missing/unusable scene models select visible keyword fallback.
 
-**M6 status:** real semantic search is wired end-to-end and verified on a real ONNX Runtime (6/6 retrieval).
-On-device provisioning of the fp16 text model + live DB index warm-up is the remaining runtime step (shared
-with the M5 indexer).
+The model contract defines 512-dimensional normalized scene vectors. The current
+index is exact brute-force retrieval, not FAISS or a cloud vector database.
+See [MobileCLIP contract](../../model_kit/INTERFACE_CONTRACT.md).
+
+## People
+
+ML Kit detects faces and landmarks; SFace creates separate 128-dimensional
+descriptors. A dedicated worker handles alignment/inference. Users supply names,
+aliases and corrections. Automatic assignments are gated by reviewed calibration
+and held-out validation; no universal identity threshold or recognition accuracy
+is asserted. See [People contract](../../model_kit/FACE_CONTRACT.md).
+
+## Online boundary
+
+Consent in the app precedes any upload. Captions send an approved resized photo;
+rewriting sends text; speech sends an approved recording. Assistant responses
+propose editable search terms and filters that are applied locally. Person-aware
+assistant requests are blocked from that online path.
+
+Map tiles use a separate consented tile client. EXIF coordinates and face records
+remain local; displaying a map is not a reason to upload a gallery.
+
+## Artifacts and historical material
+
+- Keep contracts, licenses, lock files, generated Drift code and test fixtures.
+- MobileCLIP exports are regenerated/provisioned separately and ignored by Git.
+- The licensed bundled SFace model is the explicit ONNX exception.
+- Keep private device data, build outputs, local documents and temporary renders out of Git.
+- The old demo and concatenated source dump are available in Git history, not as
+  competing active source trees.

@@ -1,11 +1,6 @@
 # PixelSearch — repository-root ignore (each subproject also has its own .gitignore)
 
 # ---- Flutter / Dart ----
-app/.dart_tool/
-app/.flutter-plugins-dependencies
-app/build/
-app/.pub-cache/
-app/.pub/
 pixelsearch_app/build/
 pixelsearch_app/.dart_tool/
 pixelsearch_app/.flutter-plugins
@@ -26,10 +21,8 @@ Thumbs.db
 
 # ---- ModelKit large regenerable artifacts (regenerate: python prepare_model.py) ----
 model_kit/out/*.onnx
-# Belt and braces: ONNX weights are provisioned to the device at runtime and are
-# NEVER committed or bundled in the APK (ADR-005). ~171 MB fp16 / ~350 MB with
-# the fp32 dev exports — far past what normal Git history should carry, and this
-# repo has no LFS/annex strategy. If that ever changes, do it deliberately.
+# MobileCLIP exports are provisioned separately, not stored in Git.
+# The smaller licensed SFace model below is an explicit offline-use exception.
 *.onnx
 pixelsearch_app/assets/models/*.onnx
 # Approved offline People exception: SFace is bundled for network-free first use.
@@ -43,6 +36,31 @@ venv/
 
 # ---- Secrets / local ----
 .env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.pem
+*.key
+.claude/
+.codex/
+
+# Local deliverables, diagnostics and regenerable output are not application source.
+/output/
+/tmp/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/coverage/
+.coverage
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+*.db-shm
+*.db-wal
+*.apk
+*.aab
 
 # Private device search traces: filenames, labels and relevance judgments.
 pixelsearch_app/local_evaluation/

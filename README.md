@@ -1,45 +1,81 @@
-# PixelSearch — Project Handoff
+# PixelSearch
 
-Privacy-first, AI-powered **semantic photo retrieval** for mobile (Flutter, Android-first).
-This package contains everything to understand the project **and** run a working demo.
+Android-first semantic search for a personal photo gallery. Describe a remembered
+scene, or name people you have registered, and search the local index.
+Core indexing, image/text embeddings, ranking and People data stay on the device.
+Online enhancements require separate consent.
 
-## What's in this folder
+## Repository layout
 
-```
-PixelSearch_Handoff/
-├── README.md                     ← you are here
-├── SETUP_AND_DEMO.md             ← install Flutter from scratch, run the app, 3-min demo script
-├── app/                          ← the runnable Flutter demo (M0 + M1 + M3 + mock search)
-└── handbook/
-    ├── PixelSearch_Mobile_Implementation_Handbook.md    ← full 12-phase plan (renders diagrams)
-    ├── PixelSearch_Mobile_Implementation_Handbook.docx  ← same, formatted for printing/submission
-    └── diagrams/                 ← the 7 architecture/DB/flow diagrams as PNGs
-```
+| Directory | Responsibility |
+| --- | --- |
+| `pixelsearch_app/` | Active Flutter application, Android integration and app tests |
+| `model_kit/` | Model export/repair, preprocessing contracts and parity/evaluation tools |
+| `enhancement_backend/` | Optional FastAPI caption, rewrite, assistant and speech service |
+| `docs/` | Documentation index and clearly separated historical plans |
+| `tool/` | Repository maintenance and publication checks |
+| `.github/workflows/` | App, backend, ModelKit and repository CI |
+| `render.yaml` | Optional backend deployment configuration |
 
-## Quick start (browser, no Android needed)
-```bash
-cd app
+The obsolete `app/` prototype is no longer an application entry point. Its source
+remains in Git history. Local documents, posters, renderings and private diagnostics
+belong in ignored `output/`, `tmp/` and `pixelsearch_app/local_evaluation/`.
+
+## Start developing
+
+Use Flutter 3.44.7 / Dart 3.12.2 to reproduce the current lock file and CI baseline.
+
+```sh
+cd pixelsearch_app
 flutter pub get
-flutter run -d chrome
+dart run build_runner build --delete-conflicting-outputs
+flutter analyze
+flutter test
+flutter build apk --debug
 ```
-Then tap **“Explore with sample photos.”** Full steps (including running on a real Android phone) are in **SETUP_AND_DEMO.md**.
 
-## What works today (verified)
-- Premium **Material 3** UI with light/dark, onboarding, bottom-nav shell.
-- **Real device gallery access** (Android) via `photo_manager`, with a **web sample-photo fallback**.
-- **Search** with live results + suggestions (keyword/tag ranking — a stand-in for CLIP).
-- **Full-screen viewer** (zoom, swipe, details) and a **consent-gated mock cloud caption**.
-- **Timeline** auto-grouping photos into events, and a **Map** grouping by location.
-- **Privacy mode** that disables all cloud features.
-- Verified: `flutter analyze` clean, widget test passes, `flutter build web` succeeds (Flutter 3.44 / Dart 3.12).
+Android is the primary runtime. The iOS, Linux and web scaffolds remain for platform
+boundaries and development/testing; their presence is not a feature-parity claim.
+The large MobileCLIP encoders must be provisioned separately. A successful APK
+build alone does not make semantic search ready. See the [app setup](pixelsearch_app/README.md).
 
-## What's mocked (be upfront at the review)
-The **search ranking** is keyword/tag matching, standing in for the real **on-device CLIP** semantic search.
-Everything else (gallery, timeline, map, privacy model, UI) is real. The CLIP indexing pipeline is the next
-milestone — the app's layered structure (data / state / features) is built so it drops straight in.
+## Implementation and verification
 
-## The plan behind the app
-`handbook/` is the complete technical plan: critical review of the original desktop design, the mobile-first
-tech stack (Flutter, on-device CLIP via ONNX, ML Kit, SQLite/drift, optional FastAPI backend), full system
-architecture, database schema, milestone-by-milestone build plan, API design, UI plan, and testing strategy.
-This demo is milestones **M0, M1, M3** (plus a mock of the M8 search UI) from that plan.
+- Local MobileCLIP image/text embeddings and exact cosine retrieval, followed by
+  hybrid reranking and filters; visible keyword fallback when semantic search is unavailable.
+- Incremental gallery indexing and SQLite/Drift persistence, with cancellation and resume.
+- Local SFace descriptors, New Faces naming, aliases, corrections and person-aware queries.
+  Automatic grouping requires a reviewed local calibration/validation gate.
+- Indexed gallery, daily timeline, stories, EXIF location records and consented map tiles.
+- Offline speech integration and optional approved online speech, captions and assistant requests.
+
+These are implemented paths, not claims of universal accuracy or a finished public
+release. Real named-person retrieval, spoken-language quality, positive GPS pins
+and full-gallery processing still require acceptance on the target phone.
+Recorded Android model acceptance uses FP32 CPU; FP16 exports are not a completed
+accelerated rollout. See [the documentation index](docs/README.md) for dated evidence.
+
+## Optional backend
+
+The app performs its own search. The backend is not a remote gallery or vector database.
+It receives only explicitly approved requests. Credentials belong in server secrets
+and local secure settings, never source control.
+
+See [backend setup and tests](enhancement_backend/README.md). Pushing to the branch
+configured by Render may trigger that service's normal deployment workflow.
+
+## Before committing
+
+```sh
+python tool/check_repository.py
+python model_kit/eval/test_metrics.py
+```
+
+Also run Flutter analysis/tests and the backend contract suite. Preserve the lock
+files, generated Drift source, model contracts, fixture data and SFace license.
+Do not add device databases, face crops, gallery exports, installation tokens,
+private keys, APKs or large MobileCLIP exports.
+
+[Architecture](pixelsearch_app/docs/ARCHITECTURE.md) |
+[Documentation](docs/README.md) |
+[Handoff](HANDOFF.md)

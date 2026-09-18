@@ -5,9 +5,11 @@ gallery storage remain on the phone. It does not serve as a replacement search e
 
 ## Deployment status
 
-Implementation and mocked contract tests are available. No service has been deployed,
-no provider key has been configured, and no real photo/audio has been uploaded during
-this work. Live model quality and free-account availability still require validation.
+A deployment and live assistant checks were recorded on 9 September 2026 in
+[the acceptance report](../pixelsearch_app/docs/ONLINE_BACKEND_ACCEPTANCE_2026-09-09.md).
+That historical check is not a guarantee of current service availability. Automated
+tests use mocked provider responses; broad caption and speech quality still need
+explicitly consented device acceptance.
 
 ## Free-tier setup
 
@@ -21,7 +23,7 @@ this work. Live model quality and free-account availability still require valida
 4. Deploy `render.yaml` as a Render Blueprint, explicitly choosing the **Free** web
    service. Keep billing disabled; if free service is unavailable, stop rather than
    choose a paid tier. Deployment needs the implemented backend files in the selected
-   repository/ref; this task has not committed or pushed them.
+   repository/ref. Verify the deployed revision after each release.
 5. Set `GROQ_ZDR_CONFIRMED=true` **only after** checking Groq's account-level setting.
    The flag is an operator attestation, not a mechanism that enables ZDR at Groq.
 6. Set the resulting HTTPS base URL and per-install token on the phone. Online

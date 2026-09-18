@@ -8,7 +8,9 @@ import 'package:photo_manager/photo_manager.dart';
 import '../data/people_repository.dart';
 import '../data/people/people_service.dart';
 import '../domain/people/people_query.dart';
-import 'providers.dart';
+import 'indexing_providers.dart';
+import 'query_providers.dart';
+import 'storage_providers.dart';
 
 final peopleRepositoryProvider = Provider((ref) {
   final db = ref.watch(appDatabaseProvider);
