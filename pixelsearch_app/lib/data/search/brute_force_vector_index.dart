@@ -20,8 +20,10 @@ class BruteForceVectorIndex implements VectorIndex {
 
   @override
   void upsert(String id, Float32List vector) {
-    assert(vector.length == dim,
-        'expected a $dim-d vector, got ${vector.length}');
+    assert(
+      vector.length == dim,
+      'expected a $dim-d vector, got ${vector.length}',
+    );
     _vectors[id] = vector;
   }
 
@@ -32,11 +34,16 @@ class BruteForceVectorIndex implements VectorIndex {
   void clear() => _vectors.clear();
 
   @override
-  List<VectorMatch> query(Float32List query, {int topK = 50}) {
-    assert(query.length == dim,
-        'expected a $dim-d query, got ${query.length}');
+  List<VectorMatch> query(
+    Float32List query, {
+    int topK = 50,
+    Set<String>? eligibleIds,
+  }) {
+    assert(query.length == dim, 'expected a $dim-d query, got ${query.length}');
     final matches = <VectorMatch>[
-      for (final e in _vectors.entries) VectorMatch(e.key, _dot(query, e.value)),
+      for (final e in _vectors.entries)
+        if (eligibleIds == null || eligibleIds.contains(e.key))
+          VectorMatch(e.key, _dot(query, e.value)),
     ];
     matches.sort((a, b) => b.score.compareTo(a.score));
     return matches.length > topK ? matches.sublist(0, topK) : matches;

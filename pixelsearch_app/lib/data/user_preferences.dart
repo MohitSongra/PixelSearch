@@ -33,6 +33,37 @@ class UserPreferences {
   }
 
   bool get onboardingComplete => _data['onboarding_complete'] == true;
+  Map<String, dynamic> get onlineSettings =>
+      Map<String, dynamic>.from(_data['online_settings'] as Map? ?? {});
+  Future<void> saveOnlineSettings(Map<String, dynamic> settings) =>
+      _update((next) => next['online_settings'] = settings);
+
+  String offlineSpeechLocale(String language) {
+    final fallback = language == 'English' ? 'en-IN' : 'hi-IN';
+    final saved = (_data['offline_speech_locales'] as Map?)?[language];
+    return saved is String && _validSpeechLocale(language, saved)
+        ? saved
+        : fallback;
+  }
+
+  bool _validSpeechLocale(String language, String locale) =>
+      const ['English', 'Hindi', 'Hinglish'].contains(language) &&
+      RegExp(r'^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$').hasMatch(locale) &&
+      locale.split('-').first.toLowerCase() ==
+          (language == 'English' ? 'en' : 'hi');
+
+  Future<void> saveOfflineSpeechLocale(String language, String locale) {
+    if (!_validSpeechLocale(language, locale)) {
+      throw ArgumentError('Choose a matching offline speech language.');
+    }
+    return _update((next) {
+      final locales = Map<String, dynamic>.from(
+        next['offline_speech_locales'] as Map? ?? {},
+      );
+      locales[language] = locale;
+      next['offline_speech_locales'] = locales;
+    });
+  }
 
   Future<bool> shouldSkipOnboarding(Future<int> Function() photoCount) async {
     await load();

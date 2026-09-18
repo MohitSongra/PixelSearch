@@ -17,7 +17,7 @@ spec both sides implement against.
 | `model_version` | `1.0` | model architecture + weights (MobileCLIP-S1/datacompdr) | full re-index |
 | `embedding_version` | `1` | the **stored image-embedding** pipeline = model + image preprocessing | full re-index |
 | `artifact_version` | `3` | the physical exported files (ONNX + vocab), even if numerically identical | re-provision model, no re-index |
-| `schema_version` | `4` | the on-device SQLite schema | DB migration, no re-index |
+| `schema_version` | `6` | the on-device SQLite schema | DB migration, no re-index |
 
 ## 1. Model identity *(frozen)*
 | Field | Value |

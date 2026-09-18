@@ -120,7 +120,7 @@ void main() {
     () async {
       final corpus = List.generate(
         230,
-        (i) => fixturePhoto('$i', album: 'Camera'),
+        (i) => fixturePhoto('$i', album: 'Camera beach'),
       );
       final index = BruteForceVectorIndex();
       for (var i = 0; i < corpus.length; i++) {

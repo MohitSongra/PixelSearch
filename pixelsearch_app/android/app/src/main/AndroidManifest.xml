@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- Photo library access (PixelSearch Milestone M1) -->
     <!-- Android 13+ (API 33+): granular media permission -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
@@ -11,6 +13,9 @@
         android:maxSdkVersion="32"/>
 
     <application
+        android:allowBackup="false"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="PixelSearch"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
@@ -48,6 +53,7 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <intent><action android:name="android.speech.RecognitionService"/></intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

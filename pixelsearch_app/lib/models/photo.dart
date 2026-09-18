@@ -86,6 +86,10 @@ class Photo {
   /// that has no usable image never throws mid-build.
   ImageProvider get image {
     if (thumbBytes != null) return MemoryImage(thumbBytes!);
+    if (source == PhotoSource.device) {
+      final preview = deviceThumbnail(id, thumbPath);
+      if (preview != null) return preview;
+    }
     if (thumbPath != null) {
       final file = fileImage(thumbPath!); // null on web
       if (file != null) return file;

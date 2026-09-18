@@ -5,10 +5,10 @@ import '../../ai/text_embedder.dart';
 import '../../core/ai_contract.dart';
 import '../../domain/search/hybrid_scorer.dart';
 import '../../domain/search/search_backend.dart';
+import '../../domain/search/search_response.dart';
 import '../../domain/search/search_diagnostics.dart';
 import '../../domain/search/vector_index.dart';
 import '../../models/photo.dart';
-import '../search_engine.dart'; // queryTerms (re-exported)
 import 'search_ranking.dart';
 
 /// M6 semantic search: query text → CLIP text embedding → cosine over the
@@ -63,8 +63,22 @@ class SemanticSearchBackend implements SearchBackend, SearchInspector {
 
   @override
   Future<List<Photo>> search(String query, List<Photo> corpus) async {
+    return (await searchDetailed(SearchRequest(query), corpus)).photos;
+  }
+
+  @override
+  Future<SearchResponse> searchDetailed(
+    SearchRequest request,
+    List<Photo> corpus,
+  ) async {
+    final query = request.query;
+    corpus = request.filterCorpus(corpus);
     if (query.trim().isEmpty) {
-      return [...corpus]..sort((a, b) => b.date.compareTo(a.date)); // browse
+      return SearchResponse(
+        request: request,
+        photos: [...corpus]..sort((a, b) => b.date.compareTo(a.date)),
+        mode: 'browse',
+      );
     }
 
     // Semantic signal (best-effort).
@@ -73,7 +87,13 @@ class SemanticSearchBackend implements SearchBackend, SearchInspector {
       try {
         if (!embedder.isLoaded) await embedder.load();
         final qvec = await embedder.embed(query);
-        matches = index.query(qvec, topK: topK);
+        matches = index.query(
+          qvec,
+          topK: topK,
+          eligibleIds: !request.constrained
+              ? null
+              : corpus.map((p) => p.id).toSet(),
+        );
       } catch (e, st) {
         _degraded = true;
         _log.error(
@@ -84,7 +104,7 @@ class SemanticSearchBackend implements SearchBackend, SearchInspector {
       }
     }
 
-    return rankSearchCandidates(
+    final run = rankSearchCandidates(
       query,
       corpus,
       matches,
@@ -96,9 +116,43 @@ class SemanticSearchBackend implements SearchBackend, SearchInspector {
         // retrieval is healthy, its labels cannot override cross-modal rank.
         includeMlKitLabels: _degraded || index.length == 0,
         allowLexicalOnly: _degraded || index.length == 0,
+        ignoreArticles: !_degraded && index.length > 0,
       ),
       scorer: scorer,
-    ).ranked.map((r) => r.photo).toList();
+    );
+    final candidates = {for (final c in run.candidates) c.photo.id: c};
+    final raw = {for (final m in matches) m.id: m.score};
+    final terms = lexicalTermsForPolicy(query, run.policy);
+    return SearchResponse(
+      request: request,
+      photos: run.ranked.map((r) => r.photo).toList(),
+      mode: _degraded || index.length == 0 ? 'keyword fallback' : 'semantic',
+      explanations: {
+        for (final r in run.ranked)
+          r.photo.id: {
+            'cosine': raw[r.photo.id],
+            'cosine_used': candidates[r.photo.id]!.cosine,
+            'semantic': r.semantic,
+            'lexical': r.lexical,
+            'face': r.face,
+            'score': r.score,
+            'weighted': weightedContributions(r, scorer.weights),
+            'matching_terms': terms
+                .where(
+                  (t) => lexicalScoreForPolicy(r.photo, [t], run.policy) > 0,
+                )
+                .toList(),
+            'mlkit_labels_used': run.policy.includeMlKitLabels,
+            'matched_metadata': matchedSearchMetadata(
+              r.photo,
+              terms,
+              includeLabels: run.policy.includeMlKitLabels,
+            ),
+            'gate': semanticMinCosine,
+            'pool': topK,
+          },
+      },
+    );
   }
 
   /// Strict diagnostic path: one embedding and one ungated full cosine scan.
@@ -163,6 +217,12 @@ class SemanticSearchBackend implements SearchBackend, SearchInspector {
         topK: topK,
         minCosine: semanticMinCosine,
         includeMlKitLabels: false,
+        ignoreArticles: true,
+      ),
+      RankingPolicy(
+        'legacy_articles_experiment',
+        topK: topK,
+        minCosine: semanticMinCosine,
       ),
       RankingPolicy(
         'legacy_mlkit_labels_experiment',
@@ -176,6 +236,7 @@ class SemanticSearchBackend implements SearchBackend, SearchInspector {
         topK: topK,
         minCosine: semanticMinCosine,
         allowLexicalOnly: true,
+        ignoreArticles: true,
       ),
       RankingPolicy(
         'whole_words_experiment',
@@ -183,18 +244,25 @@ class SemanticSearchBackend implements SearchBackend, SearchInspector {
         minCosine: semanticMinCosine,
         wholeWords: true,
         includeMlKitLabels: false,
+        ignoreArticles: true,
       ),
       for (final k in [20, 50, 100, 200])
-        RankingPolicy('pool_$k', topK: k, minCosine: semanticMinCosine),
+        RankingPolicy(
+          'pool_$k',
+          topK: k,
+          minCosine: semanticMinCosine,
+          ignoreArticles: true,
+        ),
       for (final gate in <double?>[null, 0.0, 0.1, 0.2, 0.25, 0.3])
         RankingPolicy(
           'gate_${gate ?? 'disabled'}',
           topK: topK,
           minCosine: gate,
+          ignoreArticles: true,
         ),
     ];
-    final terms = queryTerms(query);
     for (final policy in policies) {
+      final terms = lexicalTermsForPolicy(query, policy);
       final run = rankSearchCandidates(
         query,
         corpus,

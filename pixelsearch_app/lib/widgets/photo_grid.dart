@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import '../models/photo.dart';
 import '../features/viewer/photo_viewer.dart';
 import 'photo_tile.dart';
+import '../domain/search/search_response.dart';
 
 /// A responsive grid of photo tiles. Tapping opens the full-screen viewer
 /// (with a hero transition) scoped to the given [photos] list.
 class PhotoGrid extends StatelessWidget {
   final List<Photo> photos;
   final EdgeInsets padding;
+  final SearchResponse? searchResponse;
   const PhotoGrid({
     super.key,
     required this.photos,
     this.padding = const EdgeInsets.all(12),
+    this.searchResponse,
   });
 
   @override
@@ -35,7 +38,11 @@ class PhotoGrid extends StatelessWidget {
           photo: photo,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => PhotoViewerScreen(photos: photos, initialIndex: i),
+              builder: (_) => PhotoViewerScreen(
+                photos: photos,
+                initialIndex: i,
+                searchResponse: searchResponse,
+              ),
             ),
           ),
         );

@@ -3,6 +3,7 @@ import 'package:workmanager/workmanager.dart';
 import '../../ai/image_embedder.dart';
 import '../../core/model_locator.dart';
 import '../../data/local/app_database.dart';
+import '../../data/local/processing_lease.dart';
 import '../../data/indexing_preferences_repository.dart';
 import '../asset_processor.dart';
 import '../index_store.dart';
@@ -60,7 +61,10 @@ void indexCallbackDispatcher() {
 /// (retryable) if the model has not been provisioned yet (M12 model manager).
 Future<bool> runBackgroundIndex() async {
   final db = AppDatabase();
+  ProcessingLease? lease;
   try {
+    lease = await ProcessingLease.acquire(db, 'background-index');
+    if (lease == null) return false;
     final selection = await IndexingPreferencesRepository(db).load();
     if (selection.isEmpty) return true;
     const locator = ModelLocator();
@@ -93,6 +97,7 @@ Future<bool> runBackgroundIndex() async {
     }
     return false;
   } finally {
+    await lease?.release();
     await db.close();
   }
 }

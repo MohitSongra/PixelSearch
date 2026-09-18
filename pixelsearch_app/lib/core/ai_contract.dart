@@ -19,9 +19,9 @@ class AiContract {
   /// preprocessing contracts are unchanged (see MIGRATIONS.md).
   static const String artifactVersion = '3';
 
-  /// The on-device SQLite schema version (AppDatabase.schemaVersion). v4 adds
-  /// saved folder selection; model artifacts and embeddings are unchanged.
-  static const int schemaVersion = 4;
+  /// Storage-only version. v6 adds separate offline People records;
+  /// model artifacts, geometry and embedding version remain unchanged.
+  static const int schemaVersion = 6;
 
   // --- Model geometry (contract §1, §3, §4) ---
   static const int embeddingDim = 512;

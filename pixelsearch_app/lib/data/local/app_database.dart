@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import 'connection/connection.dart';
+import 'people_tables.dart';
 
 part 'app_database.g.dart';
 
@@ -74,8 +75,65 @@ class IndexingPreferencesRows extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+class MemoryEvents extends Table {
+  TextColumn get id => text()();
+  TextColumn get title => text().withDefault(const Constant(''))();
+  TextColumn get coverId => text()();
+  IntColumn get createdMs => integer()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class MemoryMembers extends Table {
+  TextColumn get photoId => text()();
+  TextColumn get eventId => text()();
+  @override
+  Set<Column> get primaryKey => {photoId};
+}
+
+class SavedCaptions extends Table {
+  TextColumn get photoId => text()();
+  IntColumn get revision => integer()();
+  TextColumn get baseCaption => text()();
+  TextColumn get editedCaption => text()();
+  TextColumn get model => text()();
+  TextColumn get provider => text().withDefault(const Constant('groq'))();
+  TextColumn get style => text().withDefault(const Constant('factual'))();
+  BoolColumn get manuallyEdited =>
+      boolean().withDefault(const Constant(false))();
+  IntColumn get generatedMs => integer()();
+  @override
+  Set<Column> get primaryKey => {photoId};
+}
+
+class PhotoLocations extends Table {
+  TextColumn get photoId => text()();
+  IntColumn get revision => integer()();
+  RealColumn get latitude => real().nullable()();
+  RealColumn get longitude => real().nullable()();
+  TextColumn get status => text()();
+  TextColumn get provenance => text().withDefault(const Constant('EXIF GPS'))();
+  @override
+  Set<Column> get primaryKey => {photoId};
+}
+
 @DriftDatabase(
-  tables: [PhotoRows, EmbeddingRows, IndexStateRows, IndexingPreferencesRows],
+  tables: [
+    PhotoRows,
+    EmbeddingRows,
+    IndexStateRows,
+    IndexingPreferencesRows,
+    MemoryEvents,
+    MemoryMembers,
+    SavedCaptions,
+    PhotoLocations,
+    PeoplePersons,
+    PeopleFaces,
+    PeopleScans,
+    PeopleDecisions,
+    PeopleReviews,
+    PeopleState,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   /// The app passes nothing (uses the platform connection); tests inject an
@@ -83,10 +141,11 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) async { await m.createAll(); await _peopleStorageIndexes(); },
     onUpgrade: (m, from, to) async {
       // v1 → v2: tag each embedding with the embedding_version that produced it.
       if (from < 2) {
@@ -106,8 +165,31 @@ class AppDatabase extends _$AppDatabase {
       if (from < 4) {
         await m.createTable(indexingPreferencesRows);
       }
+      if (from < 5) {
+        await m.createTable(memoryEvents);
+        await m.createTable(memoryMembers);
+        await m.createTable(savedCaptions);
+        await m.createTable(photoLocations);
+      }
+      if (from < 6) {
+        await m.createTable(peoplePersons);
+        await m.createTable(peopleFaces);
+        await m.createTable(peopleScans);
+        await m.createTable(peopleDecisions);
+        await m.createTable(peopleReviews);
+        await m.createTable(peopleState);
+        await _peopleStorageIndexes();
+      }
     },
   );
+
+  Future<void> _peopleStorageIndexes() async {
+    await customStatement('CREATE INDEX people_faces_photo ON people_faces(photo_id)');
+    await customStatement('CREATE INDEX people_faces_person ON people_faces(person_id)');
+    await customStatement('CREATE INDEX people_reviews_subset ON people_reviews(subset)');
+    await customStatement('CREATE TABLE processing_leases ('
+      'id INTEGER PRIMARY KEY, owner TEXT NOT NULL, expires_ms INTEGER NOT NULL)');
+  }
 
   // --- Photos --------------------------------------------------------------
   Future<void> upsertPhotos(List<PhotoRowsCompanion> rows) =>
@@ -204,6 +286,9 @@ class AppDatabase extends _$AppDatabase {
   Future<void> deleteAssets(List<String> ids) async {
     if (ids.isEmpty) return;
     await transaction(() async {
+      await (delete(memoryMembers)..where((t) => t.photoId.isIn(ids))).go();
+      await (delete(savedCaptions)..where((t) => t.photoId.isIn(ids))).go();
+      await (delete(photoLocations)..where((t) => t.photoId.isIn(ids))).go();
       await (delete(embeddingRows)..where((t) => t.photoId.isIn(ids))).go();
       await (delete(photoRows)..where((t) => t.id.isIn(ids))).go();
     });

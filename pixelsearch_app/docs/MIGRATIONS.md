@@ -19,6 +19,23 @@ Keyed on `AppDatabase.schemaVersion` via a `MigrationStrategy`.
 | 1 → 2 | add `EmbeddingRows.embeddingVersion` (default `'1'`) | `m.addColumn(embeddingRows, embeddingRows.embeddingVersion)` |
 | 2 → 3 | add M5 photo metadata, labels, faces, thumbnails and change fingerprints | additive photo columns |
 | 3 → 4 | persist folder selection separately from checkpoints | `m.createTable(indexingPreferencesRows)`; no photo/embedding rewrite |
+| 4 → 5 | persist events/membership, captions and revision-aware GPS enrichment | four additive tables; no photo/embedding rewrite |
+| 5 → 6 | offline people, observations/descriptors, revisions, corrections, reviews, opt-in state and processing lease | six People tables, three indexes and a cross-isolate lease table; no changes to existing rows |
+
+Schema v6 keeps face descriptors separate from MobileCLIP embeddings. Its full
+v5 migration fixture verifies all eight old tables and embedding bytes unchanged
+(`test/people_migration_test.dart`). Names and corrections are local-only. The
+additive lease table serializes foreground/background photo processing and
+expires after a crashed owner; it never locks search. Bundled SFace is an explicit
+exception to ADR-005 for offline first use, not a change to CLIP provisioning.
+The separate model contract is `model_kit/FACE_CONTRACT.md`.
+
+Schema v5 separates user-owned memories/captions and optional GPS enrichment from
+indexer-owned photo rows. Embedding version stays `1`. A complete v4 fixture with
+folder preferences, labels, faces, index counts and a 2048-byte embedding is
+upgraded and checked by `test/five_feature_test.dart`. No automatic model provisioning
+or re-index is part of this migration. Android upgrades require a fresh verified
+backup; never uninstall or clear the app to perform a schema upgrade.
 
 Schema v4 defaults to no selected folders until the user confirms a choice. Existing
 indexed photos remain searchable. Folder IDs (not display names) and explicit all-folders

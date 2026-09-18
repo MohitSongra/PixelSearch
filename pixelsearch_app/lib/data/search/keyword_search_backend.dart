@@ -1,6 +1,8 @@
 import '../../domain/search/search_backend.dart';
 import '../../models/photo.dart';
+import '../../domain/search/search_response.dart';
 import '../search_engine.dart';
+import 'search_ranking.dart';
 
 /// The lexical search strategy: keyword scoring over tags/labels/caption/place.
 /// It is the on-device fallback (and the only backend on web, where there is no
@@ -17,5 +19,37 @@ class KeywordSearchBackend implements SearchBackend {
 
   @override
   Future<List<Photo>> search(String query, List<Photo> corpus) async =>
-      searchPhotos(corpus, query);
+      (await searchDetailed(SearchRequest(query), corpus)).photos;
+
+  @override
+  Future<SearchResponse> searchDetailed(
+    SearchRequest request,
+    List<Photo> corpus,
+  ) async {
+    final photos = searchPhotos(
+      request.filterCorpus(corpus),
+      request.query,
+    );
+    final terms = queryTerms(request.query);
+    return SearchResponse(
+      request: request,
+      photos: photos,
+      mode: 'keyword',
+      explanations: {
+        for (final p in photos)
+          p.id: {
+            'lexical_raw': keywordScore(p, terms),
+            'matching_terms': terms
+                .where((t) => keywordScore(p, [t]) > 0)
+                .toList(),
+            'mlkit_labels_used': true,
+            'matched_metadata': matchedSearchMetadata(
+              p,
+              terms,
+              includeLabels: true,
+            ),
+          },
+      },
+    );
+  }
 }

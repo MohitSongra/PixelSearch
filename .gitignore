@@ -32,6 +32,8 @@ model_kit/out/*.onnx
 # repo has no LFS/annex strategy. If that ever changes, do it deliberately.
 *.onnx
 pixelsearch_app/assets/models/*.onnx
+# Approved offline People exception: SFace is bundled for network-free first use.
+!pixelsearch_app/assets/models/face_recognition_sface_2021dec.onnx
 
 # ---- Python ----
 **/__pycache__/

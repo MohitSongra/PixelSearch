@@ -5,6 +5,7 @@ import '../../state/providers.dart';
 import '../../widgets/indexing_status.dart';
 import '../indexing/folder_picker.dart';
 import '../search/search_diagnostics_screen.dart';
+import 'online_settings.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -12,7 +13,6 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
-    final privacy = ref.watch(privacyModeProvider);
     final total = ref.watch(photoLibraryProvider).length;
     final indexing = ref.watch(indexingControllerProvider);
     final controller = ref.read(indexingControllerProvider.notifier);
@@ -50,20 +50,12 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const Divider(),
           _header(context, 'Privacy'),
-          SwitchListTile(
-            title: const Text('Privacy mode'),
-            subtitle: const Text(
-              'Everything on-device. Cloud features (captions, assistant) are disabled.',
-            ),
-            secondary: const Icon(Icons.shield_outlined),
-            value: privacy,
-            onChanged: (v) => ref.read(privacyModeProvider.notifier).state = v,
-          ),
+          const OnlineSettings(),
           const Divider(),
           _header(context, 'Library'),
           ListTile(
             leading: const Icon(Icons.photo_library_outlined),
-            title: Text('$total photos indexed'),
+            title: Text('$total photo${total == 1 ? '' : 's'} indexed'),
             subtitle: Text(
               total == 0 ? 'Nothing indexed yet' : 'Searchable on this device',
             ),
@@ -78,7 +70,7 @@ class SettingsScreen extends ConsumerWidget {
                     ? 'Indexing…'
                     : total == 0
                     ? 'Index my photos'
-                    : 'Re-index my photos',
+                    : 'Continue indexing',
               ),
               subtitle: const Text(
                 'Labels and embeddings are computed on-device. Only new and '

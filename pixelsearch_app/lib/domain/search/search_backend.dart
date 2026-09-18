@@ -1,4 +1,5 @@
 import '../../models/photo.dart';
+import 'search_response.dart';
 
 /// Strategy for turning a text query + a photo corpus into ranked results.
 ///
@@ -21,4 +22,8 @@ abstract interface class SearchBackend {
   /// Rank [corpus] against [query]. An empty query returns the corpus
   /// newest-first (the browse state).
   Future<List<Photo>> search(String query, List<Photo> corpus);
+  Future<SearchResponse> searchDetailed(
+    SearchRequest request,
+    List<Photo> corpus,
+  );
 }

@@ -33,5 +33,9 @@ abstract interface class VectorIndex {
 
   /// The [topK] ids most similar to [query], descending by score. [query] must
   /// be L2-normalized and the same dimension as the indexed vectors.
-  List<VectorMatch> query(Float32List query, {int topK = 50});
+  List<VectorMatch> query(
+    Float32List query, {
+    int topK = 50,
+    Set<String>? eligibleIds,
+  });
 }

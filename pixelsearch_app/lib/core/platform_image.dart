@@ -5,9 +5,14 @@ import 'package:flutter/widgets.dart';
 // lets the platform-free `Photo` model resolve an on-disk thumbnail without ever
 // importing dart:io — the same boundary pattern as `semantic_wiring.dart`.
 import 'platform_image_stub.dart'
-    if (dart.library.io) 'platform_image_io.dart' as impl;
+    if (dart.library.io) 'platform_image_io.dart'
+    as impl;
 
 /// An [ImageProvider] for the thumbnail file the M5 indexer wrote at [path], or
 /// null when this platform cannot read files (web). Callers fall back to
 /// `placeholderImage`.
 ImageProvider? fileImage(String path) => impl.fileImage(path);
+
+/// Device thumbnails can be recovered from the gallery after cache eviction.
+ImageProvider? deviceThumbnail(String id, String? path) =>
+    impl.deviceThumbnail(id, path);

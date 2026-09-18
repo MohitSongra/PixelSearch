@@ -68,8 +68,12 @@ void main() {
       ]);
       final vector = Float32List(512)..[0] = 1;
       await repo.saveEmbedding('retained', vector);
-      // The v3 schema is unchanged except for the new preferences table.
-      await db.customStatement('DROP TABLE indexing_preferences_rows');
+      // Recreate the actual v3 layout, without later feature tables/indexes.
+      for (final table in ['indexing_preferences_rows', 'memory_events', 'memory_members',
+        'saved_captions', 'photo_locations', 'people_faces', 'people_persons', 'people_scans',
+        'people_decisions', 'people_reviews', 'people_state', 'processing_leases']) {
+        await db.customStatement('DROP TABLE $table');
+      }
       await db.customStatement('PRAGMA user_version = 3');
       await db.close();
       db = AppDatabase(NativeDatabase(file));

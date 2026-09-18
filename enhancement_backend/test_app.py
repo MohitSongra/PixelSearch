@@ -104,9 +104,41 @@ def test_transcription_returns_validated_text(client, monkeypatch):
     async def fake(path, **kwargs):
         assert path == "audio/transcriptions"
         assert kwargs["data"]["model"] == service.SPEECH_MODEL
+        assert kwargs["data"]["response_format"] == "json"
+        assert kwargs["files"] == {"file": ("speech.m4a", b"fixture", "audio/mp4")}
         return {"text": "friends at the beach"}
     monkeypatch.setattr(service, "groq", fake)
     assert client.post("/transcribe", files={"file": ("speech.m4a", b"fixture")}).json()["text"] == "friends at the beach"
+
+
+@pytest.mark.parametrize("text", [None, "", "   ", ["not a transcript"], "x" * 4001],
+                         ids=["missing", "empty", "whitespace", "list", "too-long"])
+def test_transcription_rejects_invalid_text(client, monkeypatch, text):
+    calls = []
+    async def fake(path, **kwargs):
+        calls.append(path)
+        return {"text": text}
+    monkeypatch.setattr(service, "groq", fake)
+    response = client.post("/transcribe", files={"file": ("speech.m4a", b"fixture")})
+    assert response.status_code == 502
+    assert calls == ["audio/transcriptions"]
+
+
+@pytest.mark.parametrize("data", [b"", b"x" * (service.MAX_FILE + 1)], ids=["empty", "oversized"])
+def test_transcription_bounds_upload_before_provider(client, monkeypatch, data):
+    async def forbidden(*args, **kwargs):
+        pytest.fail("Invalid upload must not reach the provider")
+    monkeypatch.setattr(service, "groq", forbidden)
+    assert client.post("/transcribe", files={"file": ("speech.m4a", data)}).status_code == 413
+
+
+def test_transcription_requires_installation_token(client, monkeypatch):
+    async def forbidden(*args, **kwargs):
+        pytest.fail("Unauthenticated audio must not reach the provider")
+    monkeypatch.setattr(service, "groq", forbidden)
+    response = client.post("/transcribe", headers={"Authorization": "Bearer wrong"},
+                           files={"file": ("speech.m4a", b"fixture")})
+    assert response.status_code == 401
 
 
 def test_installation_rate_limit(client, monkeypatch):

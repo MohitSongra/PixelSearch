@@ -3,6 +3,26 @@ import '../../domain/search/vector_index.dart';
 import '../../models/photo.dart';
 import '../search_engine.dart';
 
+Map<String, String> matchedSearchMetadata(
+  Photo photo,
+  List<String> terms, {
+  required bool includeLabels,
+}) {
+  final fields = {
+    'Title': photo.title,
+    'Caption': photo.caption,
+    'Tags': photo.tags.join(', '),
+    'Album': photo.album,
+    'Place': photo.place ?? '',
+    if (includeLabels) 'ML Kit labels': photo.labels.join(', '),
+  };
+  return {
+    for (final field in fields.entries)
+      if (terms.any((t) => field.value.toLowerCase().contains(t)))
+        field.key: field.value,
+  };
+}
+
 /// A replayable ranking policy. Defaults exactly match the production baseline.
 class RankingPolicy {
   const RankingPolicy(
@@ -12,12 +32,14 @@ class RankingPolicy {
     this.wholeWords = false,
     this.includeMlKitLabels = false,
     this.allowLexicalOnly = false,
+    this.ignoreArticles = false,
   });
   final String name;
   final int topK;
   final double? minCosine;
   final bool wholeWords;
   final bool includeMlKitLabels;
+  final bool ignoreArticles;
 
   /// Only keyword fallback and historical replays may bypass semantic eligibility.
   final bool allowLexicalOnly;
@@ -30,6 +52,7 @@ class RankingPolicy {
         : 'production_substrings',
     'include_mlkit_labels': includeMlKitLabels,
     'allow_lexical_only': allowLexicalOnly,
+    'ignore_articles': ignoreArticles,
   };
 }
 
@@ -64,17 +87,36 @@ double wholeWordKeywordScore(
 
 /// The lexical scorer selected by [RankingPolicy]. This keeps diagnostics and
 /// ordinary retrieval on the same semantic-hybrid policy.
+const _englishArticles = {'a', 'an', 'the'};
+
+List<String> lexicalTermsForPolicy(String query, RankingPolicy policy) {
+  final terms = policy.wholeWords
+      ? RegExp(
+          r'[\p{L}\p{N}]+',
+          unicode: true,
+        ).allMatches(query.toLowerCase()).map((m) => m.group(0)!).toList()
+      : queryTerms(query);
+  return policy.ignoreArticles
+      ? terms.where((t) => !_englishArticles.contains(t)).toList()
+      : terms;
+}
+
 double lexicalScoreForPolicy(
   Photo photo,
   List<String> terms,
   RankingPolicy policy,
-) => policy.wholeWords
-    ? wholeWordKeywordScore(
-        photo,
-        terms,
-        includeLabels: policy.includeMlKitLabels,
-      )
-    : keywordScore(photo, terms, includeLabels: policy.includeMlKitLabels);
+) {
+  if (policy.ignoreArticles) {
+    terms = terms.where((t) => !_englishArticles.contains(t)).toList();
+  }
+  return policy.wholeWords
+      ? wholeWordKeywordScore(
+          photo,
+          terms,
+          includeLabels: policy.includeMlKitLabels,
+        )
+      : keywordScore(photo, terms, includeLabels: policy.includeMlKitLabels);
+}
 
 class RankingRun {
   const RankingRun({
@@ -103,12 +145,7 @@ RankingRun rankSearchCandidates(
   HybridScorer scorer = const HybridScorer(),
 }) {
   final watch = Stopwatch()..start();
-  final terms = policy.wholeWords
-      ? RegExp(
-          r'[\p{L}\p{N}]+',
-          unicode: true,
-        ).allMatches(query.toLowerCase()).map((m) => m.group(0)!).toList()
-      : queryTerms(query);
+  final terms = lexicalTermsForPolicy(query, policy);
   final byId = {for (final p in corpus) p.id: p};
   final lexical = {
     for (final p in corpus) p.id: lexicalScoreForPolicy(p, terms, policy),

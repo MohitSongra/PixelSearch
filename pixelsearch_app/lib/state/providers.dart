@@ -7,26 +7,45 @@ import '../core/ai_contract.dart';
 import '../data/local/app_database.dart';
 import '../data/photo_repository.dart';
 import '../data/user_preferences.dart';
+import '../data/enhancements/online_policy.dart';
+import '../data/enhancements/enhancement_client.dart';
 import '../data/indexing_preferences_repository.dart';
 import '../data/search/brute_force_vector_index.dart';
 import '../data/search/keyword_search_backend.dart';
 import '../domain/search/search_backend.dart';
+import '../domain/search/search_response.dart';
 import '../domain/search/vector_index.dart';
+import '../domain/gallery/indexed_gallery.dart';
+import '../domain/search/library_suggestions.dart';
 import '../indexing/model/index_progress.dart';
 import '../indexing/model/folder_selection.dart';
 import '../models/photo.dart';
 import 'index_bridge.dart';
 import 'index_cancel_token.dart';
 import 'semantic_wiring.dart';
+import 'people_providers.dart';
+import '../data/local/processing_lease.dart';
 
 /// Light/dark/system theme selection.
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
-/// "Privacy mode" master switch (mock): when on, all cloud features are off.
-final privacyModeProvider = StateProvider<bool>((ref) => true);
+final onlinePolicyProvider = ChangeNotifierProvider<OnlinePolicy>((ref) {
+  final policy = OnlinePolicy(ref.watch(userPreferencesProvider));
+  policy.load().catchError((Object _) {}); // A read failure stays offline.
+  return policy;
+});
+final privacyModeProvider = Provider<bool>(
+  (ref) => ref.watch(onlinePolicyProvider).offline,
+);
+final enhancementClientProvider = Provider(
+  (ref) => EnhancementClient(ref.read(onlinePolicyProvider)),
+);
 
 /// The current search text.
 final searchQueryProvider = StateProvider<String>((ref) => '');
+final searchFiltersProvider = StateProvider<SearchFilters>(
+  (ref) => const SearchFilters(),
+);
 
 final userPreferencesProvider = Provider<UserPreferences>(
   (ref) => UserPreferences(),
@@ -74,6 +93,13 @@ class PhotoLibrary extends StateNotifier<List<Photo>> {
 
 final photoLibraryProvider = StateNotifierProvider<PhotoLibrary, List<Photo>>(
   (ref) => PhotoLibrary(ref),
+);
+
+final indexedGalleryProvider = Provider(
+  (ref) => IndexedGallery(ref.watch(photoLibraryProvider)),
+);
+final librarySuggestionsProvider = Provider(
+  (ref) => librarySuggestions(ref.watch(photoLibraryProvider)),
 );
 
 // --- M5: indexing on the UI path ------------------------------------------
@@ -129,7 +155,11 @@ class IndexingController extends StateNotifier<IndexingUiState> {
       running: true,
       progress: IndexProgress(phase: IndexPhase.scanning),
     );
+    ProcessingLease? lease;
     try {
+      await _ref.read(peopleControllerProvider).suspend();
+      lease = await ProcessingLease.acquire(_ref.read(appDatabaseProvider), 'foreground-index', onLost: token.cancel);
+      if (lease == null) throw StateError('Background indexing is already running. Try again after it finishes.');
       final result = await runDeviceIndexing(
         db: _ref.read(appDatabaseProvider),
         cancel: token,
@@ -152,6 +182,7 @@ class IndexingController extends StateNotifier<IndexingUiState> {
         message: 'Indexing failed: $e',
       );
     } finally {
+      await lease?.release();
       _token = null;
       // Whatever the outcome, committed batches are already durable — surface
       // them. Cancelled and failed runs still persisted their finished batches.
@@ -282,14 +313,43 @@ final debouncedQueryProvider = FutureProvider.autoDispose<String>((ref) async {
 /// Ranked results for the current (debounced) query over the library. Async
 /// because semantic ranking runs the text encoder; the UI renders its
 /// [AsyncValue] (spinner while embedding, previous results kept).
-final searchResultsProvider = FutureProvider.autoDispose<List<Photo>>((
+final searchResponseProvider = FutureProvider.autoDispose<SearchResponse>((
   ref,
 ) async {
   final corpus = ref.watch(photoLibraryProvider);
-  final backend = await ref.watch(searchBackendProvider.future);
-  final query = await ref.watch(debouncedQueryProvider.future);
-  return backend.search(query, corpus);
+  final resolved = await ref.watch(peopleQueryProvider.future);
+  if (resolved.needsChoice) {
+    return SearchResponse(request: SearchRequest(resolved.query, filters: resolved.filters),
+      photos: const [], mode: 'choose person');
+  }
+  final ids = resolved.filters.personIds;
+  final eligible = ids.isEmpty ? null : await ref.read(peopleRepositoryProvider).photoIdsFor(ids);
+  final request = SearchRequest(resolved.query, filters: resolved.filters, eligiblePhotoIds: eligible);
+  SearchResponse response;
+  if (ids.isNotEmpty && resolved.query.trim().isEmpty) {
+    response = await const KeywordSearchBackend().searchDetailed(request, corpus);
+  } else {
+    final backend = await ref.watch(searchBackendProvider.future);
+    response = await backend.searchDetailed(request, corpus);
+  }
+  if (ids.isEmpty) return response;
+  final snapshot = await ref.read(peopleRepositoryProvider).load();
+  return SearchResponse(request: request, photos: response.photos,
+    mode: resolved.query.isEmpty ? 'people' : response.mode,
+    explanations: {for (final photo in response.photos) photo.id: {
+      ...?response.explanations[photo.id],
+      'people': [for (final face in snapshot.faces)
+        if (face.photoId == photo.id && ids.contains(face.personId)) {
+          'person_id': face.personId,
+          'name': snapshot.people.where((p) => p.record.id == face.personId).firstOrNull?.label,
+          'assignment': face.assignment,
+        }],
+    }});
 });
+
+final searchResultsProvider = FutureProvider.autoDispose<List<Photo>>(
+  (ref) async => (await ref.watch(searchResponseProvider.future)).photos,
+);
 
 // --- M2: local persistence (native-only) -----------------------------------
 // These are lazy: nothing reads them on web, so the web build stays green.

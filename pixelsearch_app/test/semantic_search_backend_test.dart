@@ -6,6 +6,7 @@ import 'package:pixelsearch/ai/text_embedder.dart';
 import 'package:pixelsearch/data/search/brute_force_vector_index.dart';
 import 'package:pixelsearch/data/search/semantic_search_backend.dart';
 import 'package:pixelsearch/models/photo.dart';
+import 'package:pixelsearch/domain/search/search_response.dart';
 
 Float32List _unit(List<double> xs) {
   var n = 0.0;
@@ -61,6 +62,91 @@ Photo _photo(
 );
 
 void main() {
+  test('person eligibility filters before global Top-K and name-only needs no encoder', () async {
+    final encoder = _FakeTextEmbedder({'beach': [1, 0, 0]}, failLoad: true);
+    final index = BruteForceVectorIndex(dim: 3)
+      ..upsert('other', _unit([1, 0, 0]))..upsert('person', _unit([.8, .6, 0]));
+    final corpus = [_photo('other'), _photo('person')];
+    final offline = SemanticSearchBackend(embedder: encoder, index: index, topK: 1);
+    final named = await offline.searchDetailed(const SearchRequest('',
+      filters: SearchFilters(personIds: {'local-person'}), eligiblePhotoIds: {'person'}), corpus);
+    expect(named.photos.map((p) => p.id), ['person']);
+    expect(encoder.embedCalls, 0);
+    expect(encoder.isLoaded, isFalse);
+    final backend = SemanticSearchBackend(embedder: _FakeTextEmbedder({'beach': [1, 0, 0]}), index: index, topK: 1);
+    final scoped = await backend.searchDetailed(const SearchRequest('beach',
+      filters: SearchFilters(personIds: {'local-person'}), eligiblePhotoIds: {'person'}), corpus);
+    expect(scoped.photos.single.id, 'person');
+    expect(scoped.explanations['person']!['cosine'], closeTo(.8, 1e-6));
+    await expectLater(backend.searchDetailed(const SearchRequest('beach',
+      filters: SearchFilters(personIds: {'unresolved'})), corpus), throwsStateError);
+    expect((await backend.searchDetailed(const SearchRequest('beach', eligiblePhotoIds: {}), corpus)).photos, isEmpty);
+  });
+  test(
+    'articles add no semantic-hybrid evidence and the full sentence reaches the encoder',
+    () async {
+      final embedder = _FakeTextEmbedder({
+        'a dog': [1, 0, 0],
+      });
+      final index = BruteForceVectorIndex(dim: 3)
+        ..upsert('photo', _unit([0.2, math.sqrt(0.96), 0]));
+      final backend = SemanticSearchBackend(embedder: embedder, index: index);
+      final result = await backend.searchDetailed(
+        const SearchRequest('a dog'),
+        [_photo('photo')],
+      );
+      expect(result.photos.single.id, 'photo');
+      final evidence = result.explanations['photo']!;
+      expect(evidence['cosine'], closeTo(0.2, 1e-6));
+      expect(evidence['lexical'], 0);
+      expect(evidence['matching_terms'], isEmpty);
+      expect(evidence['matched_metadata'], isEmpty);
+      expect((evidence['weighted'] as Map)['lexical'], 0);
+      expect(embedder.embedCalls, 1);
+    },
+  );
+
+  test(
+    'detailed response uses one embedding and reproduces final score',
+    () async {
+      final embedder = _FakeTextEmbedder({
+        'scene': [1, 0, 0],
+      });
+      final index = BruteForceVectorIndex(dim: 3)
+        ..upsert('a', _unit([1, 0, 0]));
+      final backend = SemanticSearchBackend(embedder: embedder, index: index);
+      final response = await backend.searchDetailed(
+        const SearchRequest('scene'),
+        [_photo('a')],
+      );
+      expect(embedder.embedCalls, 1);
+      final explanation = response.explanations['a']!;
+      final weighted = explanation['weighted'] as Map<String, double>;
+      expect(
+        weighted.values.fold<double>(0, (a, b) => a + b),
+        explanation['score'],
+      );
+      expect(explanation['cosine'], closeTo(1, 1e-6));
+      expect(explanation['mlkit_labels_used'], isFalse);
+    },
+  );
+  test('date restriction is applied before Top-K', () async {
+    final index = BruteForceVectorIndex(dim: 3)
+      ..upsert('outside', _unit([1, 0, 0]))
+      ..upsert('inside', _unit([0.8, 0.6, 0]));
+    final backend = SemanticSearchBackend(
+      embedder: _FakeTextEmbedder({
+        'scene': [1, 0, 0],
+      }),
+      index: index,
+      topK: 1,
+    );
+    final result = await backend.searchDetailed(
+      SearchRequest('scene', filters: SearchFilters(from: DateTime(2026))),
+      [_photo('outside', date: DateTime(2025)), _photo('inside')],
+    );
+    expect(result.photos.single.id, 'inside');
+  });
   // A tiny 3-D "embedding space": beach, dog, city on orthogonal axes.
   final corpus = [
     _photo('beach', tags: ['beach', 'sea']),
