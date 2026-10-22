@@ -64,6 +64,12 @@ class PeopleReviews extends Table {
   RealColumn get cosine => real()();
   TextColumn get judgment => text().withDefault(const Constant('pending'))();
   TextColumn get contract => text()();
+
+  /// The reviewed photos (v7). Face ids include the photo revision, so after
+  /// an edit only these still identify a reviewed photo. Null for review rows
+  /// whose faces were already gone when the column was added.
+  TextColumn get leftPhotoId => text().nullable()();
+  TextColumn get rightPhotoId => text().nullable()();
   @override
   Set<Column> get primaryKey => {id};
 }

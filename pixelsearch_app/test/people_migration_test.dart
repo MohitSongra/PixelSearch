@@ -89,10 +89,87 @@ void main() {
       final upgraded = AppDatabase(NativeDatabase.opened(raw));
       addTearDown(upgraded.close);
       expect(await upgraded.photoCount(), 1);
-      expect(raw.select('PRAGMA user_version').single.values.single, 6);
+      expect(
+        raw.select('PRAGMA user_version').single.values.single,
+        upgraded.schemaVersion,
+      );
       expect({for (final name in names) name: dump(name)}, before);
       expect(await upgraded.select(upgraded.peopleFaces).get(), isEmpty);
       expect(await upgraded.select(upgraded.peopleState).get(), isEmpty);
+    },
+  );
+
+  test(
+    'v6 to v7 adds reviewed photo ids, filled from the faces that still exist',
+    () async {
+      final raw = sqlite.sqlite3.openInMemory();
+      final old = AppDatabase(
+        NativeDatabase.opened(raw, closeUnderlyingOnClose: false),
+      );
+      for (final id in ['p1', 'p2']) {
+        await old.upsertPhotos([
+          PhotoRowsCompanion.insert(id: id, source: 1, dateMs: 1),
+        ]);
+      }
+      for (final (face, photo) in [('f1', 'p1'), ('f2', 'p2')]) {
+        await old
+            .into(old.peopleFaces)
+            .insert(
+              PeopleFacesCompanion.insert(
+                id: face,
+                photoId: photo,
+                revision: '1:0:500:500',
+                contract: 'contract',
+                x: .1,
+                y: .1,
+                w: .2,
+                h: .2,
+                quality: 'ready',
+              ),
+            );
+      }
+      for (final (id, left, right) in [
+        ('both', 'f1', 'f2'),
+        ('one-gone', 'f1', 'gone'),
+      ]) {
+        await old
+            .into(old.peopleReviews)
+            .insert(
+              PeopleReviewsCompanion.insert(
+                id: id,
+                leftFaceId: left,
+                rightFaceId: right,
+                subset: 'calibration',
+                cosine: .5,
+                contract: 'contract',
+              ),
+            );
+      }
+      await old.close();
+      // Back to the v6 layout: the review table without the two columns.
+      raw.execute('ALTER TABLE people_reviews DROP COLUMN left_photo_id');
+      raw.execute('ALTER TABLE people_reviews DROP COLUMN right_photo_id');
+      raw.execute('PRAGMA user_version=6');
+      String dump(String table) => jsonEncode([
+        for (final row in raw.select('SELECT * FROM $table ORDER BY 1'))
+          {for (final entry in row.entries) entry.key: '${entry.value}'},
+      ]);
+      const unchanged = ['photo_rows', 'people_faces', 'people_state'];
+      final before = {for (final t in unchanged) t: dump(t)};
+
+      final upgraded = AppDatabase(NativeDatabase.opened(raw));
+      addTearDown(upgraded.close);
+      final reviews = {
+        for (final r in await upgraded.select(upgraded.peopleReviews).get())
+          r.id: r,
+      };
+      expect(raw.select('PRAGMA user_version').single.values.single, 7);
+      expect(reviews['both']!.leftPhotoId, 'p1');
+      expect(reviews['both']!.rightPhotoId, 'p2');
+      expect(reviews['one-gone']!.leftPhotoId, 'p1');
+      expect(reviews['one-gone']!.rightPhotoId, isNull);
+      expect(reviews['both']!.judgment, 'pending');
+      expect({for (final t in unchanged) t: dump(t)}, before);
     },
   );
 

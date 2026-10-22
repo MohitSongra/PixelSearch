@@ -1188,6 +1188,7 @@ class PeopleRepository {
       )..where((r) => r.subset.isIn(['calibration', 'validation']))).get();
       if (existing.isNotEmpty) return existing.length;
       final prefix = DateTime.now().microsecondsSinceEpoch;
+      final photoOf = {for (final f in snapshot.faces) f.id: f.photoId};
       await db.batch(
         (b) => b.insertAll(db.peopleReviews, [
           for (final p in pairs)
@@ -1198,6 +1199,8 @@ class PeopleRepository {
               subset: p.subset,
               cosine: p.cosine,
               contract: FaceContract.id,
+              leftPhotoId: Value(photoOf[p.left]),
+              rightPhotoId: Value(photoOf[p.right]),
             ),
         ]),
       );
@@ -1205,10 +1208,17 @@ class PeopleRepository {
     });
   }
 
+  /// Every photo used in any review round, archived ones included. Stored
+  /// photo ids still name a photo after it is edited (its faces get new ids);
+  /// the join covers rows written before v7 whose faces still exist.
   Future<Set<String>> _reviewedPhotos() async {
     final rows = await db
         .customSelect(
-          'SELECT DISTINCT f.photo_id FROM people_faces f JOIN people_reviews r '
+          'SELECT left_photo_id AS photo_id FROM people_reviews '
+          'WHERE left_photo_id IS NOT NULL '
+          'UNION SELECT right_photo_id FROM people_reviews '
+          'WHERE right_photo_id IS NOT NULL '
+          'UNION SELECT f.photo_id FROM people_faces f JOIN people_reviews r '
           'ON f.id=r.left_face_id OR f.id=r.right_face_id',
         )
         .get();
@@ -1269,6 +1279,7 @@ class PeopleRepository {
       }
       await archiveReview();
       final prefix = DateTime.now().microsecondsSinceEpoch;
+      final photoOf = {for (final f in live.faces) f.id: f.photoId};
       await db.batch(
         (b) => b.insertAll(db.peopleReviews, [
           for (final p in snapshot.reviews)
@@ -1280,6 +1291,8 @@ class PeopleRepository {
               cosine: p.cosine,
               judgment: Value(p.judgment),
               contract: p.contract,
+              leftPhotoId: Value(p.leftPhotoId ?? photoOf[p.leftFaceId]),
+              rightPhotoId: Value(p.rightPhotoId ?? photoOf[p.rightFaceId]),
             ),
           for (final p in pairs)
             PeopleReviewsCompanion.insert(
@@ -1289,6 +1302,8 @@ class PeopleRepository {
               subset: 'validation',
               cosine: p.cosine,
               contract: FaceContract.id,
+              leftPhotoId: Value(photoOf[p.left]),
+              rightPhotoId: Value(photoOf[p.right]),
             ),
         ]),
       );

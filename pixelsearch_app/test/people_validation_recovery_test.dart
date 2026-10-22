@@ -31,6 +31,8 @@ Future<void> seedFailedPeopleReview(PeopleRepository repo) async {
             cosine: different ? (validation ? .85 : .4) : (i == 0 ? .95 : .8),
             judgment: Value(different ? 'different' : 'same'),
             contract: FaceContract.id,
+            leftPhotoId: Value('photo-$i-a'),
+            rightPhotoId: Value('photo-$i-b'),
           ),
         );
   }
@@ -166,6 +168,8 @@ void main() {
             cosine: .3,
             judgment: const Value('different'),
             contract: FaceContract.id,
+            leftPhotoId: const Value('photo-distant-a'),
+            rightPhotoId: const Value('photo-distant-b'),
           ),
         );
     final saved = await db.select(db.peopleReviews).get();
@@ -249,10 +253,7 @@ void main() {
   );
 
   test(
-    'a revised reviewed photo is not recycled into a new review',
-    skip:
-        'BUG: _reviewedPhotos() maps review face ids through current '
-        'people_faces; a revised photo gets new face ids, so it is sampled again',
+    'a revised reviewed photo is not recycled into a new review (KI-16)',
     () async {
       await seedFailedPeopleReview(repo);
       await repo.archiveReview();

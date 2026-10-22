@@ -141,7 +141,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -179,6 +179,18 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(peopleReviews);
         await m.createTable(peopleState);
         await _peopleStorageIndexes();
+      }
+      // v6 → v7: reviewed photo ids (KI-16). A table created above already
+      // has the columns; an existing one gains them, filled from the faces
+      // that still exist.
+      if (from == 6) {
+        await m.addColumn(peopleReviews, peopleReviews.leftPhotoId);
+        await m.addColumn(peopleReviews, peopleReviews.rightPhotoId);
+        await customStatement(
+          'UPDATE people_reviews SET '
+          'left_photo_id = (SELECT photo_id FROM people_faces WHERE id = left_face_id), '
+          'right_photo_id = (SELECT photo_id FROM people_faces WHERE id = right_face_id)',
+        );
       }
     },
   );

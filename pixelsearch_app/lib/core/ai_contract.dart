@@ -19,9 +19,10 @@ class AiContract {
   /// preprocessing contracts are unchanged (see MIGRATIONS.md).
   static const String artifactVersion = '3';
 
-  /// Storage-only version. v6 adds separate offline People records;
-  /// model artifacts, geometry and embedding version remain unchanged.
-  static const int schemaVersion = 6;
+  /// Storage-only version. v6 adds separate offline People records; v7 stores
+  /// reviewed photo ids on People review rows (KI-16). Model artifacts,
+  /// geometry and embedding version remain unchanged.
+  static const int schemaVersion = 7;
 
   // --- Model geometry (contract §1, §3, §4) ---
   static const int embeddingDim = 512;
