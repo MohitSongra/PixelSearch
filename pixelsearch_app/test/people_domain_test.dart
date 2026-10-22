@@ -193,18 +193,19 @@ void main() {
   test(
     'device failure identifies the false join without enabling its cutoff',
     () {
-      // Anonymized boundary scores from the user's 2026-09-18 saved review.
+      // Boundary scores from the 2026-09-18 device review, rounded to four
+      // decimals; their order, and so the outcome, is unchanged.
       final result = calibrateFaces([
-        pair('calibration', .4307765197209109, 'same', 'c30'),
-        pair('calibration', .40920766110876833, 'different', 'c31'),
-        pair('validation', .5594195292466785, 'different', 'v55'),
-        pair('validation', .4391661156692819, 'same', 'v56'),
-        pair('validation', .40770883499056637, 'same', 'v57'),
-        pair('validation', .3783874907275571, 'different', 'v58'),
+        pair('calibration', .4308, 'same', 'c30'),
+        pair('calibration', .4092, 'different', 'c31'),
+        pair('validation', .5594, 'different', 'v55'),
+        pair('validation', .4392, 'same', 'v56'),
+        pair('validation', .4077, 'same', 'v57'),
+        pair('validation', .3784, 'different', 'v58'),
       ]);
       expect(result.passed, isFalse);
       expect(result.threshold, isNull);
-      expect(result.candidateThreshold, .4307765197209109);
+      expect(result.candidateThreshold, .4308);
       expect(result.falseJoinPairIds, ['v55-a|v55-b']);
       expect(result.missedSamePairIds, ['v57-a|v57-b']);
       expect(result.reason, contains('1 of 2 different-person'));
