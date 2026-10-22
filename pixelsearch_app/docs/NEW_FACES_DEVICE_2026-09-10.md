@@ -1,12 +1,14 @@
 # New Faces: Connected-Device Installation
 
+> **Redaction note (2026-10-22):** personal identifiers (names, the device serial, local paths, private photo filenames, backup names and APK/backup digests) were replaced with placeholders. Measurements are unchanged.
+
 Date: 2026-09-10. Device: Vivo I2214, Android.
 
 ## Installation and Preservation
 
 - Installed the New Faces debug APK with `adb install -r`. The app was not uninstalled and no app data was cleared.
-- Verified the installed and replacement APKs have the same signing certificate: `5d6a02254b32e1c91b1ad84273009f7731fc10141022e0ccef0304546dfdb26e`.
-- Installed APK SHA-256: `573986eb5d5a64976e5bff2947ba863053e1da62fb8a2a880f0c131510bc2880`.
+- Verified the installed and replacement APKs have the same signing certificate: `<digest withheld>`.
+- Installed APK SHA-256: `<digest withheld>`.
 - Confirmed indexing was idle before closing the app for a consistent pre-upgrade backup. Retained the old APK locally as well.
 - After launching the update, took a second consistent backup before enabling People. Both SQLite integrity checks returned `ok`.
 - The database migrated from schema 5 to schema 6. All eight existing tables retained identical row counts and content hashes: photos, embeddings, index state, folder preferences, memories, memory members, locations and saved captions.
@@ -17,8 +19,8 @@ Private backups remain under the git-ignored `local_evaluation/` directory:
 
 | Snapshot | File | SHA-256 |
 | --- | --- | --- |
-| Before upgrade | `app-data-20260910-141219-092.tar` | `50b223ffa9c01f8dff281ba2add06f6cfa4923d5b8340abe20993401cba7ff67` |
-| After migration, before People processing | `app-data-20260910-141433-868.tar` | `99f9027a8582b7d11d8333e79d6f8cbefc8005aa5a0f61abf06c6390f46652b7` |
+| Before upgrade | `<private backup>` | `<digest withheld>` |
+| After migration, before People processing | `<private backup>` | `<digest withheld>` |
 
 ## On-Device Checks
 

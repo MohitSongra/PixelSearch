@@ -1,5 +1,7 @@
 # PixelSearch: speech setup, article scoring and online onboarding
 
+> **Redaction note (2026-10-22):** personal identifiers (names, the device serial, local paths, private photo filenames, backup names and APK/backup digests) were replaced with placeholders. Measurements are unchanged.
+
 Date: 2026-09-09, Asia/Calcutta. Follow-up to the five-feature Android acceptance.
 
 ## Applied changes
@@ -71,7 +73,7 @@ Older notes saying only `a dog` has ratings are historical; the current saved fi
 also includes the 21 car judgments.
 
 **[VERIFIED ON VIVO]** `a dog` still returns nine results. For the first result,
-`IMG-20230821-WA0165.jpg`, the explanation now shows raw cosine 0.2073, normalized
+`<private photo A>`, the explanation now shows raw cosine 0.2073, normalized
 semantic 0.5923, metadata 0.0000, weighted lexical 0.0000, and final score 0.4146
 (previously 0.6646). Matching terms no longer contains `a`. Raw cosine is unchanged.
 
@@ -117,7 +119,7 @@ push occurred. Cloud features remain default-off and not configured.
 - 14 backend contract tests passed; two upstream deprecation warnings.
 - Final Android debug build succeeded in 26.5 seconds, then installed in place.
 - Final APK: `build/app/outputs/flutter-apk/app-debug.apk`, 260,457,114 bytes.
-- SHA-256: `66DA76DCC9524862FAAADB872623F300B1731384A4F9E21FD1DC7B99A85C19DA`.
+- SHA-256: `<digest withheld>`.
 - Signing compatibility checked; no uninstall, clear-data command or destructive
   test runner. Two incremental in-place builds were installed during this follow-up.
 - Logs: `build/followup_tests.log`, `build/followup_analyzer.log`,
@@ -128,14 +130,14 @@ Before each update, a fresh backup was taken with the app quiescent and audited:
 
 | Backup | SHA-256 |
 |---|---|
-| `local_evaluation/app-data-20260909-222834-119.tar` | `5892BDAAAA0C5700648CF67BDD0D68706D81A2A2089BDE871C09DBF6706941D3` |
-| `local_evaluation/app-data-20260909-223612-563.tar` | `D8FC75E7E8E086DA51E4AAD759A702B03C2FE95C3EDE947EFCA685BDAD04E5D9` |
+| `<private backup>` | `<digest withheld>` |
+| `<private backup>` | `<digest withheld>` |
 
 Both backups pass SQLite integrity; all database tables matched between them.
 Existing 1,916 image embeddings, version 1 and dimension 512, remained present.
 **[VERIFIED FINAL AUDIT]** Post-test archive:
-`local_evaluation/app-data-20260909-224146-500.tar`, SHA-256
-`BA3B5B27B1F809C1F1F164D660C99197EA8EFB1FCE771189443457F15FF15B59`.
+`<private backup>`, SHA-256
+`<digest withheld>`.
 SQLite integrity is `ok`. Every table hash matches the pre-update snapshot;
 both model files and both saved evaluation files also match exactly. All 1,916
 photo/vector rows and 27 memories remain present. Structured comparison of the

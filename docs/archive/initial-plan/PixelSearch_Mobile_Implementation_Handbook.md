@@ -2,7 +2,7 @@
 
 **Project:** PixelSearch — Privacy-First, AI-Powered Semantic Photo Retrieval (Mobile Edition)
 **Degree:** B.E. Information Technology, University of Mumbai (Academic Year 2025–26)
-**Team:** Mohit, Rudra Dalvi, Sameed Mulla, Adarsh Yadav (4 members)
+**Team:** four-member student team (names withheld pending consent)
 **Platform:** Android-first (iOS-ready cross-platform codebase)
 **Document type:** Complete technical implementation guide
 **Version:** 1.0
