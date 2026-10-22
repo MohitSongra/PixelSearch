@@ -1,0 +1,194 @@
+// PixelSearch | complete source architecture | 2026-09-18
+// Current working tree, including uncommitted security and People updates.
+// Solid edges: implemented source paths. Dotted edges: notes, associations or build/test contracts.
+// This is a zoomable engineering canvas, not an A4 poster.
+direction down
+colorMode pastel
+styleMode plain
+typeface clean
+
+project [label: "PixelSearch | Complete app architecture | 18 Sep 2026", icon: search, color: "#167D8D"]
+
+phone [label: "01 ANDROID PHONE | gallery, embeddings, identities and core retrieval remain local", icon: smartphone, color: "#167D8D"] {
+  experience [label: "A. Flutter application | Android-first", icon: smartphone, color: "#167D8D"] {
+    entry [label: "main.dart -> ProviderScope -> GoRouter indexed shell", icon: code]
+    screens [label: "Onboarding / folders | Search / gallery | Timeline | Map | Settings", icon: layout]
+    details [label: "Photo viewer | People / New Faces | Captions | Explanations | Diagnostics", icon: image]
+    state [label: "Riverpod: storage / preferences / online / library / query / indexing / search / people", icon: layers]
+  }
+
+  ingestion [label: "B. Local gallery indexing | foreground production path", icon: folder, color: "#167D8D"] {
+    gallery [label: "Android MediaStore via photo_manager | originals stay in gallery", icon: image]
+    access [label: "Image permission + selected folders | partial-access / deletion safeguards", icon: shield]
+    planner [label: "IndexPlanner: new / changed / stale / deleted | ID + mtime + bytes + version", icon: list]
+    lease [label: "SQLite processing lease | serialize heavy indexing and People scanning", icon: lock]
+    process [label: "AssetProcessor: load bytes -> EXIF -> decode once -> JPEG thumbnail", icon: image]
+    imageModel [label: "MobileCLIP-S1 image ONNX: 256 RGB / CHW / float32 -> 512D unit vector", icon: cpu]
+    enrichment [label: "ML Kit image labels + face detection | metadata, not identity recognition", icon: scan]
+    persist [label: "PhotoRepository: atomic batches of 32 | checkpoints / cancel / skip corrupt assets", icon: database]
+    indexLifecycle [label: "Reconcile deletions + face crops | refresh library + vector cache after commits", icon: refresh-cw]
+    foregroundLimit [label: "CPU decode / CLIP still in foreground flow | cooperative yield between photos", icon: alert-circle, color: "#AD781F"]
+  }
+
+  sceneSearch [label: "C. Offline semantic retrieval | no ANN service or cloud search", icon: search, color: "#167D8D"] {
+    query [label: "Typed or approved voice text | 300 ms debounce | date / album / place filters", icon: search]
+    identityFilter [label: "Resolve names / aliases locally | intersect all named people before top-K", icon: users]
+    textModel [label: "CLIP BPE: vocab 49408 / context 77 / int64 -> text ONNX -> 512D unit vector", icon: cpu]
+    vectorIndex [label: "Brute-force RAM index | exact cosine / dot scan O(N x 512)", icon: database]
+    retrieval [label: "Eligible photos -> top 60 candidates -> raw cosine gate 0.15", icon: filter]
+    ranking [label: "HybridScorer: 0.70 semantic + 0.25 lexical metadata + 0.05 face intent", icon: list]
+    healthyPolicy [label: "Healthy semantic mode: no ML Kit label boost or lexical-only admission", icon: shield]
+    results [label: "Ranked photos + per-result scores / matched metadata / person evidence", icon: image]
+    fallback [label: "Missing / unusable model or empty index: explicit keyword fallback | blank query: browse", icon: alert-circle]
+  }
+
+  people [label: "D. People recognition | opt-in, on-device, user-named identities", icon: users, color: "#167D8D"] {
+    peopleScan [label: "PeopleService: accessible indexed photos | pause / resume / generation cancellation", icon: scan]
+    faceDetect [label: "Kotlin EXIF-oriented decode: max 2048 px -> ML Kit detection + five landmarks", icon: image]
+    faceWorker [label: "Worker isolate: align 112 x 112 RGB -> SFace FP32 CPU -> 128D unit vector", icon: cpu]
+    faceQuality [label: "Quality / landmark checks | same-photo exclusion | manual assignment remains available", icon: shield]
+    naming [label: "New Faces: name / aliases / me | assign / merge / hide / dismiss / correct", icon: user]
+    calibration [label: "Same / Different / Unsure review | photo-disjoint calibration + held-out validation", icon: check-circle]
+    grouping [label: "Auto grouping only after local validation passes | complete-link | manual decisions win", icon: git-merge]
+    reviewRecovery [label: "Failed-pair inspection + attempted cutoff | fresh 20-pair round; archive old evidence", icon: refresh-cw]
+    identityRule [label: "Multiple names means all named people present, not exactly those people alone", icon: info]
+  }
+
+  localFeatures [label: "E. Local experiences and native services", icon: smartphone, color: "#167D8D"] {
+    timeline [label: "MemoryRepository: calendar-day memories / custom title + cover / local slideshow", icon: clock]
+    map [label: "LocationRepository + flutter_map | EXIF GPS / revision cache / photo markers", icon: map-pin]
+    locationPermission [label: "Explicit media-location permission | known / missing / unknown / inaccessible GPS", icon: shield]
+    speech [label: "Android API 33+ on-device recognizer | installed language check / model setup", icon: mic]
+    transcript [label: "English / Hindi / Hinglish | edit transcript, then apply to local search", icon: message-circle]
+    speechPrivacy [label: "Microphone permission / lifecycle cancellation | no silent cloud fallback", icon: shield]
+    explanations [label: "Search explanation + local label corrections | original photo viewer", icon: info]
+    diagnostics [label: "Local evaluation: strict semantic replay / ablations / P@K / known recall / judged nDCG", icon: activity]
+  }
+
+  localData [label: "F. Application-private persistence | Drift / SQLite schema v6; database background isolate", icon: database, color: "#4B7551"] {
+    sceneTables [label: "photo_rows + embedding_rows | metadata + versioned 512D float32-LE blobs", icon: database]
+    indexTables [label: "index_state_rows + indexing_preferences_rows | checkpoint / model / folders", icon: database]
+    memoryTables [label: "memory_events + memory_members | saved memory groups and membership", icon: database]
+    featureTables [label: "saved_captions + photo_locations | revision-aware output / provenance", icon: database]
+    identityTables [label: "people_persons + people_faces + people_scans | identities / 128D vectors / progress", icon: database]
+    reviewTables [label: "people_decisions + people_reviews + people_state | corrections / rounds / threshold", icon: database]
+    leaseTable [label: "processing_leases (raw SQL) | owner / expiry / heartbeat", icon: lock]
+    files [label: "App files: thumbnails / face crops / ONNX models / vocabulary / local diagnostics", icon: folder]
+    prefs [label: "Atomic user_preferences.json | onboarding / consent / language / label corrections", icon: settings]
+    credentials [label: "FlutterSecureStorage | backend token bound to HTTPS origin; not in preferences", icon: key]
+    storageLimits [label: "Android backups disabled | app-private SQLite is not a separately encrypted vault", icon: shield]
+  }
+
+  onlineBoundary [label: "G. Explicit online-consent boundary | defaults offline-only; per-feature switches", icon: shield, color: "#916A24"] {
+    policy [label: "OnlinePolicy: fail closed | generation revocation cancels in-flight requests", icon: toggle-left]
+    captionPrep [label: "Approve selected image: strip EXIF / resize 1280 / JPEG | rewrite sends caption text", icon: image]
+    assistantPrep [label: "Approve assistant: current message + query / filters / date / language; no named people", icon: message-circle]
+    audioPrep [label: "Approve each recorded clip: max 30 s | temporary M4A deleted on finish or cancel", icon: mic]
+    client [label: "EnhancementClient: HTTPS + origin-bound token | caps: 4 MiB upload / 64 KiB response", icon: globe]
+    clientLimits [label: "100 s total deadline | no redirects or automatic retries | cancel when consent revoked", icon: shield]
+    tileClient [label: "MapTileClient -> OSM directly: fixed HTTPS host | caps: 2 MiB / 20 s | no redirects", icon: map-pin]
+    outputs [label: "Preview / edit / save caption; review assistant proposal; approve transcript -> local query", icon: check-circle]
+  }
+}
+
+cloud [label: "02 OPTIONAL ONLINE SERVICES | backend source exists; current deployment hardening not verified", icon: cloud, color: "#916A24"] {
+  backend [label: "H. enhancement_backend | FastAPI / Uvicorn / Render", icon: server, color: "#916A24"] {
+    admission [label: "Bearer SHA-256 token-hash verification | 10 requests/min/token | 2 active POSTs/worker", icon: shield]
+    limits [label: "6 MiB streaming body cap | 60 s request deadline | strict schemas / upload validation", icon: shield]
+    routes [label: "GET /health | POST /caption | /rewrite | /assistant | /transcribe", icon: server]
+    sanitize [label: "Pillow image safety / clean re-encode | typed assistant output | provider response checks", icon: filter]
+    providerClient [label: "Groq request broker | 45 s provider deadline / 64 KiB output | controlled errors", icon: globe]
+    stateless [label: "No gallery DB / persistent photo storage / payload logs | no-store responses", icon: lock]
+    serverSecrets [label: "Server-only GROQ_API_KEY + PIXELSEARCH_TOKEN_HASHES | never packaged in app", icon: key]
+  }
+  providers [label: "I. External data recipients | only the approved request crosses", icon: cloud, color: "#916A24"] {
+    groqText [label: "Groq qwen/qwen3.6-27b | selected-photo caption / text rewrite / query proposal", icon: cpu]
+    groqSpeech [label: "Groq whisper-large-v3-turbo | approved audio transcription", icon: mic]
+    retention [label: "GROQ_ZDR_CONFIRMED is operator attestation, not proof of provider account retention", icon: alert-circle]
+    osm [label: "OpenStreetMap tile service | IP + requested map area visible; no gallery upload", icon: map]
+  }
+}
+
+engineering [label: "03 BUILD, MODEL CONTRACTS AND VERIFICATION | not phone runtime services", icon: code, color: "#626A78"] {
+  folders [label: "pixelsearch_app/ runtime | enhancement_backend/ optional broker | model_kit/ offline tooling", icon: folder]
+  modelKit [label: "PyTorch / open_clip MobileCLIP-S1 datacompdr -> ONNX opset 17 -> FP32 / repaired FP16", icon: cpu]
+  contracts [label: "Frozen CLIP resize / crop / tokenizer parity | SFace alignment / hash / embedding contract", icon: check-circle]
+  provisioning [label: "ModelLocator: manually provisioned MobileCLIP | bundled vocabulary + hash-checked SFace", icon: folder]
+  ci [label: "GitHub Actions: repo boundary check / Flutter analyze + tests / backend pytest / ModelKit metrics", icon: git-branch]
+  acceptance [label: "Real ONNX / full-gallery / quality / lifecycle acceptance require fixtures and physical-device runs", icon: smartphone]
+  platform [label: "Android is production target | web keyword-only fallback; other scaffolds not feature parity", icon: info]
+}
+
+pending [label: "04 PENDING OR CONDITIONAL | amber notes are limitations, not shipped capability claims", icon: clock, color: "#AD781F"] {
+  scheduler [label: "WorkManager callback + adapter exist | automatic scheduling not connected", icon: clock]
+  performance [label: "Full CLIP indexing worker / automatic model provisioning / FP16 acceleration acceptance", icon: cpu]
+  roadmap [label: "Relationship Graph / Emotion Search / video Highlight Reel | roadmap, not current features", icon: git-branch]
+  release [label: "Backend redeployment verification / release signing / full-library acceptance", icon: check-circle]
+}
+
+// Panel-level interfaces keep the single detailed canvas readable.
+// Read/write connectors name the call or data contract, not execution order.
+project > experience
+experience > ingestion, sceneSearch, people, localFeatures: Riverpod orchestration
+ingestion > localData: atomic photo + embedding writes; deletion reconciliation; cache refresh
+sceneSearch > localData: reads current 512D vectors + metadata + name-to-photo IDs
+people > localData: reads/writes 128D observations + crops + identities + review state; shared lease
+localFeatures > localData: reads/writes memories + GPS + preferences + evaluation outputs
+localFeatures > onlineBoundary: explicit online opt-in only
+onlineBoundary > cloud: approved requests and reviewed responses; OSM tiles use a separate direct client
+backend > groqText: caption / rewrite / assistant
+backend > groqSpeech: approved transcription
+// Engineering and pending work are separate panels, not a runtime dependency chain.
+
+// A. Composition rather than a screen-by-screen user journey.
+entry > screens > details > state
+
+// B. Index once, reconcile incrementally. Heavy CLIP is not a worker yet.
+gallery > access > planner > lease > process > imageModel > enrichment > persist > indexLifecycle
+foregroundLimit -- process
+
+// C. Names constrain the corpus before scene ranking. Name-only skips CLIP.
+query > identityFilter > textModel > vectorIndex > retrieval > ranking > results
+identityFilter > results: name-only query
+ranking -- healthyPolicy
+textModel > fallback: unavailable
+fallback > results
+
+// D. SFace does not share the CLIP embedding space.
+peopleScan > faceDetect > faceWorker > faceQuality > naming
+naming > calibration > grouping
+calibration > reviewRecovery: failed or incomplete
+reviewRecovery > grouping: only if a fresh held-out round passes
+identityRule -- naming
+
+// E. Native speech stays offline; reviewed transcript becomes a C query.
+locationPermission > map
+speechPrivacy > speech > transcript
+explanations > diagnostics: inspect and evaluate search evidence
+
+// F. Inventory is not a fake foreign-key ER diagram.
+sceneTables -- indexTables: index lifecycle
+identityTables -- reviewTables: assignments and review evidence
+memoryTables -- featureTables: derived photo experiences
+leaseTable -- files: coordinated heavy work and caches
+prefs -- credentials: settings and secrets stored separately
+
+// G. Each egress is enabled and approved; output use is still local.
+policy > captionPrep, assistantPrep, audioPrep: enabled and approved
+captionPrep, assistantPrep, audioPrep > client
+clientLimits -- client
+client > outputs: review successful response
+policy > tileClient: separate online-map permission
+
+// H/I. Only a stateless broker and external inference, not cloud photo search.
+admission > limits > routes > sanitize > providerClient
+serverSecrets > admission: token hashes
+serverSecrets > providerClient: API key
+stateless -- routes
+retention -- groqText
+
+// Offline engineering and explicit limitations.
+folders > modelKit > contracts > provisioning
+folders > ci > acceptance
+contracts --> ci: parity contracts
+platform -- folders
