@@ -90,7 +90,9 @@ flowchart LR
 Names map to user-confirmed People identities. A query requiring two people uses
 the intersection of their photo memberships; it does not imply nobody else may
 appear. Name-only retrieval bypasses CLIP. Scene-plus-person queries rank within
-the eligible set. Missing/unusable scene models select visible keyword fallback.
+the eligible set. Missing/unusable scene models select keyword fallback; since the
+2026-09-18 redesign the mode is shown only by the results header tooltip ("Matched by
+labels and photo details"), and a name-only person search says "Matched by assigned faces".
 
 The model contract defines 512-dimensional normalized scene vectors. The current
 index is exact brute-force retrieval, not FAISS or a cloud vector database.

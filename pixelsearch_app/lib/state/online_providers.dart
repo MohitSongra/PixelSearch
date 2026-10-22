@@ -8,9 +8,6 @@ final onlinePolicyProvider = ChangeNotifierProvider<OnlinePolicy>((ref) {
   policy.load().catchError((Object _) {}); // A read failure stays offline.
   return policy;
 });
-final privacyModeProvider = Provider<bool>(
-  (ref) => ref.watch(onlinePolicyProvider).offline,
-);
 final enhancementClientProvider = Provider(
   (ref) => EnhancementClient(ref.read(onlinePolicyProvider)),
 );

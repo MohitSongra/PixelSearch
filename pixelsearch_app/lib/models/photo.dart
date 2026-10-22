@@ -35,7 +35,7 @@ class Photo {
 
   /// On-device object labels from ML Kit image labeling (M5 indexing).
   /// Empty for un-indexed photos (web). Read-only for search: the indexer writes
-  /// `labelsJson`; [PhotoRepository.rowToPhoto] surfaces it here so M6 hybrid
+  /// `labelsJson`; `rowToPhoto` (photo_repository.dart) surfaces it here so M6 hybrid
   /// ranking and the UI can use it. See INDEXING_ARCHITECTURE.md.
   final List<String> labels;
 

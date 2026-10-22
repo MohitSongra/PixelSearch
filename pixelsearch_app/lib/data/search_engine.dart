@@ -64,9 +64,3 @@ List<Photo> searchPhotos(List<Photo> all, String query) {
   });
   return scored.map((e) => e.$1).toList();
 }
-
-/// The matched terms for a photo — used by the viewer's "why this matched" chip row.
-List<String> matchedTags(Photo p, String query) {
-  final terms = query.toLowerCase().split(RegExp(r'\s+')).toSet();
-  return p.tags.where((tag) => terms.any((t) => t.isNotEmpty && tag.contains(t))).toList();
-}
