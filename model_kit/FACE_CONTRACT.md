@@ -1,6 +1,6 @@
 # Offline People Contract
 
-Contract ID: `sface-2021dec-mlkit-landmarks-v1`.
+Contract ID: `sface-2021dec-mlkit-landmarks-v2` (2026-10-22; see Contract history).
 This supplements MobileCLIP. CLIP model/artifact/embedding versions are unchanged.
 
 ## Artifact and Geometry
@@ -32,9 +32,11 @@ Fit a non-reflecting least-squares similarity transform to:
 ```
 
 Warp to 112x112 with bilinear interpolation and constant-black borders.
-Faces smaller than 100 pixels on either prepared-image dimension, missing landmarks
+Faces smaller than 64 pixels on either prepared-image dimension, missing landmarks
 or invalid vectors remain manually assignable but cannot seed automatic assignments.
-This is a quality safeguard, not a calibrated recognition threshold.
+This is a quality safeguard, not a calibrated recognition threshold. Faces from 64
+to 111 pixels are upscaled to 112x112; whether they group reliably is decided only
+by the local grouping gate below, never assumed.
 
 ## Reference Tests
 
@@ -74,6 +76,25 @@ separate; established groups are never auto-merged. All existing same-photo
 assignments, including faces without descriptors, block automatic same-photo joins.
 Manual corrections remain authoritative. Passing a small local sample does not
 establish general accuracy or eliminate grouping mistakes.
+
+## Contract history
+
+- `sface-2021dec-mlkit-landmarks-v1` (2026-09-10): minimum face size 100 pixels.
+- `sface-2021dec-mlkit-landmarks-v2` (2026-10-22, owner decision): minimum 64 pixels.
+  On the test phone only 397 of 2,642 detected faces (all 1,916 photos processed)
+  reached 100 pixels, so most faces could never be compared.
+  Detection, alignment, the model and descriptor encoding are unchanged; a face of 100
+  pixels or more gets a bit-identical descriptor under both versions.
+
+Upgrade rules (`PeopleRepository.commitPhoto`): every photo is re-scanned under the new
+id. A new detection whose box overlaps an earlier observation of the same photo
+revision (intersection over union of at least 0.5, best match first) continues that
+observation: it keeps the face id, the person, the assignment, "Not a face" and every
+decision or review that names it, and takes the new box, quality, crop and descriptor.
+Unmatched earlier observations are dropped unless the user named or dismissed them;
+those stay on record but are not shown. Reviews made under an earlier contract do not
+validate a cutoff for the new one: automatic grouping stays off ("Face settings
+changed") until a new review round passes. Existing automatic assignments are kept.
 
 ## Sources
 

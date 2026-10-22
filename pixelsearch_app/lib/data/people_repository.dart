@@ -202,17 +202,24 @@ class PeopleSnapshot {
 /// from the naming list by default.
 const tinyFacePixels = 40.0;
 
-double _overlap(PeopleFaceRecord a, PeopleFaceRecord b) {
+double _overlap(PeopleFaceRecord a, PeopleFaceRecord b) =>
+    _boxOverlap((a.x, a.y, a.w, a.h), (b.x, b.y, b.w, b.h));
+
+/// Intersection over union of two (x, y, w, h) boxes.
+double _boxOverlap(
+  (double, double, double, double) a,
+  (double, double, double, double) b,
+) {
   final width = math.max(
     0.0,
-    math.min(a.x + a.w, b.x + b.w) - math.max(a.x, b.x),
+    math.min(a.$1 + a.$3, b.$1 + b.$3) - math.max(a.$1, b.$1),
   );
   final height = math.max(
     0.0,
-    math.min(a.y + a.h, b.y + b.h) - math.max(a.y, b.y),
+    math.min(a.$2 + a.$4, b.$2 + b.$4) - math.max(a.$2, b.$2),
   );
   final intersection = width * height;
-  final union = a.w * a.h + b.w * b.h - intersection;
+  final union = a.$3 * a.$4 + b.$3 * b.$4 - intersection;
   return union <= 0 ? 0 : intersection / union;
 }
 
@@ -326,25 +333,31 @@ class PeopleRepository {
       photos.removeWhere((id, _) => !accessible.contains(id));
     }
     final scans = await db.select(db.peopleScans).get();
-    final done = <String>{};
-    var inaccessible = 0, failed = 0;
+    // Photo → the contract of its finished scan. A photo still scanned under
+    // a compatible earlier contract shows those faces until it is re-scanned;
+    // only scans under the current contract count as processed.
+    final scannedWith = <String, String>{};
+    var processed = 0, inaccessible = 0, failed = 0;
     for (final s in scans) {
       final photo = photos[s.photoId];
       if (photo == null ||
           s.revision != peopleRevision(photo) ||
-          s.contract != FaceContract.id) {
+          !FaceContract.compatible.contains(s.contract)) {
         continue;
       }
-      if (s.status == 'done') done.add(s.photoId);
-      if (s.status == 'inaccessible') inaccessible++;
-      if (s.status == 'failed') failed++;
+      final current = s.contract == FaceContract.id;
+      if (s.status == 'done') {
+        scannedWith[s.photoId] = s.contract;
+        if (current) processed++;
+      }
+      if (current && s.status == 'inaccessible') inaccessible++;
+      if (current && s.status == 'failed') failed++;
     }
     final faces =
         (await db.select(db.peopleFaces).get())
             .where(
               (f) =>
-                  done.contains(f.photoId) &&
-                  f.contract == FaceContract.id &&
+                  scannedWith[f.photoId] == f.contract &&
                   f.revision == peopleRevision(photos[f.photoId]!),
             )
             .toList()
@@ -382,7 +395,7 @@ class PeopleRepository {
       photoDates: {for (final p in photos.values) p.id: p.dateMs},
       photoSizes: {for (final p in photos.values) p.id: (p.width, p.height)},
       total: photos.length,
-      processed: done.length,
+      processed: processed,
       inaccessible: inaccessible,
       failed: failed,
     );
@@ -430,10 +443,44 @@ class PeopleRepository {
             decodeFaceVector(face.vector.value) == null) {
           throw const FormatException('Invalid descriptor bytes.');
         }
-        // Repeated processing cannot overwrite user corrections.
-        await db
-            .into(db.peopleFaces)
-            .insert(face, mode: InsertMode.insertOrIgnore);
+      }
+      // A newer face contract re-detects the same photo revision. The
+      // detector is unchanged, so a face whose box matches an earlier
+      // observation is the same detection: it keeps that observation's id,
+      // and with it the person, the assignment, "Not a face" and every
+      // decision or review that names it.
+      final earlier =
+          await (db.select(db.peopleFaces)..where(
+                (f) =>
+                    f.photoId.equals(photoId) &
+                    f.revision.equals(revision) &
+                    f.contract.equals(FaceContract.id).not(),
+              ))
+              .get();
+      final carried = _matchEarlierFaces(faces, earlier);
+      for (var i = 0; i < faces.length; i++) {
+        final old = carried[i];
+        if (old == null) {
+          // Repeated processing cannot overwrite user corrections.
+          await db
+              .into(db.peopleFaces)
+              .insert(faces[i], mode: InsertMode.insertOrIgnore);
+        } else {
+          await (db.update(db.peopleFaces)..where((f) => f.id.equals(old.id)))
+              .write(faces[i].copyWith(id: const Value.absent()));
+        }
+      }
+      // An earlier observation nothing matched is dropped unless it carries
+      // the user's decision, which stays on record (it is no longer shown).
+      final kept = carried.values.map((f) => f.id).toSet();
+      final dropped = [
+        for (final f in earlier)
+          if (!kept.contains(f.id) && f.personId == null && !f.dismissed) f.id,
+      ];
+      if (dropped.isNotEmpty) {
+        await (db.delete(
+          db.peopleFaces,
+        )..where((f) => f.id.isIn(dropped))).go();
       }
     }
     await db
@@ -450,6 +497,41 @@ class PeopleRepository {
         );
     return true;
   });
+
+  /// Pairs new detections with earlier observations of the same photo
+  /// revision by box overlap, closest first, each used at most once. Index of
+  /// the new face → the earlier observation it continues.
+  Map<int, PeopleFaceRecord> _matchEarlierFaces(
+    List<PeopleFacesCompanion> faces,
+    List<PeopleFaceRecord> earlier,
+  ) {
+    final candidates = <(double, int, PeopleFaceRecord)>[
+      for (var i = 0; i < faces.length; i++)
+        for (final old in earlier)
+          (
+            _boxOverlap(
+              (
+                faces[i].x.value,
+                faces[i].y.value,
+                faces[i].w.value,
+                faces[i].h.value,
+              ),
+              (old.x, old.y, old.w, old.h),
+            ),
+            i,
+            old,
+          ),
+    ]..sort((a, b) => b.$1.compareTo(a.$1));
+    final matched = <int, PeopleFaceRecord>{};
+    final used = <String>{};
+    for (final (overlap, index, old) in candidates) {
+      if (overlap < 0.5) break;
+      if (matched.containsKey(index) || used.contains(old.id)) continue;
+      matched[index] = old;
+      used.add(old.id);
+    }
+    return matched;
+  }
 
   /// Validates every face against one snapshot (one [load], not one per face).
   Future<Map<String, PeopleFaceRecord>> _faces(
@@ -1006,7 +1088,7 @@ class PeopleRepository {
                 (p.record.id, _descriptor(f)!),
       ],
       decided: decided,
-      minSimilarity: _lowestSameScore(snapshot),
+      minSimilarity: await _lowestSameScore(snapshot),
       limit: limit,
     );
     // Every pair of groups is compared, so estimate the work: small libraries
@@ -1022,11 +1104,21 @@ class PeopleRepository {
 
   /// The lowest score among review pairs the user judged the same person.
   /// Pairs scoring below every judged "same" pair are not worth asking about.
-  double? _lowestSameScore(PeopleSnapshot snapshot) {
-    final scores = [
+  /// While a new round is still unjudged, the archived rounds' answers keep
+  /// the floor, so questions do not fall back to every pair.
+  Future<double?> _lowestSameScore(PeopleSnapshot snapshot) async {
+    var scores = [
       for (final r in snapshot.reviews)
         if (r.judgment == 'same') r.cosine,
     ];
+    if (scores.isEmpty) {
+      scores = [
+        for (final r in await (db.select(
+          db.peopleReviews,
+        )..where((r) => r.judgment.equals('same'))).get())
+          r.cosine,
+      ];
+    }
     return scores.isEmpty ? null : scores.reduce(math.min);
   }
 
@@ -1320,9 +1412,17 @@ class PeopleRepository {
     snapshot ??= await load();
     final faces = {for (final f in snapshot.faces) f.id: f};
     final calPhotos = <String>{}, valPhotos = <String>{};
+    // A review under an earlier contract did not cover the faces this one
+    // compares (for example smaller ones), so it cannot validate a cutoff.
+    if (snapshot.reviews.any((p) => p.contract != FaceContract.id)) {
+      return const FaceCalibration(
+        reason:
+            'Face settings changed: smaller faces can now be compared. '
+            'Start a new review to turn automatic grouping back on.',
+      );
+    }
     for (final p in snapshot.reviews) {
-      if (p.contract != FaceContract.id ||
-          !faces.containsKey(p.leftFaceId) ||
+      if (!faces.containsKey(p.leftFaceId) ||
           !faces.containsKey(p.rightFaceId)) {
         return const FaceCalibration(
           reason:
