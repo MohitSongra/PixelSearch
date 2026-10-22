@@ -1,13 +1,15 @@
 # Online backend acceptance - 2026-09-09
 
+> **Redaction note (2026-10-22):** personal identifiers (names, the device serial, local paths, private photo filenames, backup names and APK/backup digests) were replaced with placeholders. Measurements are unchanged.
+
 ## Scope and data safety
 
-- Physical device: Vivo I2214, API 36, serial ending 0005U.
+- Physical device: Vivo I2214, API 36, serial withheld.
 - Existing app used without rebuilding, reinstalling, clearing data, or indexing.
 - Settings displayed 1,916 indexed photos at the start of testing.
 - No gallery images or microphone recordings uploaded during this session.
 - No ranking, weights, model artifacts, embedding version, database schema, or folder selection changes.
-- Backend URL: https://pixelsearch-enhancements.onrender.com
+- Backend URL: `<render-service-url>`
 - Search Assistant was already consented on the phone. Offline only was off; online captions, transcription, and map tiles were off. These consent settings were not changed.
 
 ## Verified deployment and privacy

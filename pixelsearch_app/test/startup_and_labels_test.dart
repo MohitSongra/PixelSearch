@@ -68,6 +68,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    // Onboarding scrolls on short screens; the buttons sit at the end.
+    await tester.ensureVisible(find.text('Not now'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Not now'));
     await tester.pumpAndSettle();
     expect(find.text('Search home'), findsOneWidget);

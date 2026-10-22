@@ -11,7 +11,12 @@ void main() {
     for (var y = 0; y < 200; y++) {
       for (var x = 0; x < 320; x++) {
         src.setPixelRgb(
-            x, y, (x * 7 + y * 3) % 256, (x * 3 + 11) % 256, (y * 5 + 17) % 256);
+          x,
+          y,
+          (x * 7 + y * 3) % 256,
+          (x * 3 + 11) % 256,
+          (y * 5 + 17) % 256,
+        );
       }
     }
     final pre = preprocessForClip(src);
@@ -22,10 +27,12 @@ void main() {
       sum += v;
     }
     // ignore: avoid_print
-    print('FINGERPRINT sum=${sum.toStringAsFixed(6)} '
-        'a=${pre.data[0].toStringAsFixed(6)} '
-        'b=${pre.data[100000].toStringAsFixed(6)} '
-        'c=${pre.data[pre.data.length - 1].toStringAsFixed(6)}');
+    print(
+      'FINGERPRINT sum=${sum.toStringAsFixed(6)} '
+      'a=${pre.data[0].toStringAsFixed(6)} '
+      'b=${pre.data[100000].toStringAsFixed(6)} '
+      'c=${pre.data[pre.data.length - 1].toStringAsFixed(6)}',
+    );
 
     expect(sum, closeTo(_sum, 0.05));
     expect(pre.data[0], closeTo(_a, 1e-5));

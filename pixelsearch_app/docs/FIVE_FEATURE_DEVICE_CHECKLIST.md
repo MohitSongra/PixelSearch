@@ -1,5 +1,7 @@
 # Five-feature Android acceptance checklist
 
+> **Status note (2026-10-21 audit):** The status line below is superseded. The local-feature checks were performed on 2026-09-09; see `ANDROID_FIVE_FEATURE_ACCEPTANCE_2026-09-09.md`. Still open: live cloud captions, voice trials and positive GPS pins. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+
 Status: **not yet performed on the physical phone**. Test on Vivo I2214 / API 36.
 Host tests and APK compilation do not establish speech or caption accuracy.
 

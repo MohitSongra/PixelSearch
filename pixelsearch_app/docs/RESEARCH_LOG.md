@@ -1,5 +1,7 @@
 # RESEARCH LOG
 
+> **Status note (2026-10-21 audit):** Part of this file is not true against the code. The M4.2 (2026-08-06) entry calls the fp16 artifact a device artifact for NNAPI/XNNPACK, "validated on-device". The app registers no execution provider (FP32 on CPU only), and fp16 has never been accepted on Android (KI-2, ADR-016). Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+
 Chronological record of investigations, findings, and decisions. Measured facts only.
 
 ## 2026-08-06 (M5) — Indexing engine core (ports & adapters); all logic gates green

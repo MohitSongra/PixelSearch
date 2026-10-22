@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data' show BytesBuilder;
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'backend_credentials.dart';
 import 'online_policy.dart';
 
 class RequestCancellation extends ChangeNotifier {
@@ -16,15 +16,13 @@ class RequestCancellation extends ChangeNotifier {
 class EnhancementClient {
   EnhancementClient(
     this.policy, {
-    Future<String?> Function()? token,
+    this.token,
+    this.credentials = const BackendCredentials(),
     http.Client Function()? client,
-  }) : _token =
-           token ??
-           (() =>
-               const FlutterSecureStorage().read(key: 'backend_install_token')),
-       _client = client ?? http.Client.new;
+  }) : _client = client ?? http.Client.new;
   final OnlinePolicy policy;
-  final Future<String?> Function() _token;
+  final Future<String?> Function()? token;
+  final BackendCredentials credentials;
   final http.Client Function() _client;
 
   Future<Map<String, dynamic>> request(
@@ -40,15 +38,15 @@ class EnhancementClient {
     }
     final generation = policy.generation;
     final base = Uri.tryParse(policy.baseUrl);
-    if (base == null || base.scheme != 'https' || base.host.isEmpty) {
+    if (base == null || !BackendCredentials.validBackend(base)) {
       throw StateError('Configure the HTTPS backend in Settings.');
     }
-    final token = await _token();
+    final token = await (this.token?.call() ?? credentials.readFor(base));
     if (!policy.allows(feature) || policy.generation != generation) {
       throw StateError('Request cancelled.');
     }
     if (token == null || token.isEmpty) {
-      throw StateError('Set the per-install backend token in Settings.');
+      throw StateError('Set the access token for this backend in Settings.');
     }
     final client = _client();
     var cancelled = false;

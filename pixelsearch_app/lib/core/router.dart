@@ -14,37 +14,42 @@ final GoRouter appRouter = GoRouter(
   navigatorKey: _rootKey,
   initialLocation: '/',
   routes: [
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const StartupScreen(),
-    ),
+    GoRoute(path: '/', builder: (context, state) => const StartupScreen()),
     StatefulShellRoute.indexedStack(
       builder: (context, state, shell) => ShellScaffold(navigationShell: shell),
       branches: [
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/home/search',
-            builder: (context, state) => const SearchScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/home/timeline',
-            builder: (context, state) => const TimelineScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/home/map',
-            builder: (context, state) => const MapScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/home/settings',
-            builder: (context, state) => const SettingsScreen(),
-          ),
-        ]),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/home/search',
+              builder: (context, state) => const SearchScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/home/timeline',
+              builder: (context, state) => const TimelineScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/home/map',
+              builder: (context, state) => const MapScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/home/settings',
+              builder: (context, state) => const SettingsScreen(),
+            ),
+          ],
+        ),
       ],
     ),
   ],

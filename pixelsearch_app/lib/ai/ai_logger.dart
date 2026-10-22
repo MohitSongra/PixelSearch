@@ -21,14 +21,18 @@ class AiLog {
   }
 
   void error(String message, [Object? error, StackTrace? stackTrace]) {
-    developer.log(message,
-        name: 'pixelsearch.ai.$tag',
-        level: 1000,
-        error: error,
-        stackTrace: stackTrace);
+    developer.log(
+      message,
+      name: 'pixelsearch.ai.$tag',
+      level: 1000,
+      error: error,
+      stackTrace: stackTrace,
+    );
     if (kDebugMode) {
-      debugPrint('[pixelsearch.$tag] ERROR $message'
-          '${error == null ? '' : ' :: $error'}');
+      debugPrint(
+        '[pixelsearch.$tag] ERROR $message'
+        '${error == null ? '' : ' :: $error'}',
+      );
     }
   }
 }

@@ -12,13 +12,21 @@ void main() {
     expect(s.p95Us, 50); // nearest-rank: round(0.95*4)=4 → 50
   });
 
-  test('measure runs warmup + timed iterations and records one result', () async {
-    final b = Benchmark();
-    var calls = 0;
-    final stats = await b.measure('noop', () => calls++, iterations: 5, warmup: 2);
-    expect(calls, 7); // 2 warmup + 5 timed
-    expect(b.results.length, 1);
-    expect(stats.iterations, 5);
-    expect(stats.name, 'noop');
-  });
+  test(
+    'measure runs warmup + timed iterations and records one result',
+    () async {
+      final b = Benchmark();
+      var calls = 0;
+      final stats = await b.measure(
+        'noop',
+        () => calls++,
+        iterations: 5,
+        warmup: 2,
+      );
+      expect(calls, 7); // 2 warmup + 5 timed
+      expect(b.results.length, 1);
+      expect(stats.iterations, 5);
+      expect(stats.name, 'noop');
+    },
+  );
 }

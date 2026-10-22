@@ -141,11 +141,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (m) async { await m.createAll(); await _peopleStorageIndexes(); },
+    onCreate: (m) async {
+      await m.createAll();
+      await _peopleStorageIndexes();
+    },
     onUpgrade: (m, from, to) async {
       // v1 → v2: tag each embedding with the embedding_version that produced it.
       if (from < 2) {
@@ -180,15 +183,35 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(peopleState);
         await _peopleStorageIndexes();
       }
+      // v6 → v7: reviewed photo ids (KI-16). A table created above already
+      // has the columns; an existing one gains them, filled from the faces
+      // that still exist.
+      if (from == 6) {
+        await m.addColumn(peopleReviews, peopleReviews.leftPhotoId);
+        await m.addColumn(peopleReviews, peopleReviews.rightPhotoId);
+        await customStatement(
+          'UPDATE people_reviews SET '
+          'left_photo_id = (SELECT photo_id FROM people_faces WHERE id = left_face_id), '
+          'right_photo_id = (SELECT photo_id FROM people_faces WHERE id = right_face_id)',
+        );
+      }
     },
   );
 
   Future<void> _peopleStorageIndexes() async {
-    await customStatement('CREATE INDEX people_faces_photo ON people_faces(photo_id)');
-    await customStatement('CREATE INDEX people_faces_person ON people_faces(person_id)');
-    await customStatement('CREATE INDEX people_reviews_subset ON people_reviews(subset)');
-    await customStatement('CREATE TABLE processing_leases ('
-      'id INTEGER PRIMARY KEY, owner TEXT NOT NULL, expires_ms INTEGER NOT NULL)');
+    await customStatement(
+      'CREATE INDEX people_faces_photo ON people_faces(photo_id)',
+    );
+    await customStatement(
+      'CREATE INDEX people_faces_person ON people_faces(person_id)',
+    );
+    await customStatement(
+      'CREATE INDEX people_reviews_subset ON people_reviews(subset)',
+    );
+    await customStatement(
+      'CREATE TABLE processing_leases ('
+      'id INTEGER PRIMARY KEY, owner TEXT NOT NULL, expires_ms INTEGER NOT NULL)',
+    );
   }
 
   // --- Photos --------------------------------------------------------------
@@ -282,10 +305,35 @@ class AppDatabase extends _$AppDatabase {
   Future<void> upsertEmbeddings(List<EmbeddingRowsCompanion> rows) =>
       batch((b) => b.insertAllOnConflictUpdate(embeddingRows, rows));
 
-  /// Remove assets and their embeddings atomically (deleted-photo handling).
+  /// Remove assets and derived observations atomically (deleted-photo handling).
   Future<void> deleteAssets(List<String> ids) async {
     if (ids.isEmpty) return;
     await transaction(() async {
+      final removedFaces = await (delete(
+        peopleFaces,
+      )..where((t) => t.photoId.isIn(ids))).go();
+      await (delete(peopleScans)..where((t) => t.photoId.isIn(ids))).go();
+      await customUpdate(
+        'DELETE FROM people_decisions WHERE NOT EXISTS '
+        '(SELECT 1 FROM people_faces f WHERE f.id = people_decisions.face_id)',
+        updates: {peopleDecisions},
+      );
+      // Review pairs are kept on purpose (ids, cosine and judgment only). A
+      // pair whose face is gone makes calibration fail closed until a new
+      // review; deleting it could let the remaining pairs pass the gate.
+      await customUpdate(
+        'UPDATE people_persons SET cover_face_id = NULL WHERE cover_face_id IS NOT NULL '
+        'AND NOT EXISTS (SELECT 1 FROM people_faces f WHERE f.id = people_persons.cover_face_id)',
+        updates: {peoplePersons},
+      );
+      if (removedFaces > 0) {
+        await update(peopleState).write(
+          const PeopleStateCompanion(
+            threshold: Value(null),
+            calibrationJson: Value('{}'),
+          ),
+        );
+      }
       await (delete(memoryMembers)..where((t) => t.photoId.isIn(ids))).go();
       await (delete(savedCaptions)..where((t) => t.photoId.isIn(ids))).go();
       await (delete(photoLocations)..where((t) => t.photoId.isIn(ids))).go();

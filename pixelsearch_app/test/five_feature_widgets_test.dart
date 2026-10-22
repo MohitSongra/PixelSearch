@@ -19,6 +19,8 @@ import 'package:pixelsearch/features/search/conversation_sheet.dart';
 import 'package:pixelsearch/models/photo.dart';
 import 'package:pixelsearch/state/providers.dart';
 
+import 'support/test_fonts.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('map attribution remains visible at large text sizes', (
@@ -40,18 +42,7 @@ void main() {
     expect(find.text('\u00a9 OpenStreetMap contributors'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
-  setUpAll(() async {
-    final font = File('C:/Windows/Fonts/segoeui.ttf');
-    if (await font.exists()) {
-      await (FontLoader('Roboto')..addFont(
-            font.readAsBytes().then((bytes) => ByteData.sublistView(bytes)),
-          ))
-          .load();
-    }
-    await (FontLoader(
-      'MaterialIcons',
-    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
-  });
+  setUpAll(loadTestFonts);
   final fixture = Photo(
     id: 'fixture',
     assetName: 'assets/samples/beach_sunset.jpg',

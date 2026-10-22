@@ -1,5 +1,7 @@
 # AI CORE — Production Review (M4.6)
 
+> **Status note (2026-10-21 audit):** This file is stale. Preprocessing now reads a packed buffer (TD-9 resolved). Foreground indexing runs on the UI isolate, not a dedicated isolate. `lib/ai` has grown and there are now 6 integration suites. The text-session lifecycle has a leak on backend rebuilds. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+
 **Scope:** `lib/ai/` (7 files, 685 LOC) — `onnx_encoder`, `image_embedder`, `text_embedder`,
 `clip_tokenizer`, `image_preprocess`, `embedding_math`, `ai_logger` — plus `core/ai_contract.dart`.
 **Verdict: APPROVED — production-ready.** No critical issues, no functional regressions. Two minor

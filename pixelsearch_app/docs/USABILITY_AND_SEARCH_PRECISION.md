@@ -1,5 +1,7 @@
 # Usability and Search Precision
 
+> **Redaction note (2026-10-22):** personal identifiers (names, the device serial, local paths, private photo filenames, backup names and APK/backup digests) were replaced with placeholders. Measurements are unchanged.
+
 Date: 2026-09-08. Scope: returning-user startup, excessive search results, and label correction.
 
 ## Outcome
@@ -88,7 +90,7 @@ The tiled probe used 25 encoder calls versus five for current views. No Android 
 - [VERIFIED] A subsequent force-stop/relaunch again opened search home with 1,916 photos; the saved label correction remained in private storage.
 - [VERIFIED] Normal Android search for `a dog on a beach` displayed `No close matches`. This verifies empty-result handling, not actual absence of that scene in the gallery.
 - [VERIFIED] Normal Android search for `a car on a road` displayed exactly two results. Their relevance to this compositional query remains unjudged; this verifies no result-count padding.
-- Installed APK: 250,817,874 bytes; SHA-256 `9f75d34c64938bc57a4597ade3ac5527b5653e0054f927948837690551a0c17c`.
+- Installed APK: 250,817,874 bytes; SHA-256 `<digest withheld>`.
 
 Private artifacts (ignored by Git):
 

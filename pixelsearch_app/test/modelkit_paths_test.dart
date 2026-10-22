@@ -4,36 +4,37 @@ import 'package:path/path.dart' as p;
 import '../integration_test/support/modelkit_paths.dart';
 
 void main() {
+  // Paths are built from the host's own root ("C:\" or "/"), so the same
+  // expectations hold on the Windows host and the Linux CI runner.
+  final root = p.rootPrefix(p.current);
+
   group('ModelKitPaths', () {
     test('uses an explicit location before the sibling checkout default', () {
+      final models = p.join(root, 'models', 'pixelsearch');
       final paths = ModelKitPaths.resolve(
-        environmentValue: r'C:\models\pixelsearch',
-        workingDirectory: r'C:\work\pixelsearch_app',
+        environmentValue: models,
+        workingDirectory: p.join(root, 'work', 'pixelsearch_app'),
       );
 
-      expect(paths.root, p.normalize(r'C:\models\pixelsearch'));
+      expect(paths.root, p.normalize(models));
       expect(
         paths.imageModel,
-        p.join(
-          p.normalize(r'C:\models\pixelsearch'),
-          'out',
-          'mobileclip_image.onnx',
-        ),
+        p.join(p.normalize(models), 'out', 'mobileclip_image.onnx'),
       );
     });
 
     test('defaults to a sibling model_kit directory', () {
       final paths = ModelKitPaths.resolve(
         environmentValue: '',
-        workingDirectory: r'C:\work\pixelsearch_app',
+        workingDirectory: p.join(root, 'work', 'pixelsearch_app'),
       );
 
-      expect(paths.root, p.normalize(r'C:\work\model_kit'));
+      expect(paths.root, p.join(root, 'work', 'model_kit'));
     });
 
     test('reports all missing fixture inputs together', () {
       final paths = ModelKitPaths.resolve(
-        environmentValue: r'C:\missing-model-kit',
+        environmentValue: p.join(root, 'missing-model-kit'),
       );
 
       expect(

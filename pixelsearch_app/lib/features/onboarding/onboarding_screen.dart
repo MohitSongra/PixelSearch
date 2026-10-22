@@ -68,8 +68,9 @@ class OnboardingScreen extends ConsumerWidget {
                       const SizedBox(height: 16),
                       Text(
                         'Find any photo with natural language — “beach at sunset”, '
-                        '“my dog”, “birthday cake”. Everything runs on your device. '
-                        'Nothing is uploaded.',
+                        '“my dog”, “birthday cake”. Search runs on your device. '
+                        'Nothing is uploaded unless you turn on an online feature '
+                        'and approve it.',
                         style: TextStyle(
                           color: scheme.onSurfaceVariant,
                           fontSize: 16,
@@ -86,8 +87,8 @@ class OnboardingScreen extends ConsumerWidget {
                       _point(
                         context,
                         Icons.bolt_outlined,
-                        'Fast semantic search',
-                        'Results in under two seconds.',
+                        'Semantic search',
+                        'Describe a scene in your own words.',
                       ),
                       _point(
                         context,

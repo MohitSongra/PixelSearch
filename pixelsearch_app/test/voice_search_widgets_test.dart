@@ -16,6 +16,7 @@ import 'package:pixelsearch/data/local/app_database.dart';
 import 'package:pixelsearch/data/people_repository.dart';
 import 'package:pixelsearch/state/people_providers.dart';
 import 'package:pixelsearch/data/user_preferences.dart';
+import 'package:pixelsearch/domain/search/search_response.dart';
 import 'package:pixelsearch/features/search/conversation_sheet.dart';
 import 'package:pixelsearch/state/providers.dart';
 
@@ -273,18 +274,52 @@ Finder get _message => find.widgetWithText(TextField, 'Query or follow-up');
 String _text(WidgetTester tester) =>
     tester.widget<TextField>(_message).controller!.text;
 
+/// Saves Asha (optionally hidden) and Ben as local people.
+Future<void> _addPeople(_Fixture f, {bool hiddenAsha = false}) async {
+  final people = f.scope.read(peopleRepositoryProvider);
+  await people.enable();
+  for (final (id, name, hidden) in [
+    ('local-asha', 'Asha', hiddenAsha),
+    ('local-ben', 'Ben', false),
+  ]) {
+    await people.db
+        .into(people.db.peoplePersons)
+        .insert(
+          PeoplePersonsCompanion.insert(
+            id: id,
+            name: Value(name),
+            hidden: Value(hidden),
+            createdMs: 1,
+          ),
+        );
+  }
+}
+
 void main() {
-  testWidgets('assigned names and explicit person filters never reach the cloud assistant', (tester) async {
-    final f = await _open(tester);
-    final people = f.scope.read(peopleRepositoryProvider);
-    await people.enable();
-    await people.db.into(people.db.peoplePersons).insert(PeoplePersonsCompanion.insert(
-      id: 'local-person', name: const Value('Mohit'), createdMs: 1));
-    await tester.enterText(_message, 'Mohit at the beach');
-    await _tap(tester, find.text('Refine / translate online'));
-    expect(f.requests, isEmpty);
-    expect(find.textContaining('Named people searches stay on this device'), findsOneWidget);
-  });
+  testWidgets(
+    'assigned names and explicit person filters never reach the cloud assistant',
+    (tester) async {
+      final f = await _open(tester);
+      final people = f.scope.read(peopleRepositoryProvider);
+      await people.enable();
+      await people.db
+          .into(people.db.peoplePersons)
+          .insert(
+            PeoplePersonsCompanion.insert(
+              id: 'local-person',
+              name: const Value('Alice'),
+              createdMs: 1,
+            ),
+          );
+      await tester.enterText(_message, 'Alice at the beach');
+      await _tap(tester, find.text('Refine / translate online'));
+      expect(f.requests, isEmpty);
+      expect(
+        find.textContaining('Named people searches stay on this device'),
+        findsOneWidget,
+      );
+    },
+  );
   testWidgets(
     'permission focus loss does not cancel; capture waits for resume',
     (tester) async {
@@ -732,5 +767,96 @@ void main() {
     expect(find.text('Recording audio'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await _tap(tester, find.text('Cancel'));
+  });
+
+  testWidgets('spoken punctuation is removed before local search', (
+    tester,
+  ) async {
+    final f = await _open(tester, auto: true);
+    f.services.speech.requests.single.complete('beach sunset.');
+    await _flush(tester);
+    // The transcript stays editable as recognised.
+    expect(_text(tester), 'beach sunset.');
+    await _tap(tester, find.text('Search text locally'));
+    expect(f.scope.read(searchQueryProvider), 'beach sunset');
+    expect(f.requests, isEmpty);
+  });
+
+  for (final c in [
+    (
+      label: "a hidden person's name",
+      message: 'Asha at the beach',
+      query: '',
+      filters: const SearchFilters(),
+      hidden: true,
+    ),
+    (
+      label: 'an or person query',
+      message: 'Asha or Ben',
+      query: '',
+      filters: const SearchFilters(),
+      hidden: false,
+    ),
+    (
+      label: 'a without person query',
+      message: 'beach without Asha',
+      query: '',
+      filters: const SearchFilters(),
+      hidden: false,
+    ),
+    (
+      label: 'a manual People filter with no names in the message',
+      message: 'beach',
+      query: '',
+      filters: const SearchFilters(personIds: {'local-asha'}),
+      hidden: false,
+    ),
+    (
+      label: 'a name in the current search',
+      message: 'at the beach',
+      query: 'Asha',
+      filters: const SearchFilters(),
+      hidden: false,
+    ),
+  ]) {
+    testWidgets('the online guard blocks ${c.label}', (tester) async {
+      final f = await _open(tester);
+      await _addPeople(f, hiddenAsha: c.hidden);
+      f.scope.read(searchFiltersProvider.notifier).state = c.filters;
+      f.scope.read(searchQueryProvider.notifier).state = c.query;
+      await _flush(tester);
+      await tester.enterText(_message, c.message);
+      await _tap(tester, find.text('Refine / translate online'));
+      expect(f.requests, isEmpty);
+      expect(
+        find.textContaining('Named people searches stay on this device'),
+        findsOneWidget,
+      );
+      expect(find.text('Apply local search'), findsNothing);
+      expect(f.scope.read(searchFiltersProvider), same(c.filters));
+    });
+  }
+
+  testWidgets('an allowed online refinement sends no person filter keys', (
+    tester,
+  ) async {
+    final f = await _open(tester);
+    await _addPeople(f);
+    f.scope.read(searchFiltersProvider.notifier).state = const SearchFilters(
+      album: 'Camera',
+    );
+    await _flush(tester);
+    await tester.enterText(_message, 'friends at the beach');
+    await _tap(tester, find.text('Refine / translate online'));
+    final request = f.requests.single;
+    expect(request.url.path, '/assistant');
+    final body = jsonDecode(request.body) as Map<String, dynamic>;
+    final filters = body['filters'] as Map<String, dynamic>;
+    expect(filters, {'album': 'Camera'});
+    for (final key in ['person_ids', 'any_person_ids', 'excluded_person_ids']) {
+      expect(filters.containsKey(key), isFalse);
+    }
+    expect(request.body, isNot(contains('local-asha')));
+    expect(find.text('Apply local search'), findsOneWidget);
   });
 }

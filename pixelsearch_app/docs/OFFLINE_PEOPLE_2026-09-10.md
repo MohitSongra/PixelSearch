@@ -1,6 +1,8 @@
 # Offline People: Implementation and Acceptance
 
-Date: 2026-09-10. Repository: `C:/Users/mohit/Desktop/PixelSearch_handoff/PixelSearch`.
+> **Redaction note (2026-10-22):** personal identifiers (names, the device serial, local paths, private photo filenames, backup names and APK/backup digests) were replaced with placeholders. Measurements are unchanged.
+
+Date: 2026-09-10. Repository: `<repo>`.
 
 ## Current Status
 
@@ -29,7 +31,7 @@ taking a fresh backup or upgrading.
 ## Delivered Behavior
 
 Build artifact: `build/app/outputs/flutter-apk/app-debug.apk`.
-SHA-256: `cd240505245f5e8c8a92f107e8c62808db054083d8ebbfdbefcde915072f8312`.
+SHA-256: `<digest withheld>`.
 The debug signing certificate matches the existing app's verified signer.
 
 - Search retains its four navigation tabs and gains a compact People entry.
@@ -140,7 +142,7 @@ Unrelated work already present in this worktree was not reverted. No commit or p
 1. Unlock the Vivo, open PixelSearch and confirm normal indexing is idle. Do not uninstall or clear data.
 2. Close only PixelSearch after checking it is idle, then run the existing backup tool with `-BackupOnly`.
 3. Audit the archive using `tool/audit_private_backup.py`. Preserve photo/embedding/folder/checkpoint/memory/caption/location tables, CLIP models, preferences and search judgments.
-4. Verify the APK signer matches `5d6a02254b32e1c91b1ad84273009f7731fc10141022e0ccef0304546dfdb26e`, then use only a data-preserving `adb install -r` upgrade.
+4. Verify the APK signer matches `<digest withheld>`, then use only a data-preserving `adb install -r` upgrade.
 5. Launch and verify schema 6, original indexed count and all baseline data hashes before enabling People.
 6. In airplane mode, open People, enable local processing and run options > Check face model. Save the `pixelsearch.PeopleModelCheck` log, which contains numerical fixture results only.
 7. Observe actual face crops at the beginning and later in the scan. Pause, leave/reopen the app and continue; completed photos must not be inferred again. Capture memory and elapsed-time measurements.
@@ -152,8 +154,8 @@ Do not run the standard destructive Android integration-test installer against
 this library. Desktop tests use isolated databases only.
 
 An earlier consistent baseline is retained at
-`local_evaluation/app-data-20260910-121513-758.tar`, SHA-256
-`b1eb185d4032599208df49adb88e703240793d9eed7bbf6449c91f4c72997148`.
+`<private backup>`, SHA-256
+`<digest withheld>`.
 Its audit is `local_evaluation/before_people_20260910.json`: schema 5, 1,916 indexed
 photos/embeddings, 215 memories, 1,916 location rows. It is not a substitute for a
 fresh snapshot now that the user has reopened the app.

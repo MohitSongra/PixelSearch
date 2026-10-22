@@ -21,7 +21,10 @@ Float32List l2Normalize(Float32List v) {
 /// Cosine similarity. For L2-normalized inputs this equals the dot product
 /// (INTERFACE_CONTRACT.md §5).
 double cosineSimilarity(Float32List a, Float32List b) {
-  assert(a.length == b.length, 'dimension mismatch: ${a.length} vs ${b.length}');
+  assert(
+    a.length == b.length,
+    'dimension mismatch: ${a.length} vs ${b.length}',
+  );
   var dot = 0.0, na = 0.0, nb = 0.0;
   for (var i = 0; i < a.length; i++) {
     dot += a[i] * b[i];

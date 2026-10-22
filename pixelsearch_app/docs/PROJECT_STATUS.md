@@ -1,5 +1,7 @@
 # PROJECT_STATUS
 
+> **Status note (2026-10-21 audit):** This file was last updated 2026-09-09 and is stale. The milestone ledger still lists M9–M14 as pending, but filters, the DB timeline, map tiles, the backend and offline People are implemented. It also describes schema v3/v4; the current schema is 6. Use it only as history. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+
 **Latest retrieval follow-up (2026-09-08):** unlabelled raw-versus-final diagnostics and a 24-query
 evaluation harness are implemented; analyzer is clean and 93 host tests pass. No default model/ranking
 policy changed and no semantic-quality improvement is claimed. See [retrieval diagnosis](SEARCH_QUALITY_DIAGNOSIS_2026-09-08.md).

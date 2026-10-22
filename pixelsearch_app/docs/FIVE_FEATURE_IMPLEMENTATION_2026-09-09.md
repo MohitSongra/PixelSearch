@@ -1,5 +1,7 @@
 # PixelSearch: Five-feature implementation handoff
 
+> **Redaction note (2026-10-22):** personal identifiers (names, the device serial, local paths, private photo filenames, backup names and APK/backup digests) were replaced with placeholders. Measurements are unchanged.
+
 Date: 2026-09-09 (Asia/Calcutta)
 
 > Historical pre-device handoff. The later [Android acceptance report](ANDROID_FIVE_FEATURE_ACCEPTANCE_2026-09-09.md)
@@ -16,7 +18,7 @@ layout checks and Android compilation pass. This is not a claim that the complet
 milestone has passed on Vivo, that cloud services have been deployed, or that
 semantic-search relevance has improved.
 
-Repository: `C:\Users\mohit\Desktop\PixelSearch_handoff\PixelSearch`
+Repository: `<repo>`
 
 Branch: `main`, based on commit `5f6f07418577475c90902d19f1981e01f524b725`.
 Implementation changes are uncommitted and unpushed. Pre-existing `output/` and
@@ -27,7 +29,7 @@ Implementation changes are uncommitted and unpushed. Pre-existing `output/` and
 **[VERIFIED] Existing laptop backup preserved and checked.**
 
 Backup directory:
-`C:\Users\mohit\Downloads\PixelSearch_Backups\before_five_features_20260909_183041`
+`<private-backup-dir>\<snapshot>`
 
 - Preserved 57 files totaling 518,701,962 bytes from the existing local-evaluation archive.
 - SHA-256 manifest: `sha256.csv` in that directory.
@@ -192,7 +194,7 @@ Saved Flutter logs: `build/five_feature_tests.log`, `build/five_feature_analyzer
 APK: `build/app/outputs/flutter-apk/app-debug.apk`
 
 - Size: 260,438,882 bytes.
-- SHA-256: `8B687D8E19D2B683E6E0F2C46D503B38507EB5F08C836BA7D5517C2DE2385CAA`.
+- SHA-256: `<digest withheld>`.
 - Built 2026-09-09, 21:15 local time. This APK was not installed.
 
 ## Changed code areas

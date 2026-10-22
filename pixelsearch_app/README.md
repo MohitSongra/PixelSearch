@@ -30,6 +30,20 @@ directory, as resolved by `lib/core/model_locator.dart`. Generate and verify the
 with [ModelKit](../model_kit/README.md), then provision a known-good pair. The recorded
 Android baseline is FP32 CPU. Automatic model download/provisioning is not complete.
 
+Provisioning a debug build by hand (release builds are not debuggable, so `run-as` fails):
+
+1. Inside `model_kit/`, run `python prepare_model.py`. It writes the FP32 files
+   `mobileclip_image.onnx` and `mobileclip_text.onnx` (and FP16 files) to `model_kit/out/`.
+2. Copy only the two FP32 files to the device: `adb push` them to `/data/local/tmp/`, then
+   `adb shell run-as com.pixelsearch.pixelsearch mkdir -p files/models` and
+   `adb shell run-as com.pixelsearch.pixelsearch cp /data/local/tmp/<file> files/models/`.
+3. Never copy a `*_fp16.onnx` file. The resolver prefers FP16 when it is present, but FP16 has
+   never run on Android and no execution provider for it is registered.
+4. Re-run indexing in the app; nothing notices new models automatically.
+
+The full command block, including Git Bash notes, is in
+[docs/PROJECT_CONTEXT.md §5.1](../docs/PROJECT_CONTEXT.md).
+
 The CLIP vocabulary and licensed SFace FP32 model are bundled. SFace is a deliberate
 exception to the repository's ignored ONNX exports, verified against the
 [face contract](../model_kit/FACE_CONTRACT.md). Keep its license and numerical fixtures.
@@ -65,6 +79,9 @@ All online features are separately consented and disabled by the master offline
 policy. See [backend setup](../enhancement_backend/README.md). Never embed provider
 credentials in the app.
 
-The current Android release configuration still uses debug signing. A public
-release requires dedicated signing, model provisioning, privacy review and target
-device acceptance. Platform scaffolds are not a promise of iOS/web feature parity.
+Release builds need an operator-supplied keystore through four environment
+variables and fail without them ([release signing](docs/ANDROID_RELEASE_SIGNING.md));
+no release-signed build has been made yet, and one cannot update the debug-signed
+install in place. A public release also requires model provisioning, privacy review
+and target-device acceptance. Android is the only supported platform: the iOS and web
+folders are untested Flutter scaffolds, not a promise of feature parity.

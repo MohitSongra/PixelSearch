@@ -5,7 +5,9 @@ import '../core/ai_contract.dart';
 /// makes every prior embedding stale, so reconciliation schedules a full,
 /// resumable re-index. See MIGRATIONS.md §B.
 class ModelVersionManager {
-  const ModelVersionManager({this.currentVersion = AiContract.embeddingVersion});
+  const ModelVersionManager({
+    this.currentVersion = AiContract.embeddingVersion,
+  });
 
   final String currentVersion;
 

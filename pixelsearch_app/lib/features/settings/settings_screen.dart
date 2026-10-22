@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../state/providers.dart';
 import '../../widgets/indexing_status.dart';
 import '../indexing/folder_picker.dart';
@@ -9,61 +8,106 @@ import 'online_settings.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     final total = ref.watch(photoLibraryProvider).length;
     final indexing = ref.watch(indexingControllerProvider);
     final controller = ref.read(indexingControllerProvider.notifier);
-
+    final policy = ref.watch(onlinePolicyProvider);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: const Text('Privacy Centre')),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.only(bottom: 32),
         children: [
-          _header(context, 'Appearance'),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: SegmentedButton<ThemeMode>(
-              segments: const [
-                ButtonSegment(
-                  value: ThemeMode.system,
-                  label: Text('System'),
-                  icon: Icon(Icons.brightness_auto),
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your photos.\nYour choice.',
+                  style: theme.textTheme.headlineLarge,
                 ),
-                ButtonSegment(
-                  value: ThemeMode.light,
-                  label: Text('Light'),
-                  icon: Icon(Icons.light_mode),
-                ),
-                ButtonSegment(
-                  value: ThemeMode.dark,
-                  label: Text('Dark'),
-                  icon: Icon(Icons.dark_mode),
+                const SizedBox(height: 12),
+                Text(
+                  'Search stays on your device. You decide when optional features can go online.',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               ],
-              selected: {themeMode},
-              onSelectionChanged: (s) =>
-                  ref.read(themeModeProvider.notifier).state = s.first,
             ),
           ),
-          const Divider(),
-          _header(context, 'Privacy'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: scheme.primaryContainer,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.verified_user_outlined,
+                    color: scheme.onPrimaryContainer,
+                    size: 26,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          !policy.loaded
+                              ? 'Loading privacy settings…'
+                              : policy.offline
+                              ? 'Offline only is on'
+                              : 'Online features are optional',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: scheme.onPrimaryContainer,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          !policy.loaded
+                              ? 'Online features stay unavailable until your settings load.'
+                              : policy.offline
+                              ? 'All online enhancements are paused. Your local photo search keeps working.'
+                              : 'Only the features you allow below can connect. You can switch them off at any time.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: scheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          _header(context, 'Your permissions'),
           const OnlineSettings(),
-          const Divider(),
-          _header(context, 'Library'),
+          _header(context, 'Your library'),
           ListTile(
             leading: const Icon(Icons.photo_library_outlined),
             title: Text('$total photo${total == 1 ? '' : 's'} indexed'),
             subtitle: Text(
-              total == 0 ? 'Nothing indexed yet' : 'Searchable on this device',
+              total == 0
+                  ? 'Add folders to start searching'
+                  : 'Searchable on this device',
             ),
           ),
           if (indexingSupported)
             ListTile(
               leading: Icon(
-                indexing.running ? Icons.hourglass_top : Icons.refresh_outlined,
+                indexing.running
+                    ? Icons.hourglass_top
+                    : Icons.add_photo_alternate_outlined,
               ),
               title: Text(
                 indexing.running
@@ -73,10 +117,8 @@ class SettingsScreen extends ConsumerWidget {
                     : 'Continue indexing',
               ),
               subtitle: const Text(
-                'Labels and embeddings are computed on-device. Only new and '
-                'changed photos are processed.',
+                'Choose folders. Only new and changed photos are processed on this device.',
               ),
-              isThreeLine: true,
               trailing: indexing.running
                   ? TextButton(
                       onPressed: controller.cancel,
@@ -89,14 +131,59 @@ class SettingsScreen extends ConsumerWidget {
             ),
           if (statusLine(indexing) != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
               child: IndexingStatus(state: indexing),
             ),
-          const Divider(),
-          _header(context, 'About'),
+          // Required by the ML Kit terms: users are told about Google's
+          // processing of ML Kit's usage metrics.
+          const ListTile(
+            key: ValueKey('mlkit-metrics-notice'),
+            leading: Icon(Icons.info_outline),
+            title: Text('Google ML Kit on this device'),
+            subtitle: Text(
+              'Photo labels and face detection run on this device with '
+              'Google ML Kit. Your photos are not sent, but ML Kit sends '
+              'metrics about its performance and use to Google.',
+            ),
+          ),
+          _header(context, 'Appearance'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: LayoutBuilder(
+              builder: (context, box) => SegmentedButton<ThemeMode>(
+                direction:
+                    box.maxWidth < 330 &&
+                        MediaQuery.textScalerOf(context).scale(14) > 20
+                    ? Axis.vertical
+                    : Axis.horizontal,
+                segments: const [
+                  ButtonSegment(
+                    value: ThemeMode.system,
+                    label: Text('System'),
+                    icon: Icon(Icons.brightness_auto_outlined),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.light,
+                    label: Text('Light'),
+                    icon: Icon(Icons.light_mode_outlined),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.dark,
+                    label: Text('Dark'),
+                    icon: Icon(Icons.dark_mode_outlined),
+                  ),
+                ],
+                selected: {themeMode},
+                showSelectedIcon: false,
+                onSelectionChanged: (s) =>
+                    ref.read(themeModeProvider.notifier).state = s.first,
+              ),
+            ),
+          ),
+          _header(context, 'About PixelSearch'),
           if (indexingSupported)
             ListTile(
-              leading: const Icon(Icons.compare_arrows),
+              leading: const Icon(Icons.manage_search_outlined),
               title: const Text('Search diagnostics'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context, rootNavigator: true).push(
@@ -105,17 +192,16 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
             ),
-          const ListTile(
-            leading: Icon(Icons.info_outline),
-            title: Text('PixelSearch'),
-            subtitle: Text(
-              'Privacy-first semantic photo search.\nOn-device indexing (ML Kit + CLIP) and semantic search.',
-            ),
-          ),
-          const ListTile(
-            leading: Icon(Icons.tag),
-            title: Text('Version'),
-            subtitle: Text('0.1.0 · Flutter demo'),
+          const AboutListTile(
+            key: ValueKey('about-pixelsearch'),
+            icon: Icon(Icons.info_outline),
+            applicationName: 'PixelSearch',
+            applicationVersion: '0.1.0',
+            applicationLegalese:
+                '© 2025–2026 the PixelSearch authors. All rights reserved; '
+                'published for academic evaluation. Third-party components '
+                'keep their own licences.',
+            child: Text('On-device AI photo search · version 0.1.0 · licences'),
           ),
         ],
       ),
@@ -123,15 +209,7 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Widget _header(BuildContext context, String text) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
-    child: Text(
-      text.toUpperCase(),
-      style: TextStyle(
-        color: Theme.of(context).colorScheme.primary,
-        fontWeight: FontWeight.w700,
-        fontSize: 12,
-        letterSpacing: 1,
-      ),
-    ),
+    padding: const EdgeInsets.fromLTRB(24, 28, 24, 8),
+    child: Text(text, style: Theme.of(context).textTheme.titleMedium),
   );
 }

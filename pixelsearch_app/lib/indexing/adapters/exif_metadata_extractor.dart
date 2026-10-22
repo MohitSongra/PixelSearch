@@ -16,7 +16,8 @@ class ExifMetadataExtractor implements MetadataExtractor {
     var dateMs = asset.dateTakenMs;
     try {
       final tags = await readExifFromBytes(bytes);
-      final raw = tags['EXIF DateTimeOriginal']?.printable ??
+      final raw =
+          tags['EXIF DateTimeOriginal']?.printable ??
           tags['Image DateTime']?.printable;
       final parsed = _parseExifDate(raw);
       if (parsed != null) dateMs = parsed;
@@ -35,7 +36,9 @@ class ExifMetadataExtractor implements MetadataExtractor {
   int? _parseExifDate(String? s) {
     if (s == null || s.isEmpty) return null;
     // EXIF format: "YYYY:MM:DD HH:MM:SS"
-    final m = RegExp(r'^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})').firstMatch(s);
+    final m = RegExp(
+      r'^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})',
+    ).firstMatch(s);
     if (m == null) return null;
     return DateTime(
       int.parse(m[1]!),

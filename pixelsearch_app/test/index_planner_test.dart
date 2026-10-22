@@ -26,19 +26,25 @@ void main() {
 
   test('changed asset (mtime or size) is re-indexed', () {
     expect(
-        planner.reconcile(
-          gallery: [_a('p1', mtime: 2)],
-          indexed: [_r('p1', mtime: 1)],
-          currentEmbeddingVersion: '1',
-        ).reasonCount(IndexReason.changed),
-        1);
+      planner
+          .reconcile(
+            gallery: [_a('p1', mtime: 2)],
+            indexed: [_r('p1', mtime: 1)],
+            currentEmbeddingVersion: '1',
+          )
+          .reasonCount(IndexReason.changed),
+      1,
+    );
     expect(
-        planner.reconcile(
-          gallery: [_a('p1', size: 200)],
-          indexed: [_r('p1', size: 100)],
-          currentEmbeddingVersion: '1',
-        ).reasonCount(IndexReason.changed),
-        1);
+      planner
+          .reconcile(
+            gallery: [_a('p1', size: 200)],
+            indexed: [_r('p1', size: 100)],
+            currentEmbeddingVersion: '1',
+          )
+          .reasonCount(IndexReason.changed),
+      1,
+    );
   });
 
   test('stale embedding_version triggers re-index (model migration)', () {
@@ -82,7 +88,12 @@ void main() {
   test('mixed: add + change + stale + delete + skip together', () {
     final plan = planner.reconcile(
       gallery: [_a('new'), _a('chg', mtime: 9), _a('stale'), _a('ok')],
-      indexed: [_r('chg', mtime: 1), _r('stale', v: '0'), _r('ok'), _r('gone')],
+      indexed: [
+        _r('chg', mtime: 1),
+        _r('stale', v: '0'),
+        _r('ok'),
+        _r('gone'),
+      ],
       currentEmbeddingVersion: '1',
     );
     expect(plan.reasonCount(IndexReason.added), 1);

@@ -21,14 +21,14 @@ class TimingStats {
   final double maxUs;
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'iterations': iterations,
-        'mean_us': meanUs,
-        'median_us': medianUs,
-        'p95_us': p95Us,
-        'min_us': minUs,
-        'max_us': maxUs,
-      };
+    'name': name,
+    'iterations': iterations,
+    'mean_us': meanUs,
+    'median_us': medianUs,
+    'p95_us': p95Us,
+    'min_us': minUs,
+    'max_us': maxUs,
+  };
 
   /// Summarize raw per-iteration microsecond [samples] (nearest-rank percentiles).
   static TimingStats fromSamplesUs(String name, List<double> samples) {
@@ -79,6 +79,7 @@ class Benchmark {
     return stats;
   }
 
-  Map<String, dynamic> toJson() =>
-      {'benchmarks': [for (final r in _results) r.toJson()]};
+  Map<String, dynamic> toJson() => {
+    'benchmarks': [for (final r in _results) r.toJson()],
+  };
 }

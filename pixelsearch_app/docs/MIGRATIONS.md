@@ -21,6 +21,14 @@ Keyed on `AppDatabase.schemaVersion` via a `MigrationStrategy`.
 | 3 → 4 | persist folder selection separately from checkpoints | `m.createTable(indexingPreferencesRows)`; no photo/embedding rewrite |
 | 4 → 5 | persist events/membership, captions and revision-aware GPS enrichment | four additive tables; no photo/embedding rewrite |
 | 5 → 6 | offline people, observations/descriptors, revisions, corrections, reviews, opt-in state and processing lease | six People tables, three indexes and a cross-isolate lease table; no changes to existing rows |
+| 6 → 7 | reviewed photo ids on People review rows (KI-16, 2026-10-22) | `m.addColumn` for nullable `left_photo_id` and `right_photo_id`, then one `UPDATE` filling them from the faces that still exist; a database older than v6 creates the table with the columns. No other table changes. |
+
+Schema v7 lets a new review round exclude every previously reviewed photo even
+after that photo was edited (an edit gives its faces new ids). Rows written
+before v7 whose faces were already gone keep null photo ids; the old face-id
+join still covers rows whose faces exist. Its fixture drops the two columns from
+a v7 database, reopens it as v6 and checks the backfill and the unchanged
+photo, face and state tables (`test/people_migration_test.dart`).
 
 Schema v6 keeps face descriptors separate from MobileCLIP embeddings. Its full
 v5 migration fixture verifies all eight old tables and embedding bytes unchanged

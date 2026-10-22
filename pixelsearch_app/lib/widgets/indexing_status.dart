@@ -21,13 +21,17 @@ class IndexingStatus extends StatelessWidget {
 
     final progress = state.progress;
     final determinate =
-        state.running && progress.phase == IndexPhase.indexing && progress.total > 0;
+        state.running &&
+        progress.phase == IndexPhase.indexing &&
+        progress.total > 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(line,
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13)),
+        Text(
+          line,
+          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
+        ),
         if (state.running) ...[
           const SizedBox(height: 8),
           ClipRRect(

@@ -128,57 +128,75 @@ List<FacePair> buildFaceReview(List<FaceVector> input) {
           (f) => (_stableHash(f.photoId) % 3 == 0) == (subset == 'validation'),
         )
         .toList();
-    final pool = <String, FacePair>{};
-    for (var i = 0; i < faces.length; i++) {
-      final nearest = <FacePair>[];
-      FacePair? distant;
-      for (var j = i + 1; j < faces.length; j++) {
-        if (faces[i].photoId == faces[j].photoId) continue;
-        final pair = FacePair(
-          left: faces[i].id,
-          right: faces[j].id,
-          subset: subset,
-          cosine: _unitDot(faces[i].vector, faces[j].vector),
-        );
-        nearest.add(pair);
-        nearest.sort((a, b) => b.cosine.compareTo(a.cosine));
-        if (nearest.length > 3) nearest.removeLast();
-        if (distant == null || pair.cosine < distant.cosine) distant = pair;
-      }
-      for (final p in [...nearest, ?distant]) {
-        pool[p.id] = p;
-      }
-    }
-    final ranked = pool.values.toList()
-      ..sort((a, b) {
-        final score = b.cosine.compareTo(a.cosine);
-        return score != 0 ? score : a.id.compareTo(b.id);
-      });
-    final count = math.min(subset == 'calibration' ? 40 : 20, ranked.length);
-    // Half the review covers closest matches; the remainder spans score range.
-    final selected = <String, FacePair>{};
-    for (var i = 0; i < count ~/ 2; i++) {
-      selected[ranked[i].id] = ranked[i];
-    }
-    for (var i = 0; selected.length < count && i < ranked.length; i++) {
-      final at = count <= 1
-          ? 0
-          : (i * (ranked.length - 1) / (count - 1)).round();
-      if (at >= ranked.length) break;
-      selected[ranked[at].id] = ranked[at];
-    }
-    for (final p in ranked) {
-      if (selected.length >= count) break;
-      selected[p.id] = p;
-    }
-    result.addAll(selected.values);
+    result.addAll(
+      _sampleFacePairs(faces, subset, subset == 'calibration' ? 40 : 20),
+    );
   }
   return result;
+}
+
+/// The caller must exclude every previously reviewed photo before sampling.
+List<FacePair> buildFreshFaceValidation(List<FaceVector> input) {
+  final faces = input.where((f) => validFaceVector(f.vector)).toList()
+    ..sort((a, b) => a.id.compareTo(b.id));
+  return _sampleFacePairs(faces, 'validation', 20);
+}
+
+List<FacePair> _sampleFacePairs(
+  List<FaceVector> faces,
+  String subset,
+  int limit,
+) {
+  final pool = <String, FacePair>{};
+  for (var i = 0; i < faces.length; i++) {
+    final nearest = <FacePair>[];
+    FacePair? distant;
+    for (var j = i + 1; j < faces.length; j++) {
+      if (faces[i].photoId == faces[j].photoId) continue;
+      final pair = FacePair(
+        left: faces[i].id,
+        right: faces[j].id,
+        subset: subset,
+        cosine: _unitDot(faces[i].vector, faces[j].vector),
+      );
+      nearest.add(pair);
+      nearest.sort((a, b) => b.cosine.compareTo(a.cosine));
+      if (nearest.length > 3) nearest.removeLast();
+      if (distant == null || pair.cosine < distant.cosine) distant = pair;
+    }
+    for (final p in [...nearest, ?distant]) {
+      pool[p.id] = p;
+    }
+  }
+  final ranked = pool.values.toList()
+    ..sort((a, b) {
+      final score = b.cosine.compareTo(a.cosine);
+      return score != 0 ? score : a.id.compareTo(b.id);
+    });
+  final count = math.min(limit, ranked.length);
+  // Half the review covers closest matches; the remainder spans score range.
+  final selected = <String, FacePair>{};
+  for (var i = 0; i < count ~/ 2; i++) {
+    selected[ranked[i].id] = ranked[i];
+  }
+  for (var i = 0; selected.length < count && i < ranked.length; i++) {
+    final at = count <= 1 ? 0 : (i * (ranked.length - 1) / (count - 1)).round();
+    if (at >= ranked.length) break;
+    selected[ranked[at].id] = ranked[at];
+  }
+  for (final p in ranked) {
+    if (selected.length >= count) break;
+    selected[p.id] = p;
+  }
+  return selected.values.toList();
 }
 
 class FaceCalibration {
   const FaceCalibration({
     this.threshold,
+    this.candidateThreshold,
+    this.falseJoinPairIds = const [],
+    this.missedSamePairIds = const [],
     required this.reason,
     this.calibrationSame = 0,
     this.calibrationDifferent = 0,
@@ -189,6 +207,9 @@ class FaceCalibration {
     this.validationFalseJoins = 0,
   });
   final double? threshold;
+  // Diagnostic only. Never use a failed candidate for automatic assignment.
+  final double? candidateThreshold;
+  final List<String> falseJoinPairIds, missedSamePairIds;
   final String reason;
   final int calibrationSame,
       calibrationDifferent,
@@ -201,6 +222,9 @@ class FaceCalibration {
   Map<String, Object?> toJson() => {
     'passed': passed,
     'threshold': threshold,
+    'candidate_threshold': candidateThreshold,
+    'false_join_pair_ids': falseJoinPairIds,
+    'missed_same_pair_ids': missedSamePairIds,
     'reason': reason,
     'calibration_same': calibrationSame,
     'calibration_different': calibrationDifferent,
@@ -239,12 +263,18 @@ FaceCalibration calibrateFaces(List<FacePair> pairs) {
   FaceCalibration result(
     String reason, {
     double? threshold,
+    double? candidateThreshold,
+    List<String> falseJoins = const [],
+    List<String> missedSame = const [],
     int ct = 0,
     int vt = 0,
     int vf = 0,
   }) => FaceCalibration(
     reason: reason,
     threshold: threshold,
+    candidateThreshold: candidateThreshold,
+    falseJoinPairIds: falseJoins,
+    missedSamePairIds: missedSame,
     calibrationSame: cs,
     calibrationDifferent: cd,
     validationSame: vs,
@@ -282,9 +312,22 @@ FaceCalibration calibrateFaces(List<FacePair> pairs) {
   final vf = v
       .where((p) => p.judgment == 'different' && p.cosine >= threshold)
       .length;
+  final falseJoins = v
+      .where((p) => p.judgment == 'different' && p.cosine >= threshold)
+      .map((p) => p.id)
+      .toList();
+  final missedSame = v
+      .where((p) => p.judgment == 'same' && p.cosine < threshold)
+      .map((p) => p.id)
+      .toList();
   if (vf > 0 || vp == 0) {
     return result(
-      'Validation did not pass. Automatic assignment remains off.',
+      vf > 0
+          ? 'Automatic grouping is off: $vf of $vd different-person test pairs would be joined.'
+          : 'Automatic grouping is off: none of the $vs same-person test pairs matched.',
+      candidateThreshold: threshold,
+      falseJoins: falseJoins,
+      missedSame: missedSame,
       ct: bestTrue,
       vt: vp,
       vf: vf,
@@ -293,6 +336,8 @@ FaceCalibration calibrateFaces(List<FacePair> pairs) {
   return result(
     'Passed this reviewed sample; not a general accuracy guarantee.',
     threshold: best,
+    candidateThreshold: threshold,
+    missedSame: missedSame,
     ct: bestTrue,
     vt: vp,
   );

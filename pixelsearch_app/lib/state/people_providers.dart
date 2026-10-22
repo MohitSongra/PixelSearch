@@ -7,7 +7,10 @@ import 'package:photo_manager/photo_manager.dart';
 
 import '../data/people_repository.dart';
 import '../data/people/people_service.dart';
+import '../domain/people/face_grouping.dart';
+import '../domain/people/face_suggestions.dart';
 import '../domain/people/people_query.dart';
+import '../domain/people/same_person.dart';
 import 'indexing_providers.dart';
 import 'query_providers.dart';
 import 'storage_providers.dart';
@@ -36,6 +39,10 @@ final peopleRepositoryProvider = Provider((ref) {
 final peopleSnapshotProvider = FutureProvider<PeopleSnapshot>(
   (ref) async => ref.watch(peopleRepositoryProvider).load(),
 );
+final peopleCalibrationProvider = FutureProvider<FaceCalibration>((ref) async {
+  final snapshot = await ref.watch(peopleSnapshotProvider.future);
+  return ref.watch(peopleRepositoryProvider).calibration(snapshot: snapshot);
+});
 final peopleServiceProvider = Provider(
   (ref) => PeopleService(ref.watch(peopleRepositoryProvider)),
 );
@@ -52,17 +59,75 @@ final peopleQueryProvider = FutureProvider<PeopleQuery>((ref) async {
   if (!kIsWeb) {
     snapshot = await ref.watch(peopleSnapshotProvider.future);
   }
+  // Hidden people are not matched by typed names, but "me" still means the
+  // person the user marked "This is me" even if that person is hidden.
+  final directory = peopleDirectory(snapshot);
+  final self = snapshot?.self;
+  if (self != null && self.record.hidden) {
+    directory.add(
+      NamedPerson(
+        self.record.id,
+        '',
+        aliases: self.aliases.where(isSelfAlias).toList(),
+      ),
+    );
+  }
   return resolvePeopleQuery(
     query,
-    [
-      for (final p in snapshot?.people ?? <PersonView>[])
-        NamedPerson(p.record.id, p.record.name, aliases: p.aliases),
-    ],
+    directory,
     filters: filters,
     choices: choices,
     ignoredNames: ignored,
+    detectMissingSelf: snapshot?.state.enabled == true,
   );
 });
+
+/// Person → photos for search, derived from the cached snapshot (which every
+/// People edit invalidates), so a person query does not reload the tables.
+final peoplePhotoIndexProvider = FutureProvider<PeoplePhotoIndex>((ref) async {
+  if (kIsWeb) return const PeoplePhotoIndex(enabled: false);
+  return PeoplePhotoIndex.of(await ref.watch(peopleSnapshotProvider.future));
+});
+
+/// "Same person?" questions; recomputed after every People edit.
+final samePersonQuestionsProvider =
+    FutureProvider.autoDispose<List<SamePersonQuestion>>((ref) async {
+      final snapshot = await ref.watch(peopleSnapshotProvider.future);
+      return ref
+          .watch(peopleRepositoryProvider)
+          .samePersonQuestions(snapshot: snapshot, limit: 1000);
+    });
+
+/// Questions per round, like Google Photos' short "Same or different person?"
+/// sessions. Overridable in tests.
+final samePersonSessionSizeProvider = Provider<int>((ref) => 20);
+
+/// Questions answered since the app started (resets on the next launch).
+final samePersonAnsweredProvider = StateProvider<int>((ref) => 0);
+
+/// How many answers this launch may ask for; "Keep going" raises it.
+final samePersonAllowanceProvider = StateProvider<int>(
+  (ref) => ref.read(samePersonSessionSizeProvider),
+);
+
+/// "Not now" on the home prompt hides it until the next launch.
+final samePersonPromptDismissedProvider = StateProvider<bool>((ref) => false);
+
+/// True while an answer is being saved: the home prompt and the full screen
+/// share it, so neither offers the same pair again in the meantime.
+final samePersonSavingProvider = StateProvider<bool>((ref) => false);
+
+/// Similar unnamed faces for one person, for the user to confirm or reject.
+final personSuggestionsProvider = FutureProvider.autoDispose
+    .family<FaceSuggestionResult, ({String personId, int limit})>((
+      ref,
+      key,
+    ) async {
+      final snapshot = await ref.watch(peopleSnapshotProvider.future);
+      return ref
+          .watch(peopleRepositoryProvider)
+          .suggestionsFor(key.personId, snapshot: snapshot, limit: key.limit);
+    });
 
 final peopleControllerProvider = ChangeNotifierProvider<PeopleController>((
   ref,

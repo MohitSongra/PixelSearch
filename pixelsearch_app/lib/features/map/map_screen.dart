@@ -31,10 +31,16 @@ final mapTileFactoryProvider = Provider<MapTileFactory>(
       (policy) => _ConsentedTiles(policy),
 );
 
+/// Tiles fetched only with consent, and never written to disk: flutter_map's
+/// built-in cache (up to 1 GB) would outlive a revoked map consent.
 class _ConsentedTiles extends NetworkTileProvider {
   _ConsentedTiles(OnlinePolicy policy) : this._(MapTileClient(policy));
   _ConsentedTiles._(this.client)
-    : super(httpClient: client, attemptDecodeOfHttpErrorResponses: false);
+    : super(
+        httpClient: client,
+        attemptDecodeOfHttpErrorResponses: false,
+        cachingProvider: const DisabledMapCachingProvider(),
+      );
   final MapTileClient client;
   @override
   Future<void> dispose() async {
@@ -174,14 +180,51 @@ class _MapState extends ConsumerState<MapScreen> with WidgetsBindingObserver {
       ),
       body: Column(
         children: [
+          if (MediaQuery.textScalerOf(context).scale(16) <= 24 &&
+              MediaQuery.sizeOf(context).height > 600)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Every place, a memory.',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Explore the locations recorded in your photos.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           if (_scanning) const LinearProgressIndicator(),
           if (_status != null)
             Padding(padding: const EdgeInsets.all(12), child: Text(_status!)),
           if (summary != null)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(
-                '${summary.located} located | ${summary.missing} GPS not found | ${summary.unchecked} unchecked',
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.photo_library_outlined,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${summary.located} located · ${summary.unchecked} unchecked',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ),
+                ],
               ),
             ),
           Expanded(
@@ -225,29 +268,87 @@ class _MapState extends ConsumerState<MapScreen> with WidgetsBindingObserver {
                           ),
                         Expanded(
                           child: !policy.allows(OnlineFeature.maps)
-                              ? Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.map_outlined, size: 48),
-                                      const SizedBox(height: 12),
-                                      const Text('Online map tiles are off'),
-                                      TextButton(
+                              ? ListView(
+                                  padding: const EdgeInsets.all(24),
+                                  children: [
+                                    const SizedBox(height: 16),
+                                    Icon(
+                                      Icons.explore_outlined,
+                                      size: 56,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    Text(
+                                      'Online map tiles are off',
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleLarge,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Your photo locations stay on this device. To see the map, allow OpenStreetMap to load map areas. No photos are sent.',
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodyMedium,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    Center(
+                                      child: FilledButton.tonalIcon(
                                         onPressed: privacy,
-                                        child: const Text('Map privacy'),
+                                        icon: const Icon(Icons.shield_outlined),
+                                        label: const Text('Map privacy'),
                                       ),
-                                      if (locations.isNotEmpty)
-                                        TextButton(
-                                          onPressed: () => openPhotos([
-                                            for (final id in locations.keys)
-                                              photos[id]!,
-                                          ], 'Located photos'),
-                                          child: const Text(
-                                            'Browse located photos',
-                                          ),
+                                    ),
+                                    if (locations.isNotEmpty) ...[
+                                      const SizedBox(height: 20),
+                                      Row(
+                                        children: [
+                                          for (final id in locations.keys.take(
+                                            3,
+                                          ))
+                                            Expanded(
+                                              child: Padding(
+                                                padding: const EdgeInsets.all(
+                                                  2,
+                                                ),
+                                                child: AspectRatio(
+                                                  aspectRatio: 1,
+                                                  child: InkWell(
+                                                    onTap: () => openPhotos([
+                                                      photos[id]!,
+                                                    ], 'Located photos'),
+                                                    child: ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                      child: Image(
+                                                        image:
+                                                            photos[id]!.image,
+                                                        fit: BoxFit.cover,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      TextButton(
+                                        onPressed: () => openPhotos([
+                                          for (final id in locations.keys)
+                                            photos[id]!,
+                                        ], 'Located photos'),
+                                        child: const Text(
+                                          'Browse located photos',
                                         ),
+                                      ),
                                     ],
-                                  ),
+                                  ],
                                 )
                               : !active
                               ? const SizedBox.shrink()
@@ -315,12 +416,15 @@ class _PhotoMapState extends State<_PhotoMap> {
           Marker(
             key: ValueKey(entry.key),
             point: entry.value,
-            width: 44,
-            height: 44,
-            child: IconButton(
-              tooltip: widget.photos[entry.key]!.displayTitle,
-              icon: const Icon(Icons.location_on),
-              onPressed: () => widget.open([entry.key]),
+            width: 60,
+            height: 64,
+            child: Semantics(
+              button: true,
+              label: widget.photos[entry.key]!.displayTitle,
+              child: GestureDetector(
+                onTap: () => widget.open([entry.key]),
+                child: _PhotoLocationPin(photo: widget.photos[entry.key]!),
+              ),
             ),
           ),
     ];
@@ -365,25 +469,20 @@ class _PhotoMapState extends State<_PhotoMap> {
               options: MarkerClusterLayerOptions(
                 markers: markers,
                 maxClusterRadius: 60,
-                size: const Size(44, 44),
+                size: const Size(64, 68),
                 zoomToBoundsOnClick: false,
                 spiderfyCluster: false,
                 onClusterTap: (node) => widget.open([
                   for (final m in node.markers)
                     (m.key as ValueKey<String>).value,
                 ]),
-                builder: (context, markers) => DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${markers.length}',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                      ),
-                    ),
+                builder: (context, markers) => Semantics(
+                  button: true,
+                  label: '${markers.length} photos at this place',
+                  child: _PhotoLocationPin(
+                    photo: widget
+                        .photos[(markers.first.key as ValueKey<String>).value]!,
+                    count: markers.length,
                   ),
                 ),
               ),
@@ -426,6 +525,67 @@ class _PhotoMapState extends State<_PhotoMap> {
               ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _PhotoLocationPin extends StatelessWidget {
+  const _PhotoLocationPin({required this.photo, this.count});
+  final Photo photo;
+  final int? count;
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Stack(
+      children: [
+        Positioned(
+          left: 3,
+          right: 3,
+          top: 0,
+          bottom: 10,
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: scheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: scheme.primary, width: 2),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: Image(
+                image: photo.image,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) =>
+                    Icon(Icons.photo_outlined, color: scheme.primary),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 0,
+          left: 12,
+          right: 12,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            decoration: BoxDecoration(
+              color: scheme.primary,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: count == null
+                  ? Icon(Icons.place, size: 16, color: scheme.onPrimary)
+                  : Text(
+                      '$count',
+                      style: TextStyle(
+                        color: scheme.onPrimary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+            ),
+          ),
+        ),
       ],
     );
   }

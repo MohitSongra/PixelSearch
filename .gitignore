@@ -65,3 +65,11 @@ venv/
 # Private device search traces: filenames, labels and relevance judgments.
 pixelsearch_app/local_evaluation/
 pixelsearch_app/docs/RAW_SEMANTIC_DIAGNOSIS.md
+
+# Local deliverables and private lists that are never published (2026-10-22)
+/reports/
+/PIXELSEARCH_COPYRIGHT_SOURCE/
+/.impeccable/
+/.privacy-denylist.txt
+*.p12
+*.pfx

@@ -1,5 +1,7 @@
 # PixelSearch: Android local feature acceptance
 
+> **Redaction note (2026-10-22):** personal identifiers (names, the device serial, local paths, private photo filenames, backup names and APK/backup digests) were replaced with placeholders. Measurements are unchanged.
+
 Date: 2026-09-09, approximately 21:22-22:00 Asia/Calcutta.
 
 > Later follow-up: [speech setup and article scoring](SPEECH_SEARCH_FOLLOWUP_2026-09-09.md).
@@ -13,10 +15,10 @@ Date: 2026-09-09, approximately 21:22-22:00 Asia/Calcutta.
 below; live cloud features, successful speech transcription and positive GPS-map
 rendering are not yet accepted. Semantic relevance is not improved by this work.
 
-- Repository: `C:\Users\mohit\Desktop\PixelSearch_handoff\PixelSearch`.
+- Repository: `<repo>`.
 - App: `pixelsearch_app/`; branch `main`, based on
   `5f6f07418577475c90902d19f1981e01f524b725`; work remains uncommitted/unpushed.
-- Device: Vivo I2214, API 36, arm64, ADB serial `10BD1X0DL40005U`.
+- Device: Vivo I2214, API 36, arm64, ADB serial `<device-serial>`.
 - User deferred Groq/Render setup and requested local testing first.
 - Device UI was operated through ADB with fresh UI snapshots/screenshots. Android
   Studio was not running when the Windows application inventory was checked.
@@ -34,18 +36,18 @@ All archive paths below are within `pixelsearch_app/local_evaluation/`:
 
 | Snapshot | Archive | SHA-256 |
 |---|---|---|
-| Before schema-v5/logo upgrade | `app-data-20260909-212249-679.tar` | `2D6FC7B67B84D53BACEDB2A12EF49691978EDF37235BC315C151F71E2FF17649` |
-| Before thumbnail-fix upgrade | `app-data-20260909-213808-649.tar` | `37525751D93D36A1F15BC9235D84C425BF7410E215C69433345792BC9A310F0E` |
-| Final, after test cleanup | `app-data-20260909-215455-906.tar` | `16066788A59685AAFA2665E3C30EE707DAEF5D1A9F8CC1F163B95F44EFA7FD7A` |
+| Before schema-v5/logo upgrade | `<private backup>` | `<digest withheld>` |
+| Before thumbnail-fix upgrade | `<private backup>` | `<digest withheld>` |
+| Final, after test cleanup | `<private backup>` | `<digest withheld>` |
 
 The first archive, its manifest and the previously installed APK are also preserved
 outside the repository at:
-`C:\Users\mohit\Downloads\PixelSearch_Backups\phone_before_five_features_20260909_212249`.
+`<private-backup-dir>\<snapshot>`.
 
 Installed APK: `build/app/outputs/flutter-apk/app-debug.apk`.
 
 - Size: 260,444,090 bytes.
-- SHA-256: `F5CC3906C631F37BDE7DFA2BC5141EB3D978DBDA59D0EF5FDD8070553BE2F576`.
+- SHA-256: `<digest withheld>`.
 - Package/version unchanged: `com.pixelsearch.pixelsearch`, `0.1.0+1`.
 - Device first-install timestamp remained `2026-09-08 17:25:50`.
 - Last update: `2026-09-09 21:39:47`.
@@ -100,7 +102,7 @@ repeated on the physical gallery during this session.
 
 **[VERIFIED]** Opened an actual result for `a dog`, then `Why this matched`.
 It displayed the evidence captured by the search, not a new diagnostics run.
-Result filename: `IMG-20230821-WA0165.jpg`. The search returned nine results.
+Result filename: `<private photo A>`. The search returned nine results.
 
 | Displayed component | Observed value |
 |---|---:|
@@ -147,7 +149,7 @@ live tile use need known-geotagged accessible photos plus explicit map consent.
 ### Captions
 
 **[VERIFIED]** Saved the manual text `Local caption test` for
-`IMG-20230804-WA0000.jpg` while offline. Reopened it after an update/restart and
+`<private photo B>` while offline. Reopened it after an update/restart and
 confirmed persistence. Deleted it through the UI; final `saved_captions` count is
 zero. The generated-caption action was blocked while online caption consent was
 off. No image was approved for upload.

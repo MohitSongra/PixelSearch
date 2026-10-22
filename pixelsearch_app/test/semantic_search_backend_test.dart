@@ -62,26 +62,68 @@ Photo _photo(
 );
 
 void main() {
-  test('person eligibility filters before global Top-K and name-only needs no encoder', () async {
-    final encoder = _FakeTextEmbedder({'beach': [1, 0, 0]}, failLoad: true);
-    final index = BruteForceVectorIndex(dim: 3)
-      ..upsert('other', _unit([1, 0, 0]))..upsert('person', _unit([.8, .6, 0]));
-    final corpus = [_photo('other'), _photo('person')];
-    final offline = SemanticSearchBackend(embedder: encoder, index: index, topK: 1);
-    final named = await offline.searchDetailed(const SearchRequest('',
-      filters: SearchFilters(personIds: {'local-person'}), eligiblePhotoIds: {'person'}), corpus);
-    expect(named.photos.map((p) => p.id), ['person']);
-    expect(encoder.embedCalls, 0);
-    expect(encoder.isLoaded, isFalse);
-    final backend = SemanticSearchBackend(embedder: _FakeTextEmbedder({'beach': [1, 0, 0]}), index: index, topK: 1);
-    final scoped = await backend.searchDetailed(const SearchRequest('beach',
-      filters: SearchFilters(personIds: {'local-person'}), eligiblePhotoIds: {'person'}), corpus);
-    expect(scoped.photos.single.id, 'person');
-    expect(scoped.explanations['person']!['cosine'], closeTo(.8, 1e-6));
-    await expectLater(backend.searchDetailed(const SearchRequest('beach',
-      filters: SearchFilters(personIds: {'unresolved'})), corpus), throwsStateError);
-    expect((await backend.searchDetailed(const SearchRequest('beach', eligiblePhotoIds: {}), corpus)).photos, isEmpty);
-  });
+  test(
+    'person eligibility filters before global Top-K and name-only needs no encoder',
+    () async {
+      final encoder = _FakeTextEmbedder({
+        'beach': [1, 0, 0],
+      }, failLoad: true);
+      final index = BruteForceVectorIndex(dim: 3)
+        ..upsert('other', _unit([1, 0, 0]))
+        ..upsert('person', _unit([.8, .6, 0]));
+      final corpus = [_photo('other'), _photo('person')];
+      final offline = SemanticSearchBackend(
+        embedder: encoder,
+        index: index,
+        topK: 1,
+      );
+      final named = await offline.searchDetailed(
+        const SearchRequest(
+          '',
+          filters: SearchFilters(personIds: {'local-person'}),
+          eligiblePhotoIds: {'person'},
+        ),
+        corpus,
+      );
+      expect(named.photos.map((p) => p.id), ['person']);
+      expect(encoder.embedCalls, 0);
+      expect(encoder.isLoaded, isFalse);
+      final backend = SemanticSearchBackend(
+        embedder: _FakeTextEmbedder({
+          'beach': [1, 0, 0],
+        }),
+        index: index,
+        topK: 1,
+      );
+      final scoped = await backend.searchDetailed(
+        const SearchRequest(
+          'beach',
+          filters: SearchFilters(personIds: {'local-person'}),
+          eligiblePhotoIds: {'person'},
+        ),
+        corpus,
+      );
+      expect(scoped.photos.single.id, 'person');
+      expect(scoped.explanations['person']!['cosine'], closeTo(.8, 1e-6));
+      await expectLater(
+        backend.searchDetailed(
+          const SearchRequest(
+            'beach',
+            filters: SearchFilters(personIds: {'unresolved'}),
+          ),
+          corpus,
+        ),
+        throwsStateError,
+      );
+      expect(
+        (await backend.searchDetailed(
+          const SearchRequest('beach', eligiblePhotoIds: {}),
+          corpus,
+        )).photos,
+        isEmpty,
+      );
+    },
+  );
   test(
     'articles add no semantic-hybrid evidence and the full sentence reaches the encoder',
     () async {

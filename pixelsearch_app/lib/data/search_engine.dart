@@ -16,11 +16,7 @@ export '../domain/search/query_terms.dart' show queryTerms;
 /// Signal priority per term: an exact tag hit (3) beats a partial tag hit or an
 /// exact ML Kit label hit (2), which beats a substring hit anywhere in the
 /// caption/place/album/label blob (1).
-double keywordScore(
-  Photo p,
-  List<String> terms, {
-  bool includeLabels = true,
-}) {
+double keywordScore(Photo p, List<String> terms, {bool includeLabels = true}) {
   var score = 0.0;
   final blob = includeLabels ? p.searchBlob : p.metadataSearchBlob;
   for (final t in terms) {
@@ -63,10 +59,4 @@ List<Photo> searchPhotos(List<Photo> all, String query) {
     return b.$1.date.compareTo(a.$1.date);
   });
   return scored.map((e) => e.$1).toList();
-}
-
-/// The matched terms for a photo — used by the viewer's "why this matched" chip row.
-List<String> matchedTags(Photo p, String query) {
-  final terms = query.toLowerCase().split(RegExp(r'\s+')).toSet();
-  return p.tags.where((tag) => terms.any((t) => t.isNotEmpty && tag.contains(t))).toList();
 }

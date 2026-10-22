@@ -1,0 +1,56 @@
+name: Feature request
+description: Suggest an improvement or a new capability.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Privacy first: this repository is public.** Never attach or paste gallery photos, face crops,
+        person names, GPS coordinates, device serial numbers, backend URLs or tokens. Use synthetic images and
+        placeholders such as `<name>` instead.
+
+        PixelSearch keeps search, embeddings and People data on the phone. Proposals that send data off the
+        device must be optional, off by default and covered by their own consent.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: data
+    attributes:
+      label: Would any data leave the phone?
+      options:
+        - "No, everything stays on the device"
+        - "Yes, through an optional, consented online feature"
+        - "Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and contract impact
+      description: >-
+        Ranking changes (gate, weights, lexical policy) need judged, held-out evidence. Changes to preprocessing,
+        the tokenizer, embedding size, ONNX names or the face pipeline need a contract version bump. Say which
+        applies, if any.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: This request contains no gallery photos, face crops, person names, GPS data, device serials, backend URLs or tokens.
+          required: true

@@ -1,0 +1,105 @@
+name: Bug report
+description: Report something in PixelSearch that does not work as documented.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Privacy first: this repository is public.** Never attach or paste gallery photos, face crops,
+        person names, GPS coordinates, device serial numbers, backend URLs or tokens. Use synthetic images,
+        placeholders such as `<name>` or `<backend-url>`, and aggregate numbers instead.
+
+        **Security vulnerability?** Do not describe it here. Follow the security policy (`SECURITY.md` in the
+        repository root, also linked from the Security tab).
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Indexing
+        - Search and ranking
+        - People
+        - Gallery, timeline or map
+        - Voice search
+        - Online features (captions, assistant, transcription, map tiles)
+        - Backend (enhancement_backend)
+        - ModelKit
+        - Tests, CI or tooling
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Describe the problem. Say what you saw, not who or what was in the photos.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit or build
+      description: The git commit you built from, and whether it was a debug or release build.
+      placeholder: "e.g. 05e6276, debug build"
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Where did it happen?
+      options:
+        - Android phone
+        - Host unit or widget tests
+        - Backend (local or deployed)
+        - GitHub Actions CI
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Android version and phone model
+      description: Only the model name and Android version. Never the serial number.
+      placeholder: "e.g. Android 14, <phone model>"
+  - type: dropdown
+    id: precision
+    attributes:
+      label: MobileCLIP model files on the device
+      description: FP32 on CPU is the only supported configuration. FP16 files are not supported on Android.
+      options:
+        - FP32 (mobileclip_image.onnx and mobileclip_text.onnx)
+        - FP16 files present
+        - No model files (keyword fallback)
+        - Not applicable or unknown
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Remove file names, paths, names, URLs, tokens and serials before pasting.
+      render: shell
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: This report contains no gallery photos, face crops, person names, GPS data, device serials, backend URLs or tokens.
+          required: true
+        - label: This report contains no vulnerability details (vulnerabilities go through SECURITY.md).
+          required: true

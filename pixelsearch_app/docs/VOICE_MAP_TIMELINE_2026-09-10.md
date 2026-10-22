@@ -1,5 +1,7 @@
 # Voice, map and timeline integration - 2026-09-10
 
+> **Redaction note (2026-10-22):** personal identifiers (names, the device serial, local paths, private photo filenames, backup names and APK/backup digests) were replaced with placeholders. Measurements are unchanged.
+
 ## Scope
 
 Vivo I2214, Android API 36, arm64. Preserve the existing indexed gallery, folder
@@ -121,19 +123,19 @@ verified by automated tests, not by modifying the user's collections.
   Controlled provider responses are not live transcription measurements.
 - Native speech Kotlin compilation and the final debug APK build succeeded.
 - Final APK: `build/app/outputs/flutter-apk/app-debug.apk`.
-  SHA-256: `27D0CD32CAB8A33D7EEF7CDC816D22DD87DC0C236F080DB416488492DBFF441D`.
+  SHA-256: `<digest withheld>`.
 - Both updates were installed successfully with the data-preserving Android
   replacement option. The second update includes the calendar grouping fix.
 - Signing certificate matches the existing Android debug installation.
-- Pre-update backup: `local_evaluation/app-data-20260910-112228-923.tar`.
-  SHA-256: `34BEE17E5845AEAE2079AB473F5A4715C46082437AC00B599AC9DB9597133628`.
-- Pre-calendar-fix backup: `local_evaluation/app-data-20260910-114151-196.tar`.
-  SHA-256: `B9018BC05707CF253184E0D28C4622ED5053DC98A96CF1B40F9AFD916943C09C`.
+- Pre-update backup: `<private backup>`.
+  SHA-256: `<digest withheld>`.
+- Pre-calendar-fix backup: `<private backup>`.
+  SHA-256: `<digest withheld>`.
 - These first two backups passed SQLite integrity checks, schema 5. All eight database
   table hashes matched between them, including 1,916 photos, 1,916 embeddings,
   27 memory events, 1,916 memory members and 1,916 location observations.
-- Post-calendar-fix backup: `local_evaluation/app-data-20260910-114848-560.tar`.
-  SHA-256: `BA9117A664C117D7F931D88423C5985DD98B6A939F8939016992FA43CAF78E07`.
+- Post-calendar-fix backup: `<private backup>`.
+  SHA-256: `<digest withheld>`.
   SQLite integrity is `ok`, schema remains 5, and there are zero invalid covers.
   Photo, embedding, checkpoint, folder-preference, location and caption table
   hashes match the first backup. Only memory events and memberships intentionally
@@ -143,7 +145,7 @@ verified by automated tests, not by modifying the user's collections.
   (`offline: false`). The final live device was restored through Settings to
   `offline: true`, and its complete user-preferences file hash was then checked
   against the first backup: identical
-  (`1b4a58e978c0cb73a27579dae37b44a9fff7c22f1a298f3af183516fc50a866c`).
+  (`<digest withheld>`).
   Anyone restoring the post-update archive must also restore that original
   Offline only setting. All four individual feature choices remained enabled.
 - Embeddings remain MobileCLIP-S1 FP32 CPU, version 1, 512 dimensions.

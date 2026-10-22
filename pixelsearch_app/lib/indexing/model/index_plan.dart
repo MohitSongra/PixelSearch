@@ -40,6 +40,5 @@ class IndexPlan {
   int get total => toIndex.length + toDelete.length + upToDate;
   bool get isEmpty => toIndex.isEmpty && toDelete.isEmpty;
 
-  int reasonCount(IndexReason r) =>
-      toIndex.where((i) => i.reason == r).length;
+  int reasonCount(IndexReason r) => toIndex.where((i) => i.reason == r).length;
 }

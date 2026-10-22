@@ -1,5 +1,7 @@
 # TECHNICAL DEBT
 
+> **Status note (2026-10-21 audit):** Some rows are stale. TD-11 says the device adapters are not runtime-tested, but photo_manager, ML Kit, EXIF and thumbnails ran on the Vivo in 2026-09; only WorkManager is unexercised, and nothing schedules it. TD-17 (UI-isolate CPU work), TD-18 and TD-19 remain open. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+
 Tracked, intentional shortcuts. Each has a trigger for when it must be paid down.
 
 | # | Debt | Why it's OK for now | Pay down when |

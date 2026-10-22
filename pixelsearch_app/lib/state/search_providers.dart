@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/ai_contract.dart';
 import '../data/search/brute_force_vector_index.dart';
 import '../data/search/keyword_search_backend.dart';
+import '../data/search_engine.dart';
+import '../domain/people/people_membership.dart';
 import '../domain/search/search_backend.dart';
 import '../domain/search/search_response.dart';
 import '../domain/search/vector_index.dart';
@@ -54,52 +56,96 @@ final searchResponseProvider = FutureProvider.autoDispose<SearchResponse>((
 ) async {
   final corpus = ref.watch(photoLibraryProvider);
   final resolved = await ref.watch(peopleQueryProvider.future);
-  if (resolved.needsChoice) {
+  if (resolved.selfMissing || resolved.needsChoice) {
+    // Never search while the subject is unknown: "me" must not reach the
+    // image model, and an ambiguous name must not be guessed.
     return SearchResponse(
       request: SearchRequest(resolved.query, filters: resolved.filters),
       photos: const [],
-      mode: 'choose person',
+      mode: resolved.selfMissing ? 'self missing' : 'choose person',
     );
   }
-  final ids = resolved.filters.personIds;
-  final eligible = ids.isEmpty
-      ? null
-      : await ref.read(peopleRepositoryProvider).photoIdsFor(ids);
+  final filters = resolved.filters;
+  if (!filters.hasPeople) {
+    final backend = await ref.watch(searchBackendProvider.future);
+    return backend.searchDetailed(
+      SearchRequest(resolved.query, filters: filters),
+      corpus,
+    );
+  }
+  final index = await ref.watch(peoplePhotoIndexProvider.future);
+  final library = {for (final p in corpus) p.id};
+  final required = filters.personIds, any = filters.anyPersonIds;
+  // People off: every person constraint fails closed.
+  final eligible = !index.enabled
+      ? <String>{}
+      : matchPeoplePhotos(
+          index.photosByPerson,
+          required: required,
+          anyOf: any,
+          excluded: filters.excludedPersonIds,
+          universe: library,
+        );
   final request = SearchRequest(
     resolved.query,
-    filters: resolved.filters,
+    filters: filters,
     eligiblePhotoIds: eligible,
   );
   SearchResponse response;
-  if (ids.isNotEmpty && resolved.query.trim().isEmpty) {
-    response = await const KeywordSearchBackend().searchDetailed(
-      request,
-      corpus,
+  if (resolved.query.trim().isEmpty) {
+    // Name-only: the person's photos, newest first. No text model, and no
+    // keyword evidence that did not contribute.
+    response = SearchResponse(
+      request: request,
+      photos: searchPhotos(request.filterCorpus(corpus), ''),
+      mode: 'people',
     );
   } else {
     final backend = await ref.watch(searchBackendProvider.future);
     response = await backend.searchDetailed(request, corpus);
   }
-  if (ids.isEmpty) return response;
-  final snapshot = await ref.read(peopleRepositoryProvider).load();
+  final mentioned = {...required, ...any, ...filters.excludedPersonIds};
+  final shown = {...required, ...any};
   return SearchResponse(
     request: request,
     photos: response.photos,
-    mode: resolved.query.isEmpty ? 'people' : response.mode,
+    mode: response.mode,
+    people: PersonFilterSummary(
+      peopleEnabled: index.enabled,
+      labels: {
+        for (final id in mentioned) id: index.labels[id] ?? 'Unnamed person',
+      },
+      photoCounts: {
+        for (final id in mentioned)
+          id: (index.photosByPerson[id] ?? const <String>{})
+              .intersection(library)
+              .length,
+      },
+      together: !index.enabled
+          ? 0
+          : required.isEmpty && any.isEmpty
+          ? library.length
+          : matchPeoplePhotos(
+              index.photosByPerson,
+              required: required,
+              anyOf: any,
+              universe: library,
+            ).length,
+      eligible: eligible.length,
+      inFilters: request.filterCorpus(corpus).length,
+    ),
     explanations: {
       for (final photo in response.photos)
         photo.id: {
           ...?response.explanations[photo.id],
           'people': [
-            for (final face in snapshot.faces)
-              if (face.photoId == photo.id && ids.contains(face.personId))
+            for (final entry
+                in (index.assignments[photo.id] ?? const {}).entries)
+              if (shown.contains(entry.key))
                 {
-                  'person_id': face.personId,
-                  'name': snapshot.people
-                      .where((p) => p.record.id == face.personId)
-                      .firstOrNull
-                      ?.label,
-                  'assignment': face.assignment,
+                  'person_id': entry.key,
+                  'name': index.labels[entry.key],
+                  'assignment': entry.value,
                 },
           ],
         },

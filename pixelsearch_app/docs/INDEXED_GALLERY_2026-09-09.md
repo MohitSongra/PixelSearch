@@ -1,5 +1,7 @@
 # Indexed gallery and library-specific suggestions
 
+> **Redaction note (2026-10-22):** personal identifiers (names, the device serial, local paths, private photo filenames, backup names and APK/backup digests) were replaced with placeholders. Measurements are unchanged.
+
 ## Delivery status
 
 [VERIFIED] Implementation, analyzer, all 154 Flutter tests, and debug APK build passed on 2026-09-09.
@@ -57,8 +59,8 @@ Layout screenshots: `build/gallery_screenshots/`. These use existing bundled fix
 APK: `build/app/outputs/flutter-apk/app-debug.apk`
 
 - Size: 260,474,177 bytes.
-- SHA-256: `0029031B44F795E15D6D61B2B4618260DFDD5DA4E914CAF91D6993FD3AF2281F`.
-- Signing certificate SHA-256: `5d6a02254b32e1c91b1ad84273009f7731fc10141022e0ccef0304546dfdb26e`.
+- SHA-256: `<digest withheld>`.
+- Signing certificate SHA-256: `<digest withheld>`.
 
 Build warnings about future Java native-access restrictions and plugin Kotlin Gradle migration remain; they did not prevent this build.
 
@@ -77,7 +79,7 @@ Build warnings about future Java native-access restrictions and plugin Kotlin Gr
 | Newest indexed date | 8 December 2023, two photos; followed by 7 December, 21 photos |
 | Month picker | Actual month counts displayed; selecting September 2023 (265 photos) opened 30 September |
 | Date scrubber | Dragging to the oldest end exposed the final photo on 10 February 2023; dragging back restored December |
-| Original viewer | Opened `IMG-20230210-WA0079.jpeg`; displayed original photo, date, album, and stored label |
+| Original viewer | Opened `<private photo C>`; displayed original photo, date, album, and stored label |
 | Return from viewer | Retained the same February scroll position |
 | Suggestion execution | Paper submitted `paper` to existing semantic search and displayed 60 results; no ranking-quality claim was made |
 | Clear search | Returned to the gallery at the same February position |
@@ -103,8 +105,8 @@ These are debug-build samples from different application states, including seman
 
 The app was idle before upgrade. Only PixelSearch was force-stopped for the consistent pre-update archive, then installed using `adb install -r` with the verified matching signer.
 
-- Backup: `local_evaluation/app-data-20260909-234315-863.tar`.
-- Archive SHA-256: `96830FAE80769320551FB19769E8E327D90BE16EC65D7A04EE1B02508F13F2ED`.
+- Backup: `<private backup>`.
+- Archive SHA-256: `<digest withheld>`.
 - Audit: `local_evaluation/before_gallery_update.json`; SQLite integrity `ok`, schema 5.
 - Preserved database counts: 1,916 photos; 1,916 embeddings; 27 memory events; 1,916 event members; 1,916 location records; zero saved captions; one checkpoint row and one folder-preference row.
 - Embeddings remain MobileCLIP-S1, version 1, dimension 512. Saved folder IDs remain `-1739773001` and `-1829889111`, with all-folders disabled.
@@ -118,7 +120,7 @@ A second quiescent full archive was not taken because the user resumed using ano
 ## Procedure for future protected upgrades
 
 1. Confirm PixelSearch is idle. Force-stop only PixelSearch for a consistent offline snapshot.
-2. Run `tool/run_search_evaluation.ps1 -Device 10BD1X0DL40005U -BackupOnly`. Never use the destructive integration-test installation path.
+2. Run `tool/run_search_evaluation.ps1 -Device <device-serial> -BackupOnly`. Never use the destructive integration-test installation path.
 3. Audit the archive with the existing `tool/audit_private_backup.py`. Preserve models, all database tables, folder preferences, secure backend settings and relevance judgments.
 4. Install only with a data-preserving `adb install -r`, using the verified matching signature. Never uninstall or clear data.
 5. Check the real 1,916-photo home gallery, newest/oldest dates, month picker, date scrubber, original-photo viewer, and scroll restoration after searching.

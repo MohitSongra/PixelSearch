@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../data/enhancements/backend_credentials.dart';
 import '../../data/enhancements/online_policy.dart';
 import '../../state/providers.dart';
 
@@ -25,6 +25,7 @@ class OnlineSettings extends ConsumerWidget {
       children: [
         SwitchListTile(
           title: const Text('Offline only'),
+          subtitle: const Text('Pause every online feature with one switch.'),
           value: policy.offline,
           secondary: const Icon(Icons.shield_outlined),
           onChanged: !policy.loaded
@@ -40,7 +41,16 @@ class OnlineSettings extends ConsumerWidget {
               OnlineFeature.maps => 'Online map tiles',
             }),
             value: policy.enabled.contains(f),
-            onChanged: policy.offline
+            subtitle: Text(switch (f) {
+              OnlineFeature.captions =>
+                'Send only a photo you explicitly approve.',
+              OnlineFeature.assistant =>
+                'Send your query and conversation, not your photos.',
+              OnlineFeature.speech => 'Send only a recording you approve.',
+              OnlineFeature.maps =>
+                'Load map areas from OpenStreetMap. No photos are sent.',
+            }),
+            onChanged: !policy.loaded || policy.offline
                 ? null
                 : (v) async {
                     if (v) {
@@ -104,7 +114,7 @@ class OnlineSettings extends ConsumerWidget {
                         autocorrect: false,
                         decoration: const InputDecoration(
                           labelText: 'Per-install access token',
-                          helperText: 'Blank keeps the saved token',
+                          helperText: 'Blank keeps the token for this server',
                         ),
                       ),
                     ],
@@ -125,10 +135,10 @@ class OnlineSettings extends ConsumerWidget {
             if (save == true) {
               await update(() async {
                 await policy.update(baseUrl: url);
-                if (token.isNotEmpty) {
-                  await const FlutterSecureStorage().write(
-                    key: 'backend_install_token',
-                    value: token.trim(),
+                if (token.trim().isNotEmpty) {
+                  await const BackendCredentials().saveFor(
+                    Uri.parse(url.trim()),
+                    token,
                   );
                 }
               });

@@ -8,18 +8,17 @@ Photo _photo(
   List<String> labels = const [],
   int faceCount = 0,
   DateTime? date,
-}) =>
-    Photo(
-      id: id,
-      title: id,
-      caption: '',
-      tags: tags,
-      labels: labels,
-      faceCount: faceCount,
-      date: date ?? DateTime(2026, 1, 1),
-      album: 'A',
-      source: PhotoSource.sample,
-    );
+}) => Photo(
+  id: id,
+  title: id,
+  caption: '',
+  tags: tags,
+  labels: labels,
+  faceCount: faceCount,
+  date: date ?? DateTime(2026, 1, 1),
+  album: 'A',
+  source: PhotoSource.sample,
+);
 
 void main() {
   const scorer = HybridScorer();
@@ -76,7 +75,11 @@ void main() {
   test('zero-signal candidates are dropped', () {
     final ranked = scorer.rank('anything', [
       ScoredCandidate(photo: _photo('ghost'), cosine: null, lexicalRaw: 0),
-      ScoredCandidate(photo: _photo('neg'), cosine: -0.1, lexicalRaw: 0), // clamps to 0
+      ScoredCandidate(
+        photo: _photo('neg'),
+        cosine: -0.1,
+        lexicalRaw: 0,
+      ), // clamps to 0
       ScoredCandidate(photo: _photo('real'), cosine: 0.25, lexicalRaw: 0),
     ]);
     expect(ranked.map((p) => p.id).toList(), ['real']);
@@ -87,18 +90,28 @@ void main() {
   });
 
   test('reason reflects the dominant signal', () {
-    final semantic = scorer
-        .rankDetailed('x', [ScoredCandidate(photo: _photo('s'), cosine: 0.3, lexicalRaw: 0)]).first;
+    final semantic = scorer.rankDetailed('x', [
+      ScoredCandidate(photo: _photo('s'), cosine: 0.3, lexicalRaw: 0),
+    ]).first;
     expect(semantic.reason, 'semantic');
 
-    final keyword = scorer
-        .rankDetailed('x', [ScoredCandidate(photo: _photo('k'), cosine: null, lexicalRaw: 2)]).first;
+    final keyword = scorer.rankDetailed('x', [
+      ScoredCandidate(photo: _photo('k'), cosine: null, lexicalRaw: 2),
+    ]).first;
     expect(keyword.reason, 'keyword');
   });
 
   test('cosine is mapped to strength against the fixed reference band', () {
-    final r = scorer.rankDetailed(
-        'x', [ScoredCandidate(photo: _photo('c'), cosine: HybridScorer.kSemanticCeil, lexicalRaw: 0)]);
-    expect(r.first.semantic, closeTo(1.0, 1e-9)); // at/above ceil → full strength
+    final r = scorer.rankDetailed('x', [
+      ScoredCandidate(
+        photo: _photo('c'),
+        cosine: HybridScorer.kSemanticCeil,
+        lexicalRaw: 0,
+      ),
+    ]);
+    expect(
+      r.first.semantic,
+      closeTo(1.0, 1e-9),
+    ); // at/above ceil → full strength
   });
 }

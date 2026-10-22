@@ -2,10 +2,10 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
+import 'package:pixelsearch/core/theme.dart';
 import 'package:pixelsearch/data/local/app_database.dart';
 import 'package:pixelsearch/data/people_repository.dart';
 import 'package:pixelsearch/state/people_providers.dart';
@@ -16,6 +16,8 @@ import 'package:pixelsearch/features/search/indexed_gallery_view.dart';
 import 'package:pixelsearch/features/viewer/photo_viewer.dart';
 import 'package:pixelsearch/models/photo.dart';
 import 'package:pixelsearch/state/providers.dart';
+
+import 'support/test_fonts.dart';
 
 class TestLibrary extends PhotoLibrary {
   TestLibrary(super.ref, List<Photo> photos) {
@@ -53,7 +55,9 @@ ProviderContainer scope(List<Photo> photos) => ProviderContainer(
       ref.onDispose(db.close);
       return db;
     }),
-    peopleRepositoryProvider.overrideWith((ref) => PeopleRepository(ref.watch(appDatabaseProvider))),
+    peopleRepositoryProvider.overrideWith(
+      (ref) => PeopleRepository(ref.watch(appDatabaseProvider)),
+    ),
     photoLibraryProvider.overrideWith((ref) => TestLibrary(ref, photos)),
     searchBackendProvider.overrideWith(
       (_) async => const KeywordSearchBackend(),
@@ -88,17 +92,7 @@ Future<void> mount(
 }
 
 void main() {
-  setUpAll(() async {
-    final font = File('C:/Windows/Fonts/segoeui.ttf');
-    if (await font.exists()) {
-      await (FontLoader(
-        'Roboto',
-      )..addFont(font.readAsBytes().then(ByteData.sublistView))).load();
-    }
-    await (FontLoader(
-      'MaterialIcons',
-    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
-  });
+  setUpAll(loadTestFonts);
 
   testWidgets(
     'main page is a lazy indexed gallery with live suggestions and unchanged query wiring',
@@ -108,7 +102,7 @@ void main() {
       await mount(tester, container);
       expect(find.byType(IndexedGalleryView), findsOneWidget);
       expect(find.text('1916 photos indexed'), findsOneWidget);
-      expect(find.text('Continue indexing'), findsOneWidget);
+      expect(find.byTooltip('Continue indexing'), findsOneWidget);
       expect(find.text('beach at sunset'), findsNothing);
       expect(
         find.byKey(const ValueKey('indexed-photo-photo-0')),
@@ -164,12 +158,27 @@ void main() {
         find.byKey(const ValueKey('indexed-photo-photo-60')),
         findsOneWidget,
       );
+      expect(
+        tester.getTopLeft(find.text(Dates.short(DateTime(2023, 1, 2)))).dy,
+        greaterThanOrEqualTo(tester.getBottomLeft(find.byType(TextField)).dy),
+      );
       final rail = find.byKey(const ValueKey('gallery-date-scrubber'));
       final bounds = tester.getRect(rail);
-      final gesture = await tester.startGesture(
-        Offset(bounds.center.dx, bounds.top + 28),
+      expect(bounds.size, const Size(48, 48));
+      expect(
+        bounds.top,
+        greaterThanOrEqualTo(tester.getBottomLeft(find.byType(TextField)).dy),
       );
-      await gesture.moveTo(Offset(bounds.center.dx, bounds.bottom - 4));
+      final galleryBounds = tester.getRect(
+        find.byKey(const PageStorageKey('indexed-gallery-scroll')),
+      );
+      final gesture = await tester.startGesture(bounds.center);
+      await gesture.moveBy(const Offset(0, 24));
+      await tester.pump();
+      // The drag remains captured after the pointer leaves the moving thumb.
+      await gesture.moveTo(
+        Offset(galleryBounds.center.dx, galleryBounds.bottom - 4),
+      );
       await gesture.up();
       await tester.pumpAndSettle();
       expect(
@@ -189,24 +198,53 @@ void main() {
         find.byKey(const ValueKey('indexed-photo-photo-119')),
         findsOneWidget,
       );
-      await tester.tap(find.byKey(const ValueKey('library-suggestion-dog')));
+      final savedOffset = galleryPosition(tester).pixels;
+      // Suggestions now scroll away with Home; search remains available here.
+      expect(
+        find.byKey(const ValueKey('library-suggestion-dog')).hitTestable(),
+        findsNothing,
+      );
+      await tester.enterText(find.byType(TextField), 'dog');
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Clear search'));
       await tester.pumpAndSettle();
+      expect(galleryPosition(tester).pixels, closeTo(savedOffset, 1));
       expect(
         find.byKey(const ValueKey('indexed-photo-photo-119')).hitTestable(),
         findsOneWidget,
       );
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('gallery-month-picker')),
-          matching: find.text('January 2023'),
-        ),
-        findsOneWidget,
-      );
+      expect(find.byTooltip('January 2023'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('photo edges below the date thumb open the photo', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final container = scope(fixtures(120));
+    addTearDown(container.dispose);
+    await mount(tester, container);
+    final photo = find.byKey(const ValueKey('indexed-photo-photo-5'));
+    final photoBounds = tester.getRect(photo);
+    final thumbBounds = tester.getRect(
+      find.byKey(const ValueKey('gallery-date-scrubber')),
+    );
+    final edge = Offset(photoBounds.right - 2, photoBounds.center.dy);
+    expect(thumbBounds.contains(edge), isFalse);
+    await tester.tapAt(edge);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<PhotoViewerScreen>(find.byType(PhotoViewerScreen))
+          .initialIndex,
+      5,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('empty library shows no invented suggestions or sample photos', (
     tester,
@@ -214,10 +252,14 @@ void main() {
     final container = scope([]);
     addTearDown(container.dispose);
     await mount(tester, container);
-    expect(find.text('No indexed photos yet'), findsOneWidget);
-    expect(find.text('Index photos'), findsOneWidget);
-    expect(find.text('Try searching'), findsNothing);
-    expect(find.byType(IndexedGalleryView), findsNothing);
+    expect(find.text('Your memories start here'), findsOneWidget);
+    expect(find.byTooltip('Index photos'), findsOneWidget);
+    expect(find.text('Try a search'), findsNothing);
+    expect(find.byKey(const ValueKey('gallery-date-scrubber')), findsNothing);
+    expect(
+      find.byKey(const PageStorageKey('indexed-gallery-scroll')),
+      findsOneWidget,
+    );
   });
 
   for (final size in [
@@ -266,3 +308,16 @@ void main() {
     );
   }
 }
+
+ScrollPosition galleryPosition(WidgetTester tester) => tester
+    .state<ScrollableState>(
+      find.descendant(
+        of: find.byKey(const PageStorageKey('indexed-gallery-scroll')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              widget.axisDirection == AxisDirection.down,
+        ),
+      ),
+    )
+    .position;

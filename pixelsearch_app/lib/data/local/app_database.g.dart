@@ -5681,6 +5681,28 @@ class $PeopleReviewsTable extends PeopleReviews
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _leftPhotoIdMeta = const VerificationMeta(
+    'leftPhotoId',
+  );
+  @override
+  late final GeneratedColumn<String> leftPhotoId = GeneratedColumn<String>(
+    'left_photo_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _rightPhotoIdMeta = const VerificationMeta(
+    'rightPhotoId',
+  );
+  @override
+  late final GeneratedColumn<String> rightPhotoId = GeneratedColumn<String>(
+    'right_photo_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -5690,6 +5712,8 @@ class $PeopleReviewsTable extends PeopleReviews
     cosine,
     judgment,
     contract,
+    leftPhotoId,
+    rightPhotoId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -5760,6 +5784,24 @@ class $PeopleReviewsTable extends PeopleReviews
     } else if (isInserting) {
       context.missing(_contractMeta);
     }
+    if (data.containsKey('left_photo_id')) {
+      context.handle(
+        _leftPhotoIdMeta,
+        leftPhotoId.isAcceptableOrUnknown(
+          data['left_photo_id']!,
+          _leftPhotoIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('right_photo_id')) {
+      context.handle(
+        _rightPhotoIdMeta,
+        rightPhotoId.isAcceptableOrUnknown(
+          data['right_photo_id']!,
+          _rightPhotoIdMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -5797,6 +5839,14 @@ class $PeopleReviewsTable extends PeopleReviews
         DriftSqlType.string,
         data['${effectivePrefix}contract'],
       )!,
+      leftPhotoId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}left_photo_id'],
+      ),
+      rightPhotoId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}right_photo_id'],
+      ),
     );
   }
 
@@ -5815,6 +5865,12 @@ class PeopleReviewRecord extends DataClass
   final double cosine;
   final String judgment;
   final String contract;
+
+  /// The reviewed photos (v7). Face ids include the photo revision, so after
+  /// an edit only these still identify a reviewed photo. Null for review rows
+  /// whose faces were already gone when the column was added.
+  final String? leftPhotoId;
+  final String? rightPhotoId;
   const PeopleReviewRecord({
     required this.id,
     required this.leftFaceId,
@@ -5823,6 +5879,8 @@ class PeopleReviewRecord extends DataClass
     required this.cosine,
     required this.judgment,
     required this.contract,
+    this.leftPhotoId,
+    this.rightPhotoId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -5834,6 +5892,12 @@ class PeopleReviewRecord extends DataClass
     map['cosine'] = Variable<double>(cosine);
     map['judgment'] = Variable<String>(judgment);
     map['contract'] = Variable<String>(contract);
+    if (!nullToAbsent || leftPhotoId != null) {
+      map['left_photo_id'] = Variable<String>(leftPhotoId);
+    }
+    if (!nullToAbsent || rightPhotoId != null) {
+      map['right_photo_id'] = Variable<String>(rightPhotoId);
+    }
     return map;
   }
 
@@ -5846,6 +5910,12 @@ class PeopleReviewRecord extends DataClass
       cosine: Value(cosine),
       judgment: Value(judgment),
       contract: Value(contract),
+      leftPhotoId: leftPhotoId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(leftPhotoId),
+      rightPhotoId: rightPhotoId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rightPhotoId),
     );
   }
 
@@ -5862,6 +5932,8 @@ class PeopleReviewRecord extends DataClass
       cosine: serializer.fromJson<double>(json['cosine']),
       judgment: serializer.fromJson<String>(json['judgment']),
       contract: serializer.fromJson<String>(json['contract']),
+      leftPhotoId: serializer.fromJson<String?>(json['leftPhotoId']),
+      rightPhotoId: serializer.fromJson<String?>(json['rightPhotoId']),
     );
   }
   @override
@@ -5875,6 +5947,8 @@ class PeopleReviewRecord extends DataClass
       'cosine': serializer.toJson<double>(cosine),
       'judgment': serializer.toJson<String>(judgment),
       'contract': serializer.toJson<String>(contract),
+      'leftPhotoId': serializer.toJson<String?>(leftPhotoId),
+      'rightPhotoId': serializer.toJson<String?>(rightPhotoId),
     };
   }
 
@@ -5886,6 +5960,8 @@ class PeopleReviewRecord extends DataClass
     double? cosine,
     String? judgment,
     String? contract,
+    Value<String?> leftPhotoId = const Value.absent(),
+    Value<String?> rightPhotoId = const Value.absent(),
   }) => PeopleReviewRecord(
     id: id ?? this.id,
     leftFaceId: leftFaceId ?? this.leftFaceId,
@@ -5894,6 +5970,8 @@ class PeopleReviewRecord extends DataClass
     cosine: cosine ?? this.cosine,
     judgment: judgment ?? this.judgment,
     contract: contract ?? this.contract,
+    leftPhotoId: leftPhotoId.present ? leftPhotoId.value : this.leftPhotoId,
+    rightPhotoId: rightPhotoId.present ? rightPhotoId.value : this.rightPhotoId,
   );
   PeopleReviewRecord copyWithCompanion(PeopleReviewsCompanion data) {
     return PeopleReviewRecord(
@@ -5908,6 +5986,12 @@ class PeopleReviewRecord extends DataClass
       cosine: data.cosine.present ? data.cosine.value : this.cosine,
       judgment: data.judgment.present ? data.judgment.value : this.judgment,
       contract: data.contract.present ? data.contract.value : this.contract,
+      leftPhotoId: data.leftPhotoId.present
+          ? data.leftPhotoId.value
+          : this.leftPhotoId,
+      rightPhotoId: data.rightPhotoId.present
+          ? data.rightPhotoId.value
+          : this.rightPhotoId,
     );
   }
 
@@ -5920,7 +6004,9 @@ class PeopleReviewRecord extends DataClass
           ..write('subset: $subset, ')
           ..write('cosine: $cosine, ')
           ..write('judgment: $judgment, ')
-          ..write('contract: $contract')
+          ..write('contract: $contract, ')
+          ..write('leftPhotoId: $leftPhotoId, ')
+          ..write('rightPhotoId: $rightPhotoId')
           ..write(')'))
         .toString();
   }
@@ -5934,6 +6020,8 @@ class PeopleReviewRecord extends DataClass
     cosine,
     judgment,
     contract,
+    leftPhotoId,
+    rightPhotoId,
   );
   @override
   bool operator ==(Object other) =>
@@ -5945,7 +6033,9 @@ class PeopleReviewRecord extends DataClass
           other.subset == this.subset &&
           other.cosine == this.cosine &&
           other.judgment == this.judgment &&
-          other.contract == this.contract);
+          other.contract == this.contract &&
+          other.leftPhotoId == this.leftPhotoId &&
+          other.rightPhotoId == this.rightPhotoId);
 }
 
 class PeopleReviewsCompanion extends UpdateCompanion<PeopleReviewRecord> {
@@ -5956,6 +6046,8 @@ class PeopleReviewsCompanion extends UpdateCompanion<PeopleReviewRecord> {
   final Value<double> cosine;
   final Value<String> judgment;
   final Value<String> contract;
+  final Value<String?> leftPhotoId;
+  final Value<String?> rightPhotoId;
   final Value<int> rowid;
   const PeopleReviewsCompanion({
     this.id = const Value.absent(),
@@ -5965,6 +6057,8 @@ class PeopleReviewsCompanion extends UpdateCompanion<PeopleReviewRecord> {
     this.cosine = const Value.absent(),
     this.judgment = const Value.absent(),
     this.contract = const Value.absent(),
+    this.leftPhotoId = const Value.absent(),
+    this.rightPhotoId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PeopleReviewsCompanion.insert({
@@ -5975,6 +6069,8 @@ class PeopleReviewsCompanion extends UpdateCompanion<PeopleReviewRecord> {
     required double cosine,
     this.judgment = const Value.absent(),
     required String contract,
+    this.leftPhotoId = const Value.absent(),
+    this.rightPhotoId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        leftFaceId = Value(leftFaceId),
@@ -5990,6 +6086,8 @@ class PeopleReviewsCompanion extends UpdateCompanion<PeopleReviewRecord> {
     Expression<double>? cosine,
     Expression<String>? judgment,
     Expression<String>? contract,
+    Expression<String>? leftPhotoId,
+    Expression<String>? rightPhotoId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -6000,6 +6098,8 @@ class PeopleReviewsCompanion extends UpdateCompanion<PeopleReviewRecord> {
       if (cosine != null) 'cosine': cosine,
       if (judgment != null) 'judgment': judgment,
       if (contract != null) 'contract': contract,
+      if (leftPhotoId != null) 'left_photo_id': leftPhotoId,
+      if (rightPhotoId != null) 'right_photo_id': rightPhotoId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -6012,6 +6112,8 @@ class PeopleReviewsCompanion extends UpdateCompanion<PeopleReviewRecord> {
     Value<double>? cosine,
     Value<String>? judgment,
     Value<String>? contract,
+    Value<String?>? leftPhotoId,
+    Value<String?>? rightPhotoId,
     Value<int>? rowid,
   }) {
     return PeopleReviewsCompanion(
@@ -6022,6 +6124,8 @@ class PeopleReviewsCompanion extends UpdateCompanion<PeopleReviewRecord> {
       cosine: cosine ?? this.cosine,
       judgment: judgment ?? this.judgment,
       contract: contract ?? this.contract,
+      leftPhotoId: leftPhotoId ?? this.leftPhotoId,
+      rightPhotoId: rightPhotoId ?? this.rightPhotoId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -6050,6 +6154,12 @@ class PeopleReviewsCompanion extends UpdateCompanion<PeopleReviewRecord> {
     if (contract.present) {
       map['contract'] = Variable<String>(contract.value);
     }
+    if (leftPhotoId.present) {
+      map['left_photo_id'] = Variable<String>(leftPhotoId.value);
+    }
+    if (rightPhotoId.present) {
+      map['right_photo_id'] = Variable<String>(rightPhotoId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -6066,6 +6176,8 @@ class PeopleReviewsCompanion extends UpdateCompanion<PeopleReviewRecord> {
           ..write('cosine: $cosine, ')
           ..write('judgment: $judgment, ')
           ..write('contract: $contract, ')
+          ..write('leftPhotoId: $leftPhotoId, ')
+          ..write('rightPhotoId: $rightPhotoId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9475,6 +9587,8 @@ typedef $$PeopleReviewsTableCreateCompanionBuilder =
       required double cosine,
       Value<String> judgment,
       required String contract,
+      Value<String?> leftPhotoId,
+      Value<String?> rightPhotoId,
       Value<int> rowid,
     });
 typedef $$PeopleReviewsTableUpdateCompanionBuilder =
@@ -9486,6 +9600,8 @@ typedef $$PeopleReviewsTableUpdateCompanionBuilder =
       Value<double> cosine,
       Value<String> judgment,
       Value<String> contract,
+      Value<String?> leftPhotoId,
+      Value<String?> rightPhotoId,
       Value<int> rowid,
     });
 
@@ -9530,6 +9646,16 @@ class $$PeopleReviewsTableFilterComposer
 
   ColumnFilters<String> get contract => $composableBuilder(
     column: $table.contract,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get leftPhotoId => $composableBuilder(
+    column: $table.leftPhotoId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get rightPhotoId => $composableBuilder(
+    column: $table.rightPhotoId,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -9577,6 +9703,16 @@ class $$PeopleReviewsTableOrderingComposer
     column: $table.contract,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get leftPhotoId => $composableBuilder(
+    column: $table.leftPhotoId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get rightPhotoId => $composableBuilder(
+    column: $table.rightPhotoId,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PeopleReviewsTableAnnotationComposer
@@ -9612,6 +9748,16 @@ class $$PeopleReviewsTableAnnotationComposer
 
   GeneratedColumn<String> get contract =>
       $composableBuilder(column: $table.contract, builder: (column) => column);
+
+  GeneratedColumn<String> get leftPhotoId => $composableBuilder(
+    column: $table.leftPhotoId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get rightPhotoId => $composableBuilder(
+    column: $table.rightPhotoId,
+    builder: (column) => column,
+  );
 }
 
 class $$PeopleReviewsTableTableManager
@@ -9656,6 +9802,8 @@ class $$PeopleReviewsTableTableManager
                 Value<double> cosine = const Value.absent(),
                 Value<String> judgment = const Value.absent(),
                 Value<String> contract = const Value.absent(),
+                Value<String?> leftPhotoId = const Value.absent(),
+                Value<String?> rightPhotoId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PeopleReviewsCompanion(
                 id: id,
@@ -9665,6 +9813,8 @@ class $$PeopleReviewsTableTableManager
                 cosine: cosine,
                 judgment: judgment,
                 contract: contract,
+                leftPhotoId: leftPhotoId,
+                rightPhotoId: rightPhotoId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9676,6 +9826,8 @@ class $$PeopleReviewsTableTableManager
                 required double cosine,
                 Value<String> judgment = const Value.absent(),
                 required String contract,
+                Value<String?> leftPhotoId = const Value.absent(),
+                Value<String?> rightPhotoId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PeopleReviewsCompanion.insert(
                 id: id,
@@ -9685,6 +9837,8 @@ class $$PeopleReviewsTableTableManager
                 cosine: cosine,
                 judgment: judgment,
                 contract: contract,
+                leftPhotoId: leftPhotoId,
+                rightPhotoId: rightPhotoId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

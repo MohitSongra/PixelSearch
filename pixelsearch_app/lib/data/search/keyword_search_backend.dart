@@ -26,10 +26,7 @@ class KeywordSearchBackend implements SearchBackend {
     SearchRequest request,
     List<Photo> corpus,
   ) async {
-    final photos = searchPhotos(
-      request.filterCorpus(corpus),
-      request.query,
-    );
+    final photos = searchPhotos(request.filterCorpus(corpus), request.query);
     final terms = queryTerms(request.query);
     return SearchResponse(
       request: request,

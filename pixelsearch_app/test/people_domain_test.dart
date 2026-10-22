@@ -186,6 +186,55 @@ void main() {
     expect(result.passed, isFalse);
     expect(result.threshold, isNull);
     expect(result.validationFalseJoins, 1);
+    expect(result.candidateThreshold, .8);
+    expect(result.falseJoinPairIds, ['g-a|g-b']);
+    expect(result.toJson()['threshold'], isNull);
+  });
+  test(
+    'device failure identifies the false join without enabling its cutoff',
+    () {
+      // Boundary scores from the 2026-09-18 device review, rounded to four
+      // decimals; their order, and so the outcome, is unchanged.
+      final result = calibrateFaces([
+        pair('calibration', .4308, 'same', 'c30'),
+        pair('calibration', .4092, 'different', 'c31'),
+        pair('validation', .5594, 'different', 'v55'),
+        pair('validation', .4392, 'same', 'v56'),
+        pair('validation', .4077, 'same', 'v57'),
+        pair('validation', .3784, 'different', 'v58'),
+      ]);
+      expect(result.passed, isFalse);
+      expect(result.threshold, isNull);
+      expect(result.candidateThreshold, .4308);
+      expect(result.falseJoinPairIds, ['v55-a|v55-b']);
+      expect(result.missedSamePairIds, ['v57-a|v57-b']);
+      expect(result.reason, contains('1 of 2 different-person'));
+    },
+  );
+  test('no successful test matches is distinct from a false join', () {
+    final result = calibrateFaces([
+      pair('calibration', .9, 'same'),
+      pair('calibration', .5, 'different'),
+      pair('validation', .8, 'same'),
+      pair('validation', .4, 'different'),
+    ]);
+    expect(result.passed, isFalse);
+    expect(result.candidateThreshold, .9);
+    expect(result.falseJoinPairIds, isEmpty);
+    expect(result.reason, contains('none of the 1 same-person'));
+  });
+  test('fresh validation sampling is deterministic and capped at 20', () {
+    final input = [for (var i = 0; i < 25; i++) face('f$i', i * 3.0)];
+    final pairs = buildFreshFaceValidation(input);
+    expect(pairs, hasLength(20));
+    expect(
+      pairs.every((p) => p.subset == 'validation' && p.judgment == 'pending'),
+      isTrue,
+    );
+    expect(
+      buildFreshFaceValidation(input.reversed.toList()).map((p) => p.id),
+      pairs.map((p) => p.id),
+    );
   });
   test(
     'missing classes, pending, inseparable and invalid reviews stay disabled',
@@ -203,39 +252,39 @@ void main() {
   );
 
   const names = [
-    NamedPerson('m', 'Mohit Songra', aliases: ['Mohit']),
-    NamedPerson('s', 'Sam'),
-    NamedPerson('s2', 'Sam'),
+    NamedPerson('m', 'Alice Example', aliases: ['Alice']),
+    NamedPerson('s', 'Casey'),
+    NamedPerson('s2', 'Casey'),
     NamedPerson('a', 'Ann'),
   ];
   const friends = [
-    NamedPerson('me', 'Mohit', aliases: ['me', 'myself']),
-    NamedPerson('rudra', 'Rudra'),
+    NamedPerson('me', 'Alice', aliases: ['me', 'myself']),
+    NamedPerson('bob', 'Bob'),
   ];
   test('named friends and self aliases produce a strict two-person query', () {
     for (final text in [
-      'me with my friend Rudra',
-      'myself and Rudra',
-      'photos of me with my friend Rudra',
-      'Mohit, Rudra',
-      'Mohit & Rudra',
+      'me with my friend Bob',
+      'myself and Bob',
+      'photos of me with my friend Bob',
+      'Alice, Bob',
+      'Alice & Bob',
     ]) {
       final result = resolvePeopleQuery(text, friends);
-      expect(result.filters.personIds, {'me', 'rudra'}, reason: text);
+      expect(result.filters.personIds, {'me', 'bob'}, reason: text);
       expect(result.query, isEmpty, reason: text);
     }
   });
   test('friend wording is removed only beside an identified name', () {
     final result = resolvePeopleQuery(
-      'me with my friend Rudra at the beach last year',
+      'me with my friend Bob at the beach last year',
       friends,
       now: DateTime(2026, 9),
     );
-    expect(result.filters.personIds, {'me', 'rudra'});
+    expect(result.filters.personIds, {'me', 'bob'});
     expect(result.query, 'the beach');
     expect(result.filters.from, DateTime(2025));
     expect(
-      resolvePeopleQuery('Mohit with my friend dancing', friends).query,
+      resolvePeopleQuery('Alice with my friend dancing', friends).query,
       'my friend dancing',
     );
     expect(
@@ -243,23 +292,20 @@ void main() {
       'my friend at the beach',
     );
   });
-  test(
-    'request pronouns do not turn Rudra-only searches into self searches',
-    () {
-      for (final text in [
-        'show me photos of Rudra',
-        'find me pictures of my friend Rudra',
-        'give me all photos of Rudra',
-      ]) {
-        final result = resolvePeopleQuery(text, friends);
-        expect(result.filters.personIds, {'rudra'}, reason: text);
-        expect(result.query, isEmpty, reason: text);
-      }
-    },
-  );
+  test('request pronouns do not turn Bob-only searches into self searches', () {
+    for (final text in [
+      'show me photos of Bob',
+      'find me pictures of my friend Bob',
+      'give me all photos of Bob',
+    ]) {
+      final result = resolvePeopleQuery(text, friends);
+      expect(result.filters.personIds, {'bob'}, reason: text);
+      expect(result.query, isEmpty, reason: text);
+    }
+  });
   test('names, nicknames, scene phrases and local years compose', () {
     final query = resolvePeopleQuery(
-      'Photos of Mohit at the beach last year',
+      'Photos of Alice at the beach last year',
       names,
       now: DateTime(2026, 9),
     );
@@ -267,12 +313,12 @@ void main() {
     expect(query.query, 'the beach');
     expect(query.filters.from, DateTime(2025));
     expect(query.filters.until, DateTime(2026));
-    expect(resolvePeopleQuery('Mohit in 2023', names).query, isEmpty);
-    expect(resolvePeopleQuery('Mohit and Ann', names).filters.personIds, {
+    expect(resolvePeopleQuery('Alice in 2023', names).query, isEmpty);
+    expect(resolvePeopleQuery('Alice and Ann', names).filters.personIds, {
       'm',
       'a',
     });
-    expect(resolvePeopleQuery('Mohit and Ann', names).query, isEmpty);
+    expect(resolvePeopleQuery('Alice and Ann', names).query, isEmpty);
   });
   test(
     'whole-name match avoids substrings and chooses longest assigned name',
@@ -281,11 +327,11 @@ void main() {
         resolvePeopleQuery('a banner at sunset', names).filters.personIds,
         isEmpty,
       );
-      final query = resolvePeopleQuery('Mohit Songra', names);
+      final query = resolvePeopleQuery('Alice Example', names);
       expect(query.query, isEmpty);
-      expect(query.matched, {'mohit songra': 'm'});
+      expect(query.matched, {'alice example': 'm'});
       expect(
-        resolvePeopleQuery('Mohit photosynthesis', names).query,
+        resolvePeopleQuery('Alice photosynthesis', names).query,
         'photosynthesis',
       );
     },
@@ -293,28 +339,28 @@ void main() {
   test(
     'ambiguous names require choosing a person, and ignored chips stay removed',
     () {
-      expect(resolvePeopleQuery('Sam', names).needsChoice, isTrue);
+      expect(resolvePeopleQuery('Casey', names).needsChoice, isTrue);
       expect(
         resolvePeopleQuery(
-          'Sam',
+          'Casey',
           names,
-          choices: {'sam': 's2'},
+          choices: {'casey': 's2'},
         ).filters.personIds,
         {'s2'},
       );
       expect(
         resolvePeopleQuery(
-          'Sam',
+          'Casey',
           names,
-          choices: {'sam': 'unknown'},
+          choices: {'casey': 'unknown'},
         ).needsChoice,
         isTrue,
       );
       expect(
         resolvePeopleQuery(
-          'Mohit',
+          'Alice',
           names,
-          ignoredNames: {'mohit'},
+          ignoredNames: {'alice'},
         ).filters.personIds,
         isEmpty,
       );

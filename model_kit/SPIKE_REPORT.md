@@ -1,5 +1,7 @@
 # MobileCLIP Spike — Results
 
+> **Status note (2026-10-21 audit):** The preprocessing summary here ("resize to 256×256") was superseded by the verified contract: shortest side → 256 with antialiasing, then a 256 centre crop. FP16 was never accepted on Android, and the int8 "1/6" result has no reproducing script in the repo. Current state: [`docs/PROJECT_CONTEXT.md`](../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+
 **Goal:** before writing any Flutter, prove that real on-device semantic search works with MobileCLIP, and produce verified model assets. **Result: success.**
 
 ## What was proven

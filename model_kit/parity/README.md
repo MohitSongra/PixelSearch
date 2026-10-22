@@ -1,5 +1,7 @@
 # M4 parity gate (ModelKit ↔ Flutter)
 
+> **Status note (2026-10-21 audit):** The FP16-on-device statement below is not true: FP16 has never run on Android. The run commands use the old two-repository paths; use `model_kit/` and `pixelsearch_app/`. The generated reports are undated snapshots from 2026-08-06/07. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+
 Proves the Flutter production pipeline reproduces the ModelKit reference numerically, through a
 **real Flutter ONNX Runtime execution**.
 

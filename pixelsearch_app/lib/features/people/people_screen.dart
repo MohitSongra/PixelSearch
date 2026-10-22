@@ -7,11 +7,14 @@ import '../../data/people_repository.dart';
 import '../../data/people/face_model_check.dart';
 import '../../data/local/processing_lease.dart';
 import '../../domain/gallery/indexed_gallery.dart';
+import '../../domain/search/search_response.dart';
 import '../../state/people_providers.dart';
 import '../../state/providers.dart';
 import '../search/indexed_gallery_view.dart';
 import 'people_review_screen.dart';
 import 'people_widgets.dart';
+import 'person_suggestions_screen.dart';
+import 'same_person_screen.dart';
 
 class PeopleScreen extends ConsumerStatefulWidget {
   const PeopleScreen({super.key, this.showNewFaces = false});
@@ -27,11 +30,176 @@ class _PeopleState extends ConsumerState<PeopleScreen> {
   String _nameFilter = '';
   final _nameController = TextEditingController();
   bool _checkingModel = false;
+  bool _selecting = false;
+  bool _showSmall = false;
+  bool _grouping = false;
+  final _pickedFaces = <String>{};
+
+  void _endSelection() => setState(() {
+    _selecting = false;
+    _pickedFaces.clear();
+  });
+
+  Future<void> _nameSelected() async {
+    final repo = ref.read(peopleRepositoryProvider);
+    await assignFaces(context, ref, _pickedFaces.toList());
+    if (!mounted) return;
+    // Keep the selection if the sheet was cancelled or the save failed.
+    final open = {for (final f in (await repo.load()).unassigned) f.id};
+    if (!mounted) return;
+    setState(() => _pickedFaces.retainWhere(open.contains));
+    if (_pickedFaces.isEmpty) _endSelection();
+  }
+
+  Future<void> _dismissSelected() async {
+    final repo = ref.read(peopleRepositoryProvider);
+    final controller = ref.read(peopleControllerProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    // Only faces that are still unnamed: dismissing an assigned face would
+    // also record "not this person".
+    final open = {for (final f in (await repo.load()).unassigned) f.id};
+    final ids = _pickedFaces.where(open.contains).toList();
+    if (!mounted) return;
+    if (ids.isEmpty) {
+      _endSelection();
+      return;
+    }
+    final saved = await peopleAction(
+      context,
+      ref,
+      () => repo.assign(ids, null, dismiss: true),
+    );
+    if (!mounted) return;
+    _endSelection();
+    if (!saved) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          persist: false,
+          content: Text(
+            '${ids.length} face${ids.length == 1 ? '' : 's'} marked Not a face.',
+          ),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () async {
+              // Restore only faces still dismissed and unassigned.
+              final restore = [
+                for (final f in (await repo.load()).dismissedFaces)
+                  if (ids.contains(f.id) && f.personId == null) f.id,
+              ];
+              try {
+                if (restore.isNotEmpty) await repo.assign(restore, null);
+              } catch (e) {
+                messenger.showSnackBar(SnackBar(content: Text('$e')));
+              }
+              controller.changed();
+            },
+          ),
+        ),
+      );
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     super.dispose();
+  }
+
+  /// Runs the validated automatic grouping once, at the user's request, while
+  /// processing stays paused. Only faces large enough for a descriptor take
+  /// part; mistakes are fixed by moving or removing faces.
+  Future<void> _groupNow() async {
+    if (_grouping) return;
+    final calibration = await ref.read(peopleCalibrationProvider.future);
+    if (!mounted) return;
+    if (!calibration.passed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Grouping needs a passed review first.')),
+      );
+      return;
+    }
+    final same = calibration.validationSame;
+    final different = calibration.validationDifferent;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Group similar faces?'),
+        content: Text(
+          'Faces that look alike are grouped automatically, using the cutoff '
+          'from your review: in its test, $same same-person pairs were '
+          'checked and all $different different-person pairs stayed apart. '
+          'That is a small sample, not an accuracy guarantee. Faces can also be '
+          'added to people you named; check them under "Same person?". Faces '
+          'too small for a face model are not compared.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Group faces'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
+    setState(() => _grouping = true);
+    final repo = ref.read(peopleRepositoryProvider);
+    final controller = ref.read(peopleControllerProvider);
+    final database = ref.read(appDatabaseProvider);
+    final paused = (await repo.state()).paused;
+    final before = await repo.load();
+    var grouped = 0;
+    if (!mounted) return;
+    final saved = await peopleAction(context, ref, () async {
+      // Like the model check: stop any running pass and hold the lease so no
+      // other grouping or processing writes at the same time.
+      await controller.suspend();
+      final lease = await ProcessingLease.acquire(database, 'people-group');
+      if (lease == null) throw StateError('Photo processing is busy.');
+      try {
+        grouped = await repo.groupNow();
+      } finally {
+        await lease.release();
+      }
+    });
+    if (!paused) unawaited(controller.kick());
+    if (!mounted) return;
+    setState(() => _grouping = false);
+    if (!saved) return;
+    final after = await repo.load();
+    if (!mounted) return;
+    int automaticInNamed(PeopleSnapshot s) => s.people
+        .where((p) => p.record.name.trim().isNotEmpty)
+        .fold(
+          0,
+          (n, p) =>
+              n + p.faces.where((f) => f.assignment == 'automatic').length,
+        );
+    final intoNamed = automaticInNamed(after) - automaticInNamed(before);
+    final newGroups = after.unnamedPeople.length - before.unnamedPeople.length;
+    String faces(int n) => '$n face${n == 1 ? '' : 's'}';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          grouped == 0
+              ? 'No faces could be grouped right now.'
+              : [
+                  if (intoNamed > 0)
+                    'Added ${faces(intoNamed)} to people you named '
+                        '(check them in Same person?)',
+                  if (newGroups > 0)
+                    'made $newGroups new group${newGroups == 1 ? '' : 's'} '
+                        'in New faces',
+                  if (intoNamed <= 0 && newGroups <= 0)
+                    'grouped ${faces(grouped)}',
+                ].join('; '),
+        ),
+      ),
+    );
   }
 
   Future<void> _checkModel() async {
@@ -151,6 +319,9 @@ class _PeopleState extends ConsumerState<PeopleScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = ref.watch(peopleControllerProvider);
+    // Load the review result with the screen so the menu knows at once
+    // whether grouping is allowed.
+    ref.watch(peopleCalibrationProvider);
     final data = ref.watch(peopleSnapshotProvider);
     return Scaffold(
       appBar: AppBar(
@@ -177,6 +348,15 @@ class _PeopleState extends ConsumerState<PeopleScreen> {
                 _checkModel();
               } else if (value == 'hidden') {
                 setState(() => _hidden = !_hidden);
+              } else if (value == 'group') {
+                _groupNow();
+              } else if (value == 'dismissed') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const DismissedFacesScreen(),
+                  ),
+                );
               } else {
                 setState(() => _sort = value);
               }
@@ -187,6 +367,23 @@ class _PeopleState extends ConsumerState<PeopleScreen> {
                   value: 'model',
                   enabled: !_checkingModel,
                   child: const Text('Check face model'),
+                ),
+              if (data.valueOrNull?.state.enabled == true)
+                PopupMenuItem(
+                  value: 'group',
+                  enabled:
+                      !_grouping &&
+                      ref
+                              .watch(peopleCalibrationProvider)
+                              .valueOrNull
+                              ?.passed ==
+                          true,
+                  child: const Text('Group similar faces'),
+                ),
+              if (data.valueOrNull?.state.enabled == true)
+                const PopupMenuItem(
+                  value: 'dismissed',
+                  child: Text('Faces marked Not a face'),
                 ),
               const PopupMenuItem(
                 value: 'photos',
@@ -273,8 +470,29 @@ class _PeopleState extends ConsumerState<PeopleScreen> {
             };
             return order != 0 ? order : a.record.id.compareTo(b.record.id);
           });
-          final faces = snapshot.unassigned;
-          final unnamedPeople = snapshot.unnamedPeople;
+          // Computed once per build and reused below.
+          final faces = snapshot.namingQueue(includeSmall: _showSmall);
+          final questions =
+              ref.watch(samePersonQuestionsProvider).valueOrNull?.length ?? 0;
+          final allGroups = snapshot.namingGroups(includeSmall: true);
+          final allFaces = _showSmall
+              ? faces
+              : snapshot.namingQueue(includeSmall: true);
+          // Largest look-alike groups first: usually the people seen most.
+          final unnamedPeople = snapshot.namingGroups(includeSmall: _showSmall)
+            ..sort((a, b) {
+              final bySize = b.faces.length.compareTo(a.faces.length);
+              return bySize != 0 ? bySize : a.record.id.compareTo(b.record.id);
+            });
+          final hiddenSmall =
+              allFaces.length -
+              snapshot.namingQueue().length +
+              allGroups.length -
+              snapshot.namingGroups().length;
+          final toName = faces.length + unnamedPeople.length;
+          // A face named or dismissed elsewhere leaves the selection.
+          final open = {for (final f in faces) f.id};
+          _pickedFaces.retainWhere(open.contains);
           return LayoutBuilder(
             builder: (context, box) {
               final large = MediaQuery.textScalerOf(context).scale(14) > 21;
@@ -297,7 +515,7 @@ class _PeopleState extends ConsumerState<PeopleScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  '${snapshot.processed} of ${snapshot.total} photos processed\n${snapshot.faces.length} faces | ${snapshot.people.length} groups',
+                                  '${snapshot.processed} of ${snapshot.total} photos processed${snapshot.state.paused ? ' | Paused' : ''}\n${snapshot.faces.length} faces | ${snapshot.people.length} groups',
                                 ),
                               ),
                               IconButton(
@@ -366,16 +584,31 @@ class _PeopleState extends ConsumerState<PeopleScreen> {
                               ),
                             ),
                           ),
-                        if (!_unassigned && snapshot.facesToName > 0)
+                        if (questions > 0)
+                          ListTile(
+                            key: const ValueKey('same-person-entry'),
+                            leading: const Icon(Icons.compare_outlined),
+                            title: const Text('Same person?'),
+                            subtitle: Text(
+                              '$questions quick question${questions == 1 ? '' : 's'} '
+                              'to make grouping more accurate',
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute<void>(
+                                builder: (_) => const SamePersonScreen(),
+                              ),
+                            ),
+                          ),
+                        if (!_unassigned && snapshot.toName() > 0)
                           ListTile(
                             key: const ValueKey('new-faces-notice'),
                             leading: const Icon(
                               Icons.person_add_alt_1_outlined,
                             ),
                             title: const Text('New faces found'),
-                            subtitle: Text(
-                              '${snapshot.facesToName} faces to name',
-                            ),
+                            subtitle: Text('${snapshot.toName()} to name'),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () => setState(() => _unassigned = true),
                           ),
@@ -400,17 +633,74 @@ class _PeopleState extends ConsumerState<PeopleScreen> {
                                 setState(() => _unassigned = values.single),
                           ),
                         ),
-                        if (_unassigned)
+                        if (_unassigned && _selecting)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Wrap(
+                              spacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Stop selecting',
+                                  icon: const Icon(Icons.close),
+                                  onPressed: _endSelection,
+                                ),
+                                Text('${_pickedFaces.length} selected'),
+                                TextButton.icon(
+                                  key: const ValueKey(
+                                    'new-faces-name-selected',
+                                  ),
+                                  onPressed: _pickedFaces.isEmpty
+                                      ? null
+                                      : _nameSelected,
+                                  icon: const Icon(Icons.person_add_outlined),
+                                  label: const Text('Name selected faces'),
+                                ),
+                                TextButton.icon(
+                                  key: const ValueKey(
+                                    'new-faces-dismiss-selected',
+                                  ),
+                                  onPressed: _pickedFaces.isEmpty
+                                      ? null
+                                      : _dismissSelected,
+                                  icon: const Icon(Icons.block),
+                                  label: const Text('Not a face'),
+                                ),
+                              ],
+                            ),
+                          )
+                        else if (_unassigned)
                           Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 8,
                             ),
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                '${snapshot.facesToName} faces to name',
-                              ),
+                            // Wraps on narrow screens and with large text.
+                            child: Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              children: [
+                                Text('$toName to name'),
+                                if (hiddenSmall > 0 || _showSmall)
+                                  TextButton(
+                                    key: const ValueKey('new-faces-small'),
+                                    onPressed: () => setState(
+                                      () => _showSmall = !_showSmall,
+                                    ),
+                                    child: Text(
+                                      _showSmall
+                                          ? 'Hide small faces'
+                                          : 'Show small faces ($hiddenSmall)',
+                                    ),
+                                  ),
+                                if (faces.isNotEmpty)
+                                  TextButton(
+                                    key: const ValueKey('new-faces-select'),
+                                    onPressed: () =>
+                                        setState(() => _selecting = true),
+                                    child: const Text('Select'),
+                                  ),
+                              ],
                             ),
                           )
                         else
@@ -473,61 +763,105 @@ class _PeopleState extends ConsumerState<PeopleScreen> {
                           final face = person != null
                               ? person.cover
                               : faces[i - unnamedPeople.length];
-                          return InkWell(
-                            key: ValueKey(
-                              _unassigned
-                                  ? 'new-face-${face!.id}'
-                                  : 'named-person-${person!.record.id}',
-                            ),
-                            onTap: () => _unassigned
-                                ? assignFaces(
-                                    context,
-                                    ref,
-                                    person?.faces.map((f) => f.id).toList() ??
-                                        [face!.id],
-                                    unnamedPerson: person,
-                                  )
-                                : Navigator.push(
-                                    context,
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => PersonScreen(
-                                        personId: person!.record.id,
+                          // Individual new faces can be multi-selected;
+                          // unnamed groups are named as a whole.
+                          final selectable = _unassigned && person == null;
+                          final picked =
+                              selectable && _pickedFaces.contains(face!.id);
+                          void toggle() => setState(() {
+                            _selecting = true;
+                            if (!_pickedFaces.add(face!.id)) {
+                              _pickedFaces.remove(face.id);
+                            }
+                          });
+                          return Semantics(
+                            selected: _selecting && selectable ? picked : null,
+                            label: _selecting && selectable
+                                ? 'New face, ${picked ? 'selected' : 'not selected'}'
+                                : null,
+                            child: InkWell(
+                              key: ValueKey(
+                                _unassigned
+                                    ? 'new-face-${face!.id}'
+                                    : 'named-person-${person!.record.id}',
+                              ),
+                              onLongPress: selectable ? toggle : null,
+                              onTap: () => _unassigned && _selecting
+                                  ? (selectable ? toggle() : null)
+                                  : _unassigned
+                                  ? assignFaces(
+                                      context,
+                                      ref,
+                                      person?.faces.map((f) => f.id).toList() ??
+                                          [face!.id],
+                                      unnamedPerson: person,
+                                    )
+                                  : Navigator.push(
+                                      context,
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => PersonScreen(
+                                          personId: person!.record.id,
+                                        ),
+                                      ),
+                                    ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Center(
+                                      child: Stack(
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            child: FaceImage(face: face),
+                                          ),
+                                          if (_selecting && selectable)
+                                            Positioned(
+                                              right: 2,
+                                              top: 2,
+                                              child: Icon(
+                                                picked
+                                                    ? Icons.check_circle
+                                                    : Icons
+                                                          .radio_button_unchecked,
+                                                color: picked
+                                                    ? Colors.lightGreenAccent
+                                                    : Colors.white,
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
                                   ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Center(
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: FaceImage(face: face),
+                                  const SizedBox(height: 6),
+                                  SizedBox(
+                                    height:
+                                        MediaQuery.textScalerOf(
+                                          context,
+                                        ).scale(14) *
+                                        2.8,
+                                    child: Text(
+                                      _unassigned
+                                          ? 'Add a name'
+                                          : person!.label,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                ),
-                                const SizedBox(height: 6),
-                                SizedBox(
-                                  height:
-                                      MediaQuery.textScalerOf(
-                                        context,
-                                      ).scale(14) *
-                                      2.8,
-                                  child: Text(
-                                    _unassigned ? 'Add a name' : person!.label,
-                                    maxLines: 2,
+                                  Text(
+                                    person == null
+                                        ? 'New face found'
+                                        : '${person.photoCount} ${person.photoCount == 1 ? 'photo' : 'photos'}',
+                                    maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
                                   ),
-                                ),
-                                Text(
-                                  person == null
-                                      ? 'New face found'
-                                      : '${person.photoCount} ${person.photoCount == 1 ? 'photo' : 'photos'}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           );
                         }, childCount: count),
@@ -595,7 +929,53 @@ class _PersonState extends ConsumerState<PersonScreen> {
       ref,
       () => ref.read(peopleRepositoryProvider).merge(person.record.id, target),
     );
-    if (saved && mounted) Navigator.pop(context);
+    if (!saved || !mounted) return;
+    forgetPersonInSearch(ref, person.record.id);
+    Navigator.pop(context);
+  }
+
+  Future<void> _deletePerson(PersonView person) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete ${person.label}?'),
+        content: Text(
+          'The name and nicknames are removed. Its ${person.faces.length} '
+          'faces go back to New faces. Photos are not deleted.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete person'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final saved = await peopleAction(
+      context,
+      ref,
+      () => ref.read(peopleRepositoryProvider).deletePerson(person.record.id),
+    );
+    if (!saved || !mounted) return;
+    forgetPersonInSearch(ref, person.record.id);
+    Navigator.pop(context);
+  }
+
+  /// Searches this person's photos (works for hidden people too, because the
+  /// user chose them explicitly).
+  void _searchPhotos(PersonView person) {
+    ref.invalidate(peopleNameChoicesProvider);
+    ref.invalidate(peopleIgnoredNamesProvider);
+    ref.read(searchQueryProvider.notifier).state = '';
+    ref.read(searchFiltersProvider.notifier).state = SearchFilters(
+      personIds: {person.record.id},
+    );
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
@@ -618,10 +998,20 @@ class _PersonState extends ConsumerState<PersonScreen> {
         actions: [
           if (person != null) ...[
             IconButton(
+              key: const ValueKey('person-search-photos'),
+              tooltip: 'Search photos of ${person.label}',
+              icon: const Icon(Icons.image_search_outlined),
+              onPressed: () => _searchPhotos(person),
+            ),
+            IconButton(
               tooltip: 'Edit name',
               icon: const Icon(Icons.edit_outlined),
               onPressed: () async {
-                final result = await editPersonName(context, person: person);
+                final result = await editPersonName(
+                  context,
+                  person: person,
+                  currentSelf: snapshot?.self,
+                );
                 if (result != null && context.mounted) {
                   await peopleAction(
                     context,
@@ -661,11 +1051,16 @@ class _PersonState extends ConsumerState<PersonScreen> {
                     _selected.clear();
                   });
                 }
+                if (value == 'delete') _deletePerson(person);
               },
               itemBuilder: (_) => [
                 const PopupMenuItem(
                   value: 'merge',
                   child: Text('Merge with another person'),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Delete person'),
                 ),
                 PopupMenuItem(
                   value: 'hide',
@@ -686,6 +1081,7 @@ class _PersonState extends ConsumerState<PersonScreen> {
           ? const Center(child: Text('This person is no longer available.'))
           : Column(
               children: [
+                _SuggestionsEntry(person: person),
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: SegmentedButton<bool>(
@@ -788,4 +1184,184 @@ class _PersonState extends ConsumerState<PersonScreen> {
             ),
     );
   }
+}
+
+/// Entry to the confirm-only similar-faces review for one person.
+class _SuggestionsEntry extends ConsumerWidget {
+  const _SuggestionsEntry({required this.person});
+  final PersonView person;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final references = person.faces
+        .where(
+          (f) =>
+              f.assignment == 'manual' &&
+              f.quality == 'ready' &&
+              f.vector != null,
+        )
+        .length;
+    final result = references == 0
+        ? null
+        : ref
+              .watch(
+                personSuggestionsProvider((
+                  personId: person.record.id,
+                  limit: 1,
+                )),
+              )
+              .valueOrNull;
+    final subtitle = references == 0
+        ? 'Needs a clear, large face of ${person.label} first.'
+        : result != null && result.eligible == 0
+        ? 'No unnamed detailed faces to compare right now.'
+        : 'Unnamed faces ordered by similarity to ${person.label}. '
+              'Nothing is added until you confirm.';
+    return ListTile(
+      key: const ValueKey('person-suggestions-entry'),
+      dense: true,
+      visualDensity: VisualDensity.compact,
+      enabled: references > 0,
+      leading: const Icon(Icons.face_retouching_natural_outlined),
+      title: Text(
+        result == null || result.eligible == 0
+            ? 'Review similar faces'
+            : 'Review similar faces (${result.eligible})',
+      ),
+      subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => PersonSuggestionsScreen(personId: person.record.id),
+        ),
+      ),
+    );
+  }
+}
+
+/// Faces the user marked "Not a face"; restoring returns them to New faces.
+class DismissedFacesScreen extends ConsumerStatefulWidget {
+  const DismissedFacesScreen({super.key});
+  @override
+  ConsumerState<DismissedFacesScreen> createState() => _DismissedState();
+}
+
+class _DismissedState extends ConsumerState<DismissedFacesScreen> {
+  final _picked = <String>{};
+  @override
+  Widget build(BuildContext context) {
+    final snapshot = ref.watch(peopleSnapshotProvider).valueOrNull;
+    final faces = snapshot?.dismissedFaces ?? const [];
+    return Scaffold(
+      appBar: AppBar(title: const Text('Not a face')),
+      bottomNavigationBar: _picked.isEmpty
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Expanded(child: Text('${_picked.length} selected')),
+                    FilledButton(
+                      key: const ValueKey('dismissed-restore'),
+                      onPressed: () async {
+                        final ids = _picked.toList();
+                        await peopleAction(
+                          context,
+                          ref,
+                          () => ref
+                              .read(peopleRepositoryProvider)
+                              .assign(ids, null),
+                        );
+                        if (mounted) setState(_picked.clear);
+                      },
+                      child: const Text('Restore'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+      body: snapshot == null
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Faces you marked Not a face are hidden from New faces. '
+                    'Restore any that are real faces.',
+                  ),
+                ),
+                Expanded(
+                  child: faces.isEmpty
+                      ? const Center(child: Text('No faces marked Not a face.'))
+                      : GridView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: faces.length,
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 140,
+                                mainAxisSpacing: 8,
+                                crossAxisSpacing: 8,
+                              ),
+                          itemBuilder: (context, i) {
+                            final face = faces[i];
+                            final picked = _picked.contains(face.id);
+                            return Semantics(
+                              selected: picked,
+                              label:
+                                  'Face marked Not a face, ${picked ? 'selected' : 'not selected'}',
+                              child: InkWell(
+                                key: ValueKey('dismissed-${face.id}'),
+                                onTap: () => setState(() {
+                                  if (!_picked.add(face.id)) {
+                                    _picked.remove(face.id);
+                                  }
+                                }),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    FaceImage(face: face),
+                                    Positioned(
+                                      right: 2,
+                                      top: 2,
+                                      child: Icon(
+                                        picked
+                                            ? Icons.check_circle
+                                            : Icons.radio_button_unchecked,
+                                        color: picked
+                                            ? Colors.lightGreenAccent
+                                            : Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+/// A deleted or merged person must not linger in the search filters, where
+/// it would read as "No photos of Unnamed person".
+void forgetPersonInSearch(WidgetRef ref, String personId) {
+  final filters = ref.read(searchFiltersProvider);
+  if (!{
+    ...filters.personIds,
+    ...filters.anyPersonIds,
+    ...filters.excludedPersonIds,
+  }.contains(personId)) {
+    return;
+  }
+  ref.read(searchFiltersProvider.notifier).state = filters.withPeople(
+    required: {...filters.personIds}..remove(personId),
+    any: {...filters.anyPersonIds}..remove(personId),
+    excluded: {...filters.excludedPersonIds}..remove(personId),
+  );
 }

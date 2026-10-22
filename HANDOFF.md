@@ -11,6 +11,7 @@ The active app is `pixelsearch_app/`. The obsolete `app/` demo and concatenated
 source snapshot were removed from the active tree; Git history retains them.
 Historical plans are under `docs/archive/` and are not current capability claims.
 
-Keep local deliverables in ignored `output/`, temporary work in ignored `tmp/`,
-and private evaluation data in ignored `pixelsearch_app/local_evaluation/`.
+Keep local deliverables in the ignored `output/`, `reports/`,
+`PIXELSEARCH_COPYRIGHT_SOURCE/` and `.impeccable/` folders, temporary work in ignored
+`tmp/`, and private evaluation data in ignored `pixelsearch_app/local_evaluation/`.
 Never commit device databases, gallery images, face crops, credentials or APKs.
