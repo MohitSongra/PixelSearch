@@ -33,8 +33,10 @@ class OnnxTextEmbedder extends OnnxEncoder implements TextEmbedder {
   @override
   Future<Float32List> embed(String text) async {
     final ids = tokenizer.tokenize(text); // Int64List(contextLength)
-    final input = OrtValueTensor.createTensorWithDataList(
-        ids, [1, AiContract.contextLength]);
+    final input = OrtValueTensor.createTensorWithDataList(ids, [
+      1,
+      AiContract.contextLength,
+    ]);
     return runEmbedding(input, AiContract.textInputName);
   }
 }

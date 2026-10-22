@@ -28,75 +28,84 @@ class PhotoRepository {
   Future<int> photoCount() => _db.photoCount();
 
   // Embeddings --------------------------------------------------------------
-  Future<void> saveEmbedding(String photoId, Float32List vector,
-          {String model = modelId, String version = embeddingVersion}) =>
-      _db.upsertEmbedding(EmbeddingRowsCompanion.insert(
-        photoId: photoId,
-        modelId: model,
-        embeddingVersion: Value(version),
-        dim: vector.length,
-        vector: encodeVector(vector),
-        createdAtMs: Value(DateTime.now().millisecondsSinceEpoch),
-      ));
+  Future<void> saveEmbedding(
+    String photoId,
+    Float32List vector, {
+    String model = modelId,
+    String version = embeddingVersion,
+  }) => _db.upsertEmbedding(
+    EmbeddingRowsCompanion.insert(
+      photoId: photoId,
+      modelId: model,
+      embeddingVersion: Value(version),
+      dim: vector.length,
+      vector: encodeVector(vector),
+      createdAtMs: Value(DateTime.now().millisecondsSinceEpoch),
+    ),
+  );
 
   /// All current-version embeddings for [model], keyed by photo id (loaded into
   /// memory for the M6 cosine scan).
-  Future<Map<String, Float32List>> loadEmbeddings(
-      {String model = modelId, String version = embeddingVersion}) async {
+  Future<Map<String, Float32List>> loadEmbeddings({
+    String model = modelId,
+    String version = embeddingVersion,
+  }) async {
     final rows = await _db.embeddingsFor(model, version);
     return {for (final r in rows) r.photoId: decodeVector(r.vector)};
   }
 
   /// Photo ids still awaiting a current-version embedding — the M5 work queue.
-  Future<List<String>> photoIdsNeedingEmbedding(
-          {String model = modelId, String version = embeddingVersion}) =>
-      _db.photoIdsNeedingEmbedding(model, version);
+  Future<List<String>> photoIdsNeedingEmbedding({
+    String model = modelId,
+    String version = embeddingVersion,
+  }) => _db.photoIdsNeedingEmbedding(model, version);
 }
 
 // --- pure mapping + vector codec (unit-tested, no I/O) ----------------------
 
 PhotoRowsCompanion photoToRow(Photo p) => PhotoRowsCompanion.insert(
-      id: p.id,
-      source: p.source.index,
-      assetName: Value(p.assetName),
-      title: Value(p.title),
-      caption: Value(p.caption),
-      tagsJson: Value(_encodeTags(p.tags)),
-      dateMs: p.date.millisecondsSinceEpoch,
-      lat: Value(p.lat),
-      lng: Value(p.lng),
-      place: Value(p.place),
-      album: Value(p.album),
-      thumbPath: Value(p.thumbPath),
-      createdAtMs: Value(DateTime.now().millisecondsSinceEpoch),
-    );
+  id: p.id,
+  source: p.source.index,
+  assetName: Value(p.assetName),
+  title: Value(p.title),
+  caption: Value(p.caption),
+  tagsJson: Value(_encodeTags(p.tags)),
+  dateMs: p.date.millisecondsSinceEpoch,
+  lat: Value(p.lat),
+  lng: Value(p.lng),
+  place: Value(p.place),
+  album: Value(p.album),
+  thumbPath: Value(p.thumbPath),
+  createdAtMs: Value(DateTime.now().millisecondsSinceEpoch),
+);
 
 Photo rowToPhoto(PhotoRow r) => Photo(
-      id: r.id,
-      assetName: r.assetName,
-      title: r.title,
-      caption: r.caption,
-      tags: _decodeTags(r.tagsJson),
-      date: DateTime.fromMillisecondsSinceEpoch(r.dateMs),
-      lat: r.lat,
-      lng: r.lng,
-      place: r.place,
-      album: r.album,
-      source: PhotoSource
-          .values[r.source.clamp(0, PhotoSource.values.length - 1)],
-      // Written by the M5 indexer, read-only here: the cached thumbnail the grid
-      // renders, plus the M6 hybrid-ranking signals.
-      thumbPath: r.thumbPath,
-      labels: _decodeLabels(r.labelsJson),
-      faceCount: _decodeCount(r.facesJson),
-    );
+  id: r.id,
+  assetName: r.assetName,
+  title: r.title,
+  caption: r.caption,
+  tags: _decodeTags(r.tagsJson),
+  date: DateTime.fromMillisecondsSinceEpoch(r.dateMs),
+  lat: r.lat,
+  lng: r.lng,
+  place: r.place,
+  album: r.album,
+  source: PhotoSource.values[r.source.clamp(0, PhotoSource.values.length - 1)],
+  // Written by the M5 indexer, read-only here: the cached thumbnail the grid
+  // renders, plus the M6 hybrid-ranking signals.
+  thumbPath: r.thumbPath,
+  labels: _decodeLabels(r.labelsJson),
+  faceCount: _decodeCount(r.facesJson),
+);
 
 String _encodeTags(List<String> tags) => jsonEncode(tags);
 
 List<String> _decodeTags(String s) {
   try {
     final decoded = jsonDecode(s);
-    return decoded is List ? decoded.map((e) => e.toString()).toList() : <String>[];
+    return decoded is List
+        ? decoded.map((e) => e.toString()).toList()
+        : <String>[];
   } catch (_) {
     return <String>[];
   }

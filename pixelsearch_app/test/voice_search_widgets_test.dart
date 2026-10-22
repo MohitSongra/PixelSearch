@@ -296,17 +296,30 @@ Future<void> _addPeople(_Fixture f, {bool hiddenAsha = false}) async {
 }
 
 void main() {
-  testWidgets('assigned names and explicit person filters never reach the cloud assistant', (tester) async {
-    final f = await _open(tester);
-    final people = f.scope.read(peopleRepositoryProvider);
-    await people.enable();
-    await people.db.into(people.db.peoplePersons).insert(PeoplePersonsCompanion.insert(
-      id: 'local-person', name: const Value('Alice'), createdMs: 1));
-    await tester.enterText(_message, 'Alice at the beach');
-    await _tap(tester, find.text('Refine / translate online'));
-    expect(f.requests, isEmpty);
-    expect(find.textContaining('Named people searches stay on this device'), findsOneWidget);
-  });
+  testWidgets(
+    'assigned names and explicit person filters never reach the cloud assistant',
+    (tester) async {
+      final f = await _open(tester);
+      final people = f.scope.read(peopleRepositoryProvider);
+      await people.enable();
+      await people.db
+          .into(people.db.peoplePersons)
+          .insert(
+            PeoplePersonsCompanion.insert(
+              id: 'local-person',
+              name: const Value('Alice'),
+              createdMs: 1,
+            ),
+          );
+      await tester.enterText(_message, 'Alice at the beach');
+      await _tap(tester, find.text('Refine / translate online'));
+      expect(f.requests, isEmpty);
+      expect(
+        find.textContaining('Named people searches stay on this device'),
+        findsOneWidget,
+      );
+    },
+  );
   testWidgets(
     'permission focus loss does not cancel; capture waits for resume',
     (tester) async {

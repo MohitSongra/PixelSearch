@@ -67,13 +67,17 @@ abstract class OnnxEncoder {
       // inside the graph (~1e-7 on an L2-normalised vector), never the model.
       final threads = _intraOpThreads;
       _options!.setIntraOpNumThreads(threads);
-      log.info('$label session: intraOpThreads=$threads '
-          '(${Platform.numberOfProcessors} cores)');
+      log.info(
+        '$label session: intraOpThreads=$threads '
+        '(${Platform.numberOfProcessors} cores)',
+      );
       final sw = Stopwatch()..start();
       _session = OrtSession.fromFile(file, _options!);
       sw.stop();
-      log.info('loaded ${AiContract.modelId} $label encoder in '
-          '${sw.elapsedMilliseconds}ms');
+      log.info(
+        'loaded ${AiContract.modelId} $label encoder in '
+        '${sw.elapsedMilliseconds}ms',
+      );
     } catch (e, st) {
       log.error('$label load failed', e, st);
       await dispose();
@@ -83,7 +87,10 @@ abstract class OnnxEncoder {
 
   /// Run the session on a single [input] tensor (named [inputName]) and return
   /// the L2-normalized 512-d embedding. Always releases [input] and the outputs.
-  Future<Float32List> runEmbedding(OrtValueTensor input, String inputName) async {
+  Future<Float32List> runEmbedding(
+    OrtValueTensor input,
+    String inputName,
+  ) async {
     final session = _session;
     if (session == null) {
       input.release();
@@ -104,9 +111,11 @@ abstract class OnnxEncoder {
         for (final v in embedding) {
           sumSq += v * v;
         }
-        log.info('$label encoder ran its first inference in '
-            '${sw.elapsedMilliseconds}ms → ${embedding.length}-d embedding, '
-            'norm=${sqrt(sumSq).toStringAsFixed(6)} (want 1.000000)');
+        log.info(
+          '$label encoder ran its first inference in '
+          '${sw.elapsedMilliseconds}ms → ${embedding.length}-d embedding, '
+          'norm=${sqrt(sumSq).toStringAsFixed(6)} (want 1.000000)',
+        );
       }
       return embedding;
     } on OnnxEncoderException {
@@ -141,7 +150,8 @@ abstract class OnnxEncoder {
     final row = (batch.first as List).cast<double>();
     if (row.length != AiContract.embeddingDim) {
       throw OnnxEncoderException(
-          '$label expected ${AiContract.embeddingDim}-d embedding, got ${row.length}');
+        '$label expected ${AiContract.embeddingDim}-d embedding, got ${row.length}',
+      );
     }
     return Float32List.fromList(row);
   }

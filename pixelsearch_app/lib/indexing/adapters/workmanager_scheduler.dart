@@ -14,18 +14,17 @@ class WorkManagerScheduler implements BackgroundScheduler {
 
   @override
   Future<void> scheduleIndexing() => Workmanager().registerOneOffTask(
-        kIndexUniqueName,
-        kIndexTaskName,
-        existingWorkPolicy: ExistingWorkPolicy.keep,
-        backoffPolicy: BackoffPolicy.exponential,
-        backoffPolicyDelay: const Duration(seconds: 30),
-        constraints: Constraints(networkType: NetworkType.notRequired),
-      );
+    kIndexUniqueName,
+    kIndexTaskName,
+    existingWorkPolicy: ExistingWorkPolicy.keep,
+    backoffPolicy: BackoffPolicy.exponential,
+    backoffPolicyDelay: const Duration(seconds: 30),
+    constraints: Constraints(networkType: NetworkType.notRequired),
+  );
 
   @override
   Future<void> cancel() => Workmanager().cancelByUniqueName(kIndexUniqueName);
 
   @override
-  Future<bool> isScheduled() async =>
-      true; // WorkManager has no direct query; unused while nothing schedules.
+  Future<bool> isScheduled() async => true; // WorkManager has no direct query; unused while nothing schedules.
 }

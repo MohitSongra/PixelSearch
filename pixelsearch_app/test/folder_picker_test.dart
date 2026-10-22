@@ -109,10 +109,7 @@ void main() {
     await IndexingPreferencesRepository(
       db,
     ).save(FolderSelection(folderIds: {'gone'}));
-    await mount(
-      tester,
-      folders: FolderCatalog(catalog.folders, limited: true),
-    );
+    await mount(tester, folders: FolderCatalog(catalog.folders, limited: true));
     expect(find.text('Limited photo access'), findsOneWidget);
     expect(find.text('Unavailable folder'), findsOneWidget);
     expect(

@@ -79,25 +79,33 @@ class ModelLocator {
       _present('image', imageCandidates);
 
   Future<List<ResolvedModel>> _present(
-      String label, List<String> candidates) async {
+    String label,
+    List<String> candidates,
+  ) async {
     final dir = await modelsDir();
     final found = <ResolvedModel>[];
     for (final name in candidates) {
       final file = File(p.join(dir, name));
       if (!file.existsSync()) continue;
-      found.add(ResolvedModel(
-        path: file.path,
-        fileName: name,
-        precision: name.contains('_fp16') ? 'fp16' : 'fp32',
-        bytes: file.lengthSync(),
-      ));
+      found.add(
+        ResolvedModel(
+          path: file.path,
+          fileName: name,
+          precision: name.contains('_fp16') ? 'fp16' : 'fp32',
+          bytes: file.lengthSync(),
+        ),
+      );
     }
     if (found.isEmpty) {
-      log.info('$label encoder → NOT FOUND. Looked in $dir for '
-          '${candidates.join(" then ")}');
+      log.info(
+        '$label encoder → NOT FOUND. Looked in $dir for '
+        '${candidates.join(" then ")}',
+      );
     } else {
-      log.info('$label encoder candidates in $dir: '
-          '${found.map((m) => m.toString()).join(", ")}');
+      log.info(
+        '$label encoder candidates in $dir: '
+        '${found.map((m) => m.toString()).join(", ")}',
+      );
     }
     return found;
   }

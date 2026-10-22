@@ -36,25 +36,30 @@ class IndexStore {
           mtimeMs: r.mtimeMs,
           byteSize: r.byteSize,
           embeddingVersion: r.embeddingVersion,
-        )
+        ),
     ];
   }
 
   /// Persist a batch of processed items (photo rows + embeddings) atomically.
-  Future<void> commitBatch(List<IndexedItem> items, {required int nowMs}) async {
+  Future<void> commitBatch(
+    List<IndexedItem> items, {
+    required int nowMs,
+  }) async {
     if (items.isEmpty) return;
     final photos = <PhotoRowsCompanion>[];
     final embeds = <EmbeddingRowsCompanion>[];
     for (final it in items) {
       photos.add(_photoCompanion(it, nowMs));
-      embeds.add(EmbeddingRowsCompanion.insert(
-        photoId: it.asset.id,
-        modelId: modelId,
-        embeddingVersion: Value(embeddingVersion),
-        dim: it.embedding.length,
-        vector: encodeVector(it.embedding),
-        createdAtMs: Value(nowMs),
-      ));
+      embeds.add(
+        EmbeddingRowsCompanion.insert(
+          photoId: it.asset.id,
+          modelId: modelId,
+          embeddingVersion: Value(embeddingVersion),
+          dim: it.embedding.length,
+          vector: encodeVector(it.embedding),
+          createdAtMs: Value(nowMs),
+        ),
+      );
     }
     await _db.transaction(() async {
       await _db.upsertPhotos(photos);
@@ -65,15 +70,19 @@ class IndexStore {
   Future<void> deleteAssets(List<String> ids) => _db.deleteAssets(ids);
 
   // --- checkpoints (crash-recovery / resume, via the singleton IndexStateRows) ---
-  Future<void> saveCheckpoint(
-          {required int total, required int embedded, int nowMs = 0}) =>
-      _db.putIndexState(IndexStateRowsCompanion(
-        modelId: Value(modelId),
-        totalPhotos: Value(total),
-        embeddedCount: Value(embedded),
-        lastRunMs: Value(nowMs),
-        modelReady: const Value(true),
-      ));
+  Future<void> saveCheckpoint({
+    required int total,
+    required int embedded,
+    int nowMs = 0,
+  }) => _db.putIndexState(
+    IndexStateRowsCompanion(
+      modelId: Value(modelId),
+      totalPhotos: Value(total),
+      embeddedCount: Value(embedded),
+      lastRunMs: Value(nowMs),
+      modelReady: const Value(true),
+    ),
+  );
 
   Future<({int total, int embedded})> loadCheckpoint() async {
     final s = await _db.indexState();

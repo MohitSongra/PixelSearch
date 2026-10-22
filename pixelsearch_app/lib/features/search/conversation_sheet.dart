@@ -400,7 +400,9 @@ class _ConversationState extends ConsumerState<ConversationSheet>
           references.any(
             (q) => q.hasPeople || q.needsChoice || q.mentions.isNotEmpty,
           )) {
-        throw StateError('Named people searches stay on this device. Use Search locally with the editable English query.');
+        throw StateError(
+          'Named people searches stay on this device. Use Search locally with the editable English query.',
+        );
       }
       final data = await ref
           .read(enhancementClientProvider)

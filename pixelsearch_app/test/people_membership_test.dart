@@ -19,10 +19,10 @@ void main() {
     const universe = {'p1', 'p2', 'p3', 'p4', 'p5', 'p6'};
 
     test('required people intersect', () {
-      expect(
-        matchPeoplePhotos(photosByPerson, required: {'asha', 'ben'}),
-        {'p2', 'p3'},
-      );
+      expect(matchPeoplePhotos(photosByPerson, required: {'asha', 'ben'}), {
+        'p2',
+        'p3',
+      });
       expect(
         matchPeoplePhotos(photosByPerson, required: {'asha', 'ben', 'chen'}),
         {'p3'},
@@ -35,10 +35,12 @@ void main() {
     });
 
     test('any-of people union', () {
-      expect(
-        matchPeoplePhotos(photosByPerson, anyOf: {'ben', 'chen'}),
-        {'p2', 'p3', 'p4', 'p5'},
-      );
+      expect(matchPeoplePhotos(photosByPerson, anyOf: {'ben', 'chen'}), {
+        'p2',
+        'p3',
+        'p4',
+        'p5',
+      });
     });
 
     test('excluded people are subtracted', () {
@@ -150,23 +152,19 @@ void main() {
         'p5',
       });
       expect(
-        matchPeoplePhotos(photosByPerson, required: {'ghost'}, universe: universe),
+        matchPeoplePhotos(
+          photosByPerson,
+          required: {'ghost'},
+          universe: universe,
+        ),
         isEmpty,
       );
     });
 
     test('inputs are never mutated', () {
       final universeCopy = {...universe};
-      matchPeoplePhotos(
-        photosByPerson,
-        required: {'asha'},
-        excluded: {'ben'},
-      );
-      matchPeoplePhotos(
-        photosByPerson,
-        anyOf: {'chen'},
-        excluded: {'ben'},
-      );
+      matchPeoplePhotos(photosByPerson, required: {'asha'}, excluded: {'ben'});
+      matchPeoplePhotos(photosByPerson, anyOf: {'chen'}, excluded: {'ben'});
       matchPeoplePhotos(
         photosByPerson,
         excluded: {'ben'},
@@ -285,9 +283,7 @@ void main() {
 
     test('peopleDirectory leaves out hidden and nameless people', () async {
       final snapshot = await repo.load();
-      final visible = {
-        for (final p in peopleDirectory(snapshot)) p.id: p,
-      };
+      final visible = {for (final p in peopleDirectory(snapshot)) p.id: p};
       expect(visible.keys.toSet(), {ashaId, devId, aliasOnlyId});
       expect(visible[ashaId]!.name, 'Asha');
       expect(visible[ashaId]!.aliases, ['Ash']);
@@ -296,12 +292,7 @@ void main() {
       expect(visible[aliasOnlyId]!.aliases, ['Kai']);
 
       final all = peopleDirectory(snapshot, includeHidden: true);
-      expect(all.map((p) => p.id).toSet(), {
-        ashaId,
-        benId,
-        devId,
-        aliasOnlyId,
-      });
+      expect(all.map((p) => p.id).toSet(), {ashaId, benId, devId, aliasOnlyId});
       expect(peopleDirectory(null), isEmpty);
     });
 
@@ -316,19 +307,21 @@ void main() {
       expect(hidden.query, 'Ben at the beach');
     });
 
-    test('photoIdsFor is AND across people and includes hidden people',
-        () async {
-      expect(await repo.photoIdsFor({ashaId}), {'p1', 'p2', 'p3', 'p6'});
-      expect(await repo.photoIdsFor({ashaId, benId}), {'p1'});
-      expect(await repo.photoIdsFor({benId}), {'p1', 'p5'});
-      expect(await repo.photoIdsFor({devId, unnamedId}), {'p7'});
-      expect(await repo.photoIdsFor({ashaId, 'ghost'}), isEmpty);
-      final index = PeoplePhotoIndex.of(await repo.load());
-      expect(
-        await repo.photoIdsFor({ashaId, benId}),
-        matchPeoplePhotos(index.photosByPerson, required: {ashaId, benId}),
-      );
-    });
+    test(
+      'photoIdsFor is AND across people and includes hidden people',
+      () async {
+        expect(await repo.photoIdsFor({ashaId}), {'p1', 'p2', 'p3', 'p6'});
+        expect(await repo.photoIdsFor({ashaId, benId}), {'p1'});
+        expect(await repo.photoIdsFor({benId}), {'p1', 'p5'});
+        expect(await repo.photoIdsFor({devId, unnamedId}), {'p7'});
+        expect(await repo.photoIdsFor({ashaId, 'ghost'}), isEmpty);
+        final index = PeoplePhotoIndex.of(await repo.load());
+        expect(
+          await repo.photoIdsFor({ashaId, benId}),
+          matchPeoplePhotos(index.photosByPerson, required: {ashaId, benId}),
+        );
+      },
+    );
 
     test('photoIdsFor rejects an empty selection', () async {
       await expectLater(repo.photoIdsFor({}), throwsArgumentError);

@@ -29,7 +29,11 @@ class SearchFilters {
       anyPersonIds.isNotEmpty ||
       excludedPersonIds.isNotEmpty;
   bool get isEmpty =>
-      from == null && until == null && album == null && place == null && !hasPeople;
+      from == null &&
+      until == null &&
+      album == null &&
+      place == null &&
+      !hasPeople;
   bool allows(Photo p) =>
       (from == null || !p.date.isBefore(from!)) &&
       (until == null || p.date.isBefore(until!)) &&
@@ -85,7 +89,8 @@ class SearchFilters {
     if (until != null) 'until': until!.toIso8601String(),
     if (album != null) 'album': album,
     if (place != null) 'place': place,
-    if (includePeople && personIds.isNotEmpty) 'person_ids': personIds.toList()..sort(),
+    if (includePeople && personIds.isNotEmpty)
+      'person_ids': personIds.toList()..sort(),
     if (includePeople && anyPersonIds.isNotEmpty)
       'any_person_ids': anyPersonIds.toList()..sort(),
     if (includePeople && excludedPersonIds.isNotEmpty)
@@ -94,17 +99,28 @@ class SearchFilters {
 }
 
 class SearchRequest {
-  const SearchRequest(this.query, {this.filters = const SearchFilters(), this.eligiblePhotoIds});
+  const SearchRequest(
+    this.query, {
+    this.filters = const SearchFilters(),
+    this.eligiblePhotoIds,
+  });
   final String query;
   final SearchFilters filters;
   final Set<String>? eligiblePhotoIds;
   bool get constrained => !filters.isEmpty || eligiblePhotoIds != null;
   List<Photo> filterCorpus(List<Photo> corpus) {
     if (filters.hasPeople && eligiblePhotoIds == null) {
-      throw StateError('Person filters must be resolved locally before searching.');
+      throw StateError(
+        'Person filters must be resolved locally before searching.',
+      );
     }
-    return corpus.where((p) => filters.allows(p) &&
-      (eligiblePhotoIds == null || eligiblePhotoIds!.contains(p.id))).toList();
+    return corpus
+        .where(
+          (p) =>
+              filters.allows(p) &&
+              (eligiblePhotoIds == null || eligiblePhotoIds!.contains(p.id)),
+        )
+        .toList();
   }
 }
 

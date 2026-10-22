@@ -40,8 +40,10 @@ class ClipTokenizer {
   // --- construction --------------------------------------------------------
 
   /// Build from the decompressed vocab text (the pure, platform-free path).
-  factory ClipTokenizer.fromVocabText(String vocabText,
-      {int contextLength = AiContract.contextLength}) {
+  factory ClipTokenizer.fromVocabText(
+    String vocabText, {
+    int contextLength = AiContract.contextLength,
+  }) {
     final byteEncoder = _bytesToUnicode();
 
     // merges = lines[1 : 49152-256-2+1]  (== lines[1:48895]) — matches open_clip.
@@ -77,19 +79,31 @@ class ClipTokenizer {
       caseSensitive: false,
     );
 
-    return ClipTokenizer._(byteEncoder, encoder, bpeRanks, pat,
-        encoder['<start_of_text>']!, encoder['<end_of_text>']!, contextLength);
+    return ClipTokenizer._(
+      byteEncoder,
+      encoder,
+      bpeRanks,
+      pat,
+      encoder['<start_of_text>']!,
+      encoder['<end_of_text>']!,
+      contextLength,
+    );
   }
 
   /// Build from gzipped vocab bytes (native — uses `dart:io` gzip).
-  factory ClipTokenizer.fromGzipBytes(Uint8List gz,
-          {int contextLength = AiContract.contextLength}) =>
-      ClipTokenizer.fromVocabText(utf8.decode(gzip.decode(gz)),
-          contextLength: contextLength);
+  factory ClipTokenizer.fromGzipBytes(
+    Uint8List gz, {
+    int contextLength = AiContract.contextLength,
+  }) => ClipTokenizer.fromVocabText(
+    utf8.decode(gzip.decode(gz)),
+    contextLength: contextLength,
+  );
 
   /// Build from a gzipped vocab file on disk (tests / provisioned model dir).
-  static Future<ClipTokenizer> fromGzipFile(String path,
-      {int contextLength = AiContract.contextLength}) async {
+  static Future<ClipTokenizer> fromGzipFile(
+    String path, {
+    int contextLength = AiContract.contextLength,
+  }) async {
     final bytes = await File(path).readAsBytes();
     return ClipTokenizer.fromGzipBytes(bytes, contextLength: contextLength);
   }
@@ -100,8 +114,10 @@ class ClipTokenizer {
     int contextLength = AiContract.contextLength,
   }) async {
     final data = await rootBundle.load(assetKey);
-    return ClipTokenizer.fromGzipBytes(data.buffer.asUint8List(),
-        contextLength: contextLength);
+    return ClipTokenizer.fromGzipBytes(
+      data.buffer.asUint8List(),
+      contextLength: contextLength,
+    );
   }
 
   // --- public API ----------------------------------------------------------
@@ -253,9 +269,13 @@ class ClipTokenizer {
         .replaceAll('&quot;', '"')
         .replaceAll('&#39;', "'")
         .replaceAll('&apos;', "'")
-        .replaceAllMapped(RegExp(r'&#x([0-9a-fA-F]+);'),
-            (m) => String.fromCharCode(int.parse(m.group(1)!, radix: 16)))
         .replaceAllMapped(
-            RegExp(r'&#(\d+);'), (m) => String.fromCharCode(int.parse(m.group(1)!)));
+          RegExp(r'&#x([0-9a-fA-F]+);'),
+          (m) => String.fromCharCode(int.parse(m.group(1)!, radix: 16)),
+        )
+        .replaceAllMapped(
+          RegExp(r'&#(\d+);'),
+          (m) => String.fromCharCode(int.parse(m.group(1)!)),
+        );
   }
 }

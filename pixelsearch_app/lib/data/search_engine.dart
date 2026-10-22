@@ -16,11 +16,7 @@ export '../domain/search/query_terms.dart' show queryTerms;
 /// Signal priority per term: an exact tag hit (3) beats a partial tag hit or an
 /// exact ML Kit label hit (2), which beats a substring hit anywhere in the
 /// caption/place/album/label blob (1).
-double keywordScore(
-  Photo p,
-  List<String> terms, {
-  bool includeLabels = true,
-}) {
+double keywordScore(Photo p, List<String> terms, {bool includeLabels = true}) {
   var score = 0.0;
   final blob = includeLabels ? p.searchBlob : p.metadataSearchBlob;
   for (final t in terms) {

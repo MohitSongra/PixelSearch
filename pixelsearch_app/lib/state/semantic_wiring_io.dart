@@ -22,8 +22,10 @@ Future<SearchBackend?> buildSemanticBackend(VectorIndex index) async {
     final model = await const ModelLocator().resolveText();
     if (model == null) return null; // not provisioned → keyword, badge honest
     final tokenizer = await ClipTokenizer.fromAsset();
-    final embedder =
-        OnnxTextEmbedder(modelPath: model.path, tokenizer: tokenizer);
+    final embedder = OnnxTextEmbedder(
+      modelPath: model.path,
+      tokenizer: tokenizer,
+    );
     return SemanticSearchBackend(embedder: embedder, index: index);
   } catch (_) {
     return null; // provisioning not ready → keyword fallback

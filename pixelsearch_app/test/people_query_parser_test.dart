@@ -524,7 +524,10 @@ void main() {
 
     test('a cleaned transcript resolves like typed text', () {
       expectPeople(
-        resolvePeopleQuery(cleanSpokenQuery('Photos of me with Asha.'), withSelf),
+        resolvePeopleQuery(
+          cleanSpokenQuery('Photos of me with Asha.'),
+          withSelf,
+        ),
         all: {'dev', 'asha'},
         query: '',
       );
@@ -558,7 +561,10 @@ void main() {
       final state = explainEmptyPeopleSearch(
         resolvePeopleQuery('me with Asha', withSelf),
         response(
-          people: const PersonFilterSummary(peopleEnabled: false, labels: labels),
+          people: const PersonFilterSummary(
+            peopleEnabled: false,
+            labels: labels,
+          ),
         ),
       )!;
       expect(state.kind, PeopleEmptyKind.peopleOff);
@@ -585,7 +591,10 @@ void main() {
       final missing = explainEmptyPeopleSearch(
         query,
         response(
-          people: const PersonFilterSummary(peopleEnabled: true, labels: labels),
+          people: const PersonFilterSummary(
+            peopleEnabled: true,
+            labels: labels,
+          ),
         ),
       )!;
       expect(missing.kind, PeopleEmptyKind.noAssignedPhotos);
@@ -728,9 +737,7 @@ void main() {
       expect(
         explainEmptyPeopleSearch(
           resolvePeopleQuery('beach', withSelf),
-          response(
-            people: const PersonFilterSummary(peopleEnabled: false),
-          ),
+          response(people: const PersonFilterSummary(peopleEnabled: false)),
         ),
         isNull,
       );
@@ -901,10 +908,9 @@ void main() {
       );
       expect(collapsed.anyOf, isEmpty);
       expect(collapsed.required, containsAll({'asha', 'ben'}));
-      expect(
-        collapsed.mentions.map((m) => m.role).toSet(),
-        {PersonRole.required},
-      );
+      expect(collapsed.mentions.map((m) => m.role).toSet(), {
+        PersonRole.required,
+      });
     });
   });
 }

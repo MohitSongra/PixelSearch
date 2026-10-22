@@ -51,14 +51,14 @@ void main() {
 
   test('upsert replaces an existing photo rather than duplicating', () async {
     Photo mk(String title) => Photo(
-          id: 'same',
-          title: title,
-          caption: '',
-          tags: const [],
-          date: DateTime.fromMillisecondsSinceEpoch(0),
-          album: '',
-          source: PhotoSource.device,
-        );
+      id: 'same',
+      title: title,
+      caption: '',
+      tags: const [],
+      date: DateTime.fromMillisecondsSinceEpoch(0),
+      album: '',
+      source: PhotoSource.device,
+    );
     await repo.savePhotos([mk('first')]);
     await repo.savePhotos([mk('second')]);
     expect(await repo.photoCount(), 1);
@@ -75,12 +75,13 @@ void main() {
         date: DateTime.fromMillisecondsSinceEpoch(0),
         album: '',
         source: PhotoSource.device,
-      )
+      ),
     ]);
 
     // Values chosen to exercise sign, fractions and exact powers of two.
     final v = Float32List.fromList(
-        List<double>.generate(512, (i) => (i - 256) / 128.0));
+      List<double>.generate(512, (i) => (i - 256) / 128.0),
+    );
     await repo.saveEmbedding('p1', v);
 
     final loaded = await repo.loadEmbeddings();
@@ -124,7 +125,7 @@ void main() {
         date: DateTime.fromMillisecondsSinceEpoch(0),
         album: '',
         source: PhotoSource.device,
-      )
+      ),
     ]);
     await repo.saveEmbedding('p1', Float32List(512)); // stored at version '1'
     expect(await repo.photoIdsNeedingEmbedding(), isEmpty);
@@ -132,24 +133,28 @@ void main() {
     expect(await repo.photoIdsNeedingEmbedding(version: '2'), ['p1']);
   });
 
-  test('index state starts as a single default row and persists updates',
-      () async {
-    final initial = await db.indexState();
-    expect(initial.id, 0);
-    expect(initial.embeddedCount, 0);
-    expect(initial.modelReady, isFalse);
+  test(
+    'index state starts as a single default row and persists updates',
+    () async {
+      final initial = await db.indexState();
+      expect(initial.id, 0);
+      expect(initial.embeddedCount, 0);
+      expect(initial.modelReady, isFalse);
 
-    await db.putIndexState(const IndexStateRowsCompanion(
-      modelId: Value('MobileCLIP-S1'),
-      totalPhotos: Value(10),
-      embeddedCount: Value(4),
-      modelReady: Value(true),
-    ));
+      await db.putIndexState(
+        const IndexStateRowsCompanion(
+          modelId: Value('MobileCLIP-S1'),
+          totalPhotos: Value(10),
+          embeddedCount: Value(4),
+          modelReady: Value(true),
+        ),
+      );
 
-    final updated = await db.indexState();
-    expect(updated.id, 0);
-    expect(updated.totalPhotos, 10);
-    expect(updated.embeddedCount, 4);
-    expect(updated.modelReady, isTrue);
-  });
+      final updated = await db.indexState();
+      expect(updated.id, 0);
+      expect(updated.totalPhotos, 10);
+      expect(updated.embeddedCount, 4);
+      expect(updated.modelReady, isTrue);
+    },
+  );
 }

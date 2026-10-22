@@ -145,7 +145,10 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (m) async { await m.createAll(); await _peopleStorageIndexes(); },
+    onCreate: (m) async {
+      await m.createAll();
+      await _peopleStorageIndexes();
+    },
     onUpgrade: (m, from, to) async {
       // v1 → v2: tag each embedding with the embedding_version that produced it.
       if (from < 2) {
@@ -196,11 +199,19 @@ class AppDatabase extends _$AppDatabase {
   );
 
   Future<void> _peopleStorageIndexes() async {
-    await customStatement('CREATE INDEX people_faces_photo ON people_faces(photo_id)');
-    await customStatement('CREATE INDEX people_faces_person ON people_faces(person_id)');
-    await customStatement('CREATE INDEX people_reviews_subset ON people_reviews(subset)');
-    await customStatement('CREATE TABLE processing_leases ('
-      'id INTEGER PRIMARY KEY, owner TEXT NOT NULL, expires_ms INTEGER NOT NULL)');
+    await customStatement(
+      'CREATE INDEX people_faces_photo ON people_faces(photo_id)',
+    );
+    await customStatement(
+      'CREATE INDEX people_faces_person ON people_faces(person_id)',
+    );
+    await customStatement(
+      'CREATE INDEX people_reviews_subset ON people_reviews(subset)',
+    );
+    await customStatement(
+      'CREATE TABLE processing_leases ('
+      'id INTEGER PRIMARY KEY, owner TEXT NOT NULL, expires_ms INTEGER NOT NULL)',
+    );
   }
 
   // --- Photos --------------------------------------------------------------

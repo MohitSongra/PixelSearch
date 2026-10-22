@@ -292,20 +292,17 @@ void main() {
       'my friend at the beach',
     );
   });
-  test(
-    'request pronouns do not turn Bob-only searches into self searches',
-    () {
-      for (final text in [
-        'show me photos of Bob',
-        'find me pictures of my friend Bob',
-        'give me all photos of Bob',
-      ]) {
-        final result = resolvePeopleQuery(text, friends);
-        expect(result.filters.personIds, {'bob'}, reason: text);
-        expect(result.query, isEmpty, reason: text);
-      }
-    },
-  );
+  test('request pronouns do not turn Bob-only searches into self searches', () {
+    for (final text in [
+      'show me photos of Bob',
+      'find me pictures of my friend Bob',
+      'give me all photos of Bob',
+    ]) {
+      final result = resolvePeopleQuery(text, friends);
+      expect(result.filters.personIds, {'bob'}, reason: text);
+      expect(result.query, isEmpty, reason: text);
+    }
+  });
   test('names, nicknames, scene phrases and local years compose', () {
     final query = resolvePeopleQuery(
       'Photos of Alice at the beach last year',

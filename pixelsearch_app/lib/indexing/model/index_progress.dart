@@ -1,5 +1,14 @@
 /// Coarse phase of an indexing run, surfaced to the UI and notifications.
-enum IndexPhase { idle, scanning, planning, indexing, finalizing, done, cancelled, error }
+enum IndexPhase {
+  idle,
+  scanning,
+  planning,
+  indexing,
+  finalizing,
+  done,
+  cancelled,
+  error,
+}
 
 /// Immutable progress snapshot streamed by the indexing service.
 class IndexProgress {
@@ -38,16 +47,15 @@ class IndexProgress {
     int? deleted,
     String? currentId,
     String? message,
-  }) =>
-      IndexProgress(
-        phase: phase ?? this.phase,
-        total: total ?? this.total,
-        completed: completed ?? this.completed,
-        failed: failed ?? this.failed,
-        deleted: deleted ?? this.deleted,
-        currentId: currentId ?? this.currentId,
-        message: message ?? this.message,
-      );
+  }) => IndexProgress(
+    phase: phase ?? this.phase,
+    total: total ?? this.total,
+    completed: completed ?? this.completed,
+    failed: failed ?? this.failed,
+    deleted: deleted ?? this.deleted,
+    currentId: currentId ?? this.currentId,
+    message: message ?? this.message,
+  );
 
   static const idle = IndexProgress(phase: IndexPhase.idle);
 }
