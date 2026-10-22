@@ -1,6 +1,50 @@
 # KNOWN ISSUES
 
+> **Status note (2026-10-21 audit):** Several entries are stale. KI-5 and KI-13 describe a lexical union with semantic candidates, but healthy semantic search now admits only the gated top-60. KI-8 says only `mobileclip_image.onnx` is checked, but the resolver tries fp16 first and then fp32. KI-11 (onboarding reappearing) is still listed as untriaged although onboarding completion is now persisted. The current prioritized register is `docs/PROJECT_CONTEXT.md` §9. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+
 Ranked by severity. "Critical" = must be resolved before the dependent milestone is trusted.
+
+## KI-14 (Open, coverage) - person search only covers assigned faces in processed photos (2026-10-22)
+People search and similar-face suggestions use assigned faces (manual or automatic). On the test phone
+People processing was paused by the user at 485 of 1,916 photos until 2026-10-22, when the user resumed it;
+all 1,916 photos are now processed (backup B8: 2,642 detections, 397 with descriptors). Root cause of the same
+person being listed many times: only 336 of 2,342 detections (at 485 photos) reach the 100 px SFace descriptor minimum
+(`FaceContract.minFacePixels`); the other 2,006 have no descriptor, so the current face contract can never
+group or suggest them. Duplicate detections are a minor factor (26 overlapping same-photo pairs, about 20
+near-identical cross-photo pairs). The first review round failed (one false join); a backup taken on
+2026-10-22 shows the later fresh round passed (validation 16 same / 4 different pairs, 0 false joins,
+saved threshold about 0.462). That is a small holdout, not a general accuracy result.
+On 2026-10-22 the user ran "Group similar faces" (ADR-020) with processing still paused. 266 faces were
+assigned automatically (3 joined one named person; the rest formed 137 new unnamed groups, 142 groups in
+total).
+New faces went from 2,329 face entries to 1,402 to name, with 798 small or duplicate faces hidden behind
+"Show small faces" (not deleted, still nameable). The suggestions screen counts 1,994 unnamed faces as too
+small to compare; those still need manual naming. Grouping them needs a new `FaceContract.id` with a lower
+minimum, a full re-scan and a new review round; not started. The automatic grouping after a processing
+pass (`applyGrouping`) never runs while paused; since the user resumed processing it runs after each full pass
+(after the first one: 85 more automatic assignments, 127 to 152 groups, none added to a named person; New faces
+shows 1,497 to name). Older docs that say the gate failed and the threshold is empty describe the first round.
+The "Same person?" questions (ADR-021, 2026-10-22) also only cover faces with descriptors: the face asked
+about is always at least 100 px (only the confirmed face shown beside it may be smaller), so an unnamed
+small face is never the subject of a question and still needs manual naming.
+
+## KI-15 (Low, by design) - person-query wording limits (2026-10-22)
+"without X" excludes only photos where X's face is assigned. A saved name that is also a common word
+(for example a flower or month) becomes a person filter until its chip is dismissed. In Hinglish, "me"
+can mean "in" and is read as the device owner; dismiss the "You" chip, or use 'Search without "me"'
+when nobody is marked This is me. Bare "I", "we" and "us" are not resolved, and mixed "and/or" wording
+falls back to requiring everyone. Pre-existing and not by design: a name typed in a different script
+from the saved one (for example Devanagari for a Latin-script name) is not matched, so the online guard
+cannot recognise it either.
+
+## KI-16 (Medium, People validation) - an edited reviewed photo can be sampled into a new review (2026-10-22)
+Pre-existing, found by the 2026-10-22 tests. `_reviewedPhotos` finds reviewed photos through their
+current face ids, and face ids include the photo revision. After a reviewed photo is edited (a new
+revision), that photo can be sampled again into a new review round (calibration or a fresh holdout),
+which weakens the photo-disjoint guarantee of the validation gate. A proper fix stores the photo ids
+with the review rows, which is a schema change and is not done. A skipped test in
+`test/people_validation_recovery_test.dart` documents the bug. Mitigation: do not start a new review
+after editing reviewed photos until this is fixed.
 
 ## KI-12 (Critical testing safety) - device-test cleanup removed private app data
 On 2026-09-08, a new semantic diagnostics integration test was run without `--no-uninstall`.

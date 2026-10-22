@@ -1,5 +1,7 @@
 # Search Evaluation
 
+> **Status note (2026-10-21 audit):** This file is stale in places. The diagnostics screen's third tab shows the ML Kit-labels experiment, not whole-word matching. Exports also include the legacy-articles and lexical-bypass replays. The device test hashes 4 of 14 tables, not the complete persisted tables. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+
 Date: 2026-09-08. No relevance labels are bundled or inferred.
 
 ## Device Workflow

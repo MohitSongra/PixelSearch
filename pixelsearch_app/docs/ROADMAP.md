@@ -1,5 +1,7 @@
 # ROADMAP
 
+> **Status note (2026-10-21 audit):** This file has not changed since the initial import (`ce7bf55`, 2026-08-07) and is stale. It still names M9 as the current milestone and says background indexing runs in an isolate. The prioritized remaining work is in `docs/PROJECT_CONTEXT.md` §12. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+
 Milestone-by-milestone path to a production-quality MVP. We do not skip milestones and
 do not redesign completed work (per `CLAUDE.md`).
 

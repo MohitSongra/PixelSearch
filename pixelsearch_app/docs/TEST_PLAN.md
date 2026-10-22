@@ -1,6 +1,78 @@
 # TEST PLAN
 
+> **Status note (2026-10-21 audit):** This file is stale. The test count today is 372 passed + 1 skipped on the working tree. Web builds are not a CI target, and the "on-device fp16 golden on NNAPI/XNNPACK" item has never run. CI has failed on every push since 2026-09-09 (runs 4–7). At HEAD (`4a7c81f`, run 7, 2026-09-18) only the Flutter job failed: 324 passed, 3 failed, 1 skipped on the Linux runner. The causes of runs 4–6, and which 3 tests failed, are unknown (job logs not read). Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record. **Update 2026-10-22:** the working tree now passes 526 + 2 skipped on the Windows host, and the People search build passed device acceptance; see [People search (2026-10-22)](#people-search-2026-10-22), the only section added since.
+
 Testing scales with the milestone. Principle: every milestone lands with the tests that prove it.
+
+## People search (2026-10-22)
+
+Windows host, 2026-10-22: `flutter analyze --no-pub` reports no issues and `flutter test --no-pub test/`
+gives **526 passed, 2 skipped** after the rounds and all review fixes (523 + 2 before the second verification
+pass's fixes, 512 + 2 on the first
+"Same person?" build, 499 + 2 before it and 496 + 2 before the user-requested grouping change, all the same day;
+372 + 1 on 2026-10-21). The skips are the real SFace worker test (needs
+`--dart-define=SFACE_MODEL_TEST=true`) and the KI-16 bug test below.
+
+- `test/people_query_parser_test.dart` (52, new): the `resolvePeopleQuery` grammar. Self words after request
+  verbs, required / any-of / excluded roles, negation wording, mixed and/or falling back to AND, possessives
+  and edge punctuation, saved spellings, and queries that name nobody returned byte-identical.
+- `test/people_membership_test.dart` (21, new): `matchPeoplePhotos` (required ∩ any-of − excluded), failing closed.
+- `test/people_suggestions_test.dart` (27, new): suggestion order with no cutoff; suggestions are read-only and
+  assign nothing automatically; confirming fails closed without partial writes; rejected suggestions never return
+  for that person; Undo restores the exact rows; paused stays paused and nothing becomes automatic after any
+  other People action. Two review-fix tests: grouping skips duplicate detections, leaves no empty group and
+  advances the generation; face size follows the decoder's power-of-two scaling (a 4160x3120 photo is prepared
+  at 1040x780). Three tests cover the user-requested grouping and naming list (ADR-020):
+  - "Group similar faces" while paused: `groupNow()` assigns nothing without a passed review; after the review
+    passes, the automatic `applyGrouping()` still assigns nothing while paused, and `groupNow()` then groups two
+    look-alike faces as `automatic` while People stays paused.
+  - Tiny faces and duplicate detections leave the naming list; they are not deleted and can still be named.
+  - An unnamed group counts once in the naming total.
+- `test/people_same_person_test.dart` (24, new; ADR-021, ADR-022): the "Same person?" confirmations and rounds.
+  - `buildSamePersonQuestions` (4): automatic faces in named people come first, beside the closest confirmed face
+    (any confirmed face when none has a descriptor); group pairs are ordered closest first, never share a photo,
+    never pair two named people, put the named (or larger) group on the left and skip pairs already answered;
+    the limit is honoured; pairs less alike than the lowest reviewed "same" pair are not asked.
+  - `answerSamePerson` (12): for an automatic face, Yes makes it manual with an accept decision, No unassigns it
+    with a reject (it is no longer suggested for that person either) and Not sure changes nothing but records
+    `unsure`; for two groups, Yes merges the unnamed group into the named person, No keeps them apart with
+    rejects both ways and Not sure keeps both without asking again, while a later explicit naming still replaces
+    `unsure`. Each answered question is not asked again. Answers keep processing paused and assign nothing
+    automatically, and a stale question (its group deleted) fails closed. From the review fixes: a Yes confirms
+    only the two faces shown (other automatic faces stay automatic and are asked about next); a Not sure survives
+    a merge; a No outranks an earlier Not sure when groups merge; a named group with only automatic faces is
+    checked against its cover.
+  - Widget (1): the card shows both faces and the No / Not sure / Yes answers; Yes saves and the empty state
+    follows.
+  - Rounds (4, ADR-022): a round stops after its size, "Keep going" asks more and no question repeats; the home
+    prompt answers in place and "Not now" hides it; the prompt disappears when the round is answered; and the
+    prompt takes no answer until the next question has loaded (this test fails without the fix).
+  - Second verification pass (3, each failing without its fix): a group pair whose compared face has moved fails
+    closed and changes nothing; while an answer saves, neither the prompt nor the full screen takes another; if the
+    next question fails to load, the answered pair is not shown again.
+- `test/people_validation_recovery_test.dart` (+3): deleting a reviewed photo keeps automatic grouping off; a
+  deleted reviewed photo blocks the fresh check until a new review; a **skipped BUG test** documents that a
+  revised reviewed photo can be sampled into a new review (KI-16).
+- `test/people_repository_test.dart` (updated): `deleteAssets` keeps the review row, so calibration fails closed.
+- `test/people_widgets_test.dart` (+21): per-face confirmation and the "not recognition" copy, Undo binding,
+  multi-select, the This-is-me holder (hidden self included), missing-self state, chips, empty states, hidden
+  people, the People filter chip, no flow resuming processing, small-screen layouts, naming an automatic group
+  confirms the face shown first, and a name-only search is labelled "Matched by assigned faces".
+- `test/voice_search_widgets_test.dart` (+7): spoken punctuation removed before local search; the online guard
+  blocks person filters, names (hidden people included), "or" and "without"; an allowed refinement sends no
+  person keys.
+
+**Device acceptance, 2026-10-22** (Vivo I2214, API 36; aggregate): driven over adb by the assistant at the user's
+request through the accessibility tree, with no screenshots and no identity actions by the assistant (no naming,
+confirming, rejecting or answering). The in-place install checks, backup comparisons, eight typed person queries,
+the hidden-person flow, the user-approved "Group similar faces" run and restart persistence passed, with expected
+values taken from backups. The "Same person?" screen was first only viewed (122 questions; tables unchanged from
+B3 to B5). The user then named faces and answered the questions on the phone (B5 to B6, checked through backup
+counts; "photos of me with" a named person then gave 2 results). The rounds build followed (no question left), the
+user resumed People processing (all 1,916 photos processed, 70 new questions, the main-screen prompt shown), and
+two builds with the later fixes were installed; nine in-place installs in all. Suggestion decisions, answering
+through the rounds and voice input remain host-tested only. Results:
+`PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22.md`.
 
 ## Folder Selection (2026-09-08)
 

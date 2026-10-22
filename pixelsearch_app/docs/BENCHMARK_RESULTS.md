@@ -1,5 +1,7 @@
 # BENCHMARK RESULTS
 
+> **Status note (2026-10-21 audit):** Parts of this file are stale or wrong against the code. The claims that FP16 is "shipped" and "validated on-device (NNAPI/XNNPACK)" are **false**. No execution provider is registered, FP16 has never run on Android, and every device result is FP32 on CPU. The on-device sections still say PENDING although dated device measurements exist. The "35.1 ms dominated by the ~42 ms text embed" comparison combines different runs. Host numbers here predate commit `a76d3b6`, which changed preprocessing and threading. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+
 **Rule:** only measured values appear here. Anything not yet measured is marked **PENDING** — never estimated as if measured.
 
 ## 1. Model export parity (measured — ModelKit spike, 2026-07-24)

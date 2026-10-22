@@ -1,5 +1,7 @@
 # Engineering Audit and Prioritized Roadmap
 
+> **Status note (2026-10-21 audit):** This file is stale in places. Lexical hits are no longer unioned with semantic candidates in healthy semantic mode, and while semantic search is healthy, ML Kit labels are excluded from hybrid lexical scoring. They are still used in keyword fallback (no model or empty index). The audit-scope commit hash in this file is mistyped; the real commit is `a76d3b6`. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+
 **Audit date:** 2026-09-08
 
 **Scope:** current `main` at `a76d3b6be7232cc54c39c40c8bb15c4fd2899b`

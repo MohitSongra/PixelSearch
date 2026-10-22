@@ -1,6 +1,145 @@
 # ARCHITECTURE DECISIONS (ADR log)
 
+> **Status note (2026-10-21 audit):** Some records below no longer match the code. ADR-006 (two separate repositories) is superseded: the app, `model_kit` and the backend now live as sibling folders in one repository, with the same ownership rule. ADR-015's early-cancel replay is defeated, because `IndexingService.run()` clears the cancel flag on entry. ADR-016 (fp16 v3) remains unaccepted on Android. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The decisions below are kept unchanged as the historical record.
+
 Format: each record is a decision, its context, and its consequences. Newest first.
+
+## ADR-022 - "Same person?" rounds on the main screen (2026-10-22)
+**Context:** the user asked for "Same person?" questions to come back every time the app opens, 20 at a time,
+never repeating a question, as Google Photos does. Public sources on Google Photos (read 2026-10-22): its
+help page (support.google.com/photos/answer/6128838) describes suggestions to merge two face groups, answered
+Same / Different / Not sure, and says a merge cannot be undone. An Android Police article (2019-04-26,
+androidpolice.com, "Google Photos has been asking users to help improve its facial recognition grouping")
+describes a prompt to "improve some results" at the top of People & Pets, a full-screen view of matches
+Photos is unsure about, and further prompts for other people after answering. Neither source gives a
+question count or schedule; 20 per launch is the user's choice.
+**Decision:** questions are asked in rounds. `samePersonSessionSizeProvider` (20) sets the round size, and
+two in-memory providers count answers and the allowance for the current launch, so a new round starts with
+each app launch. The Search home shows `SamePersonPrompt` while People is enabled and questions remain: one
+question at a time, answered in place ("Help improve face groups · k of N"), "Not now" to hide it until the
+next launch and "Open full screen". `SamePersonScreen` shows "Question k of N" and, at the end of a round,
+"Keep going (20 more)". The question shown is always the first of the live list (provider limit 1000), which
+is rebuilt after every answer. Every answer, Not sure included, is stored (ADR-021), so no question is asked
+twice. The answer buttons (and "Open full screen") stay disabled while an answer is saving, through a flag
+the prompt and the full screen share, and until the next question has loaded; if that reload fails, no
+question is shown, because the old list may start with the pair just answered. The selection floor is
+unchanged: at the user's choice (2026-10-22) only pairs at or above the lowest reviewed "same" score are
+asked, with no lower tier when they run out.
+**Consequences:** no schema, threshold, `FaceContract` or grouping-rule change, and nothing about rounds is
+stored: a relaunch starts a new round, and "Not now" lasts until then. The supply of questions is limited by
+faces with descriptors. On the test phone, after the user's answers, none were left: of the remaining group
+pairs, 79 were already answered No or Not sure, 104 share a photo, 7,319 score below the floor and 1 joins
+two named people. New questions need new faces, so on 2026-10-22 the user chose to resume People processing;
+after each full pass the validated automatic grouping (`applyGrouping`) runs. On the phone that pass covered
+all 1,916 photos (faces 2,342 to 2,642, descriptors 336 to 397), grouping assigned 85 more faces
+automatically (groups 127 to 152, none added to a named person), and 70 questions were offered, all group
+pairs; the main screen showed "Help improve face groups · 1 of 20".
+
+## ADR-021 - "Same person?" confirmations (2026-10-22)
+**Context:** after the user-requested grouping run (ADR-020), 266 faces on the test phone were assigned
+automatically, 3 of them into a named person, and one person can still be split across unnamed groups. The
+grouping cutoff is validated only on a 20-pair holdout with 4 different-person pairs, and same- and
+different-person SFace scores overlap on that phone (current review round, calibration: same 0.398-0.996,
+different 0.307-0.439). The user asked for Google-style "Is this the same person?" confirmations that compare
+two faces and offer Yes / No / Not sure.
+**Decision:** a pure builder, `buildSamePersonQuestions` (`lib/domain/people/same_person.dart`), asks two
+kinds of question. (1) Every face that automatic grouping put into a named person ("Is this `<name>`?"), shown
+beside a face the user confirmed for that person: the closest one with a descriptor, otherwise any confirmed
+face. A named person whose faces were all grouped automatically has no confirmed face; its cover face (or its
+first face) is the anchor instead and is never asked about itself. (2) Pairs of groups ("Is this `<name>`?"
+when the left group is named, otherwise "Same or different person?"), named or unnamed but never two named
+people, ordered by the cosine of their closest
+faces (an ordering key only, never shown). Pairs that share a photo are skipped; the named (or larger) group is
+the left anchor; pairs already answered No or Not sure are never asked again; and pairs whose closest faces
+score below the lowest cosine among review pairs the user judged "same" (`minSimilarity`) are not asked. That
+floor comes from the user's own review and selects questions; it never decides identity. Hidden people are not
+asked about. `PeopleRepository.samePersonQuestions` is read-only and runs the builder off the UI isolate
+when the pairwise work (faces times faces across groups) exceeds 20,000. `answerSamePerson` records only the
+user's answer:
+- For an automatic face, Yes makes it a manual assignment with an `accept` decision; No unassigns it and
+  records `reject`, so it is never suggested or regrouped into that person; Not sure records `unsure`.
+- For a group pair, Yes merges the right group into the left one, which keeps its identity. Only the two
+  faces the user compared become manual (confirmed); other faces that grouping placed stay `automatic`, so
+  they can still be asked about ("Is this X?") instead of turning into confirmations the user never made.
+  Earlier `reject` and `unsure` answers carry over to the merged person, and a `reject` replaces an `unsure`.
+  No records `reject` both ways for every face; Not sure records `unsure` for the right group's faces.
+- `unsure` is a new decision value stored in the existing `people_decisions` table. Grouping and suggestions
+  ignore it, it never overwrites an existing decision, and a later explicit naming replaces it.
+- A stale question fails closed ("Try the next question") and writes nothing: when a person in it no longer
+  exists, or when the automatic face, or either of the two compared faces, has left its person. Answers stay on
+  the device, and no answer resumes processing or assigns anything automatically.
+The UI is `SamePersonScreen` ("Same person?": two face crops capped at 160 px with "Open photo", No / Not sure
+/ Yes in a fixed bottom bar, and a note to answer Not sure when in doubt), entered from a People screen tile;
+the compact card on the main screen (ADR-022) caps the crops at 72 px and has no "Open photo".
+ADR-022 adds rounds and the prompt on the main screen.
+**Consequences:** grouping accuracy improves only through the user's answers. There is no threshold,
+`FaceContract`, grouping-rule, calibration or schema change; `unsure` is a new value in an existing text
+column, documented here. Questions only exist for faces with descriptors (at least 100 px), so small faces
+still need manual naming (KI-14). A wrong Yes joins two people; the user fixes it by moving or removing faces,
+as for ADR-020. On the phone after the grouping run the screen offered 122 questions (3 for the automatic faces
+in a named person and 119 group pairs at or above the floor of about 0.398). That floor is below the highest
+different-person calibration score (0.439), so some questions can show two different people, which is why
+the user answers them.
+
+## ADR-020 - User-requested validated grouping and a smaller naming list (2026-10-22)
+**Context:** on the test phone the same person was listed many times in New faces. 2,006 of 2,342 detected
+faces (86%) are below the 100 px SFace descriptor minimum and can never be compared; duplicate detections
+are a minor factor. Automatic grouping had never run because the user keeps processing paused, although the
+fresh review round passed (20 validation pairs, 4 of them different-person, 0 false joins). After seeing
+this, the user chose automatic grouping and hiding tiny faces.
+**Decision:** `PeopleRepository.groupNow()` runs the existing validated `groupFaces` (complete-link, the
+saved review cutoff, never into a person already in that photo or one the user rejected for that face) once,
+at an explicit user request (People ⋮ "Group similar faces", with a confirmation dialog), while processing
+stays paused. It assigns nothing without a passed review gate. `applyGrouping()`, the automatic run after a
+processing pass, still never runs while paused. New faces hides unassigned faces under 40 px in the prepared
+image and a second detection overlapping a larger face in the same photo (IoU > 0.5) behind "Show small
+faces (N)"; they are never deleted and can still be named from the photo. Each unnamed group counts once in
+"N to name", and unnamed groups are listed largest first.
+**Consequences:** no schema, `FaceContract`, grouping-rule or calibration change. Automatic assignments can
+also join people the user named, and the cutoff is validated only on a 20-pair holdout with 4
+different-person pairs, so wrong joins are possible; the user fixes them by moving or removing faces. On the
+phone the run assigned 266 faces (137 new unnamed groups; 3 faces joined one named person). Small faces
+still need manual naming. Lowering `minFacePixels` would need a new `FaceContract.id`, a re-scan with
+processing resumed and a new review round to re-validate the cutoff; not done.
+
+## ADR-019 - Person-query grammar and hidden-people semantics (2026-10-22)
+**Context:** person search used one AND rule. "me" with no "This is me" person, voice punctuation,
+"show me `<name>`" and "or"/"without" leaked words into the CLIP text or added the wrong person.
+Hidden people were still matched by typed names.
+**Decision:** `resolvePeopleQuery` stays the only parser. "me"/"myself" share one self key. A self word
+is not a subject after a request verb (unless coordinated or placed) or after near/for/by. With People
+enabled and no self person, the query reports `selfMissing` and no search runs. Names joined only by
+"or" are alternatives; names after without/except/not are excluded; any mixed wording requires everyone
+(the narrowest reading). Possessives, edge punctuation and fillers are stripped only in person queries;
+a query that names nobody is returned byte-identical. Membership is one pure function
+(`matchPeoplePhotos`) over assigned, non-dismissed faces, built once per People snapshot. Hidden people
+are not resolved from typed text or offered in the People filter, but an explicit "Search photos of X"
+still works, and the online privacy guard checks every saved name, hidden or not.
+**Consequences:** no schema, ranking-constant or model change. Exclusion covers assigned faces only, so
+an unassigned face of an excluded person can still appear. Names that are common words become filters
+until the chip is dismissed. Hinglish "me" meaning "in" is a known false positive.
+
+## ADR-018 - Similar-face suggestions are ranking-only and confirmed per face (2026-10-22)
+**Context:** automatic grouping is only as trustworthy as a small reviewed holdout (the first round on
+the test phone failed with one false join; a later 20-pair round passed), and People processing is
+paused, so in practice every photo needs a manual name. Same- and different-person SFace scores overlap
+on that phone.
+**Decision:** for a named person, order unassigned, detailed faces by their maximum cosine to that
+person's **manually** confirmed faces (ties: mean of the top three, then face id), one face per photo,
+skipping photos that already show the person and faces the user rejected. There is no threshold, no
+score shown and no select-all; nothing is assigned until the user confirms each face. "Not `<name>`"
+writes the existing `people_decisions` reject row, so the face is never suggested for that person again.
+Deleting photos keeps review pairs, so calibration fails closed ("A reviewed photo changed or is
+unavailable") instead of re-scoring the remaining pairs.
+**Consequences:** no schema change and no change to grouping, the gate or the sampler. Suggestions only
+cover faces with descriptors (faces at least 100 px) in processed photos. A wrong confirmation attracts
+look-alikes; per-face confirmation, Undo and "Remove assignment" are the mitigations. Retained review rows
+hold face ids, a cosine and a judgment only, and "Disable and delete People data" still removes them.
+**Update (2026-10-22, later the same day):** per-face confirmation governs similar-face suggestions. The
+automatic grouping the user explicitly requests ("Group similar faces") assigns faces without per-face
+confirmation; ADR-020 covers it. The Context line above ("in practice every photo needs a manual name")
+predates that run, which assigned 266 faces automatically on the test phone; faces without descriptors still
+need a manual name. "Same person?" questions (ADR-021) let the user confirm or undo automatic assignments.
 
 ## ADR-017 - Folder-scoped candidates with gallery-wide deletion reconciliation
 **Context:** the user wants to choose folders for new indexing and explicitly retain already-indexed

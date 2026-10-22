@@ -1,5 +1,7 @@
 # M5 — Production Indexing Engine
 
+> **Status note (2026-10-21 audit):** Some adapter and status claims are stale. The gallery throws `StateError` without access rather than returning an empty gallery. `WorkManagerScheduler` has only a one-off task, no notifications, and **no caller**, so no background run ever happens. The EXIF extractor reads only the date. `byteSize` is hard-coded to 0. The controller lives in `lib/state/indexing_providers.dart`. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+
 A fault-tolerant, resumable, incremental indexing pipeline for galleries of
 10k–50k+ photos, built as **ports & adapters (hexagonal)**: a pure, fully
 unit-tested orchestration core, with device capabilities (MediaStore, ML Kit,
