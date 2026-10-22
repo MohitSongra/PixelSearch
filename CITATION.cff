@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: >-
+  If you use PixelSearch or refer to its results, please cite it using the
+  metadata from this file.
+title: PixelSearch
+type: software
+abstract: >-
+  PixelSearch is an Android-first Flutter app for private, on-device semantic
+  photo search. It embeds photos with MobileCLIP-S1 through ONNX Runtime,
+  ranks them by exact cosine similarity with hybrid reranking, and supports
+  offline, user-confirmed People search. Optional online features need
+  separate consent. A final-year undergraduate project.
+authors:
+  - name: PixelSearch team
+repository-code: "https://github.com/MohitSongra/PixelSearch"
+keywords:
+  - semantic search
+  - on-device machine learning
+  - MobileCLIP
+  - ONNX Runtime
+  - Flutter
+  - Android
+  - privacy
