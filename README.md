@@ -347,14 +347,14 @@ diagnostics are the other safe option.
   and for pull requests: the repository check, the backend tests, Flutter analyze and unit tests, and the ModelKit
   metric tests. CI never builds an APK and never runs `integration_test/`, the real SFace model test or the FP16
   conversion test.
-- **CI is not green yet.** Every push from 2026-09-09 to 2026-09-18 failed (four runs). On the last pushed commit
-  only the Flutter job failed, with 3 of 328 tests failing on the Linux runner while the same commit passed on
-  Windows. A simulation on the Windows host reproduced the failure counts and traced them to two host-dependent
-  test problems (KI-17), both fixed on the branch on 2026-10-22: widget tests loaded a Windows system font as
-  "Roboto" (on Linux the wider fallback font made 320 px layouts overflow), and one test built Windows-only path
-  literals. The fix has not yet run on Linux: the branch has not been pushed, and a local Linux run in Docker did
-  not start. It is therefore not yet confirmed that the fix explains all three failures, and this README shows no
-  CI badge.
+- **CI passed on pull request #1 (2026-10-22).** Every push to `main` from 2026-09-09 to 2026-09-18 failed (four
+  runs). On the last of those commits only the Flutter job failed, with 3 of 328 tests failing on the Linux runner
+  while the same commit passed on Windows. A simulation on the Windows host reproduced the failure counts and traced
+  them to two host-dependent test problems (KI-17), both fixed on 2026-10-22: widget tests loaded a Windows system
+  font as "Roboto" (on Linux the wider fallback font made 320 px layouts overflow), and one test built Windows-only
+  path literals. The first GitHub run of the fix, on pull request #1 (2026-10-22, `ubuntu-24.04` runner), passed
+  all four jobs, so KI-17 is confirmed fixed on Linux. That run's test count is not recorded (the job log needs a
+  GitHub sign-in). Pull request #1 was merged into `main` on 2026-10-22.
 - **Parity.** Host Flutter-ONNX Runtime parity has not been re-run since commit `a76d3b6` (2026-08-08), which
   changed how preprocessing reads pixels.
 
@@ -371,8 +371,9 @@ gallery or a vector database.
   paid fallback and no model substitution. Model requests return 503 unless the operator has set the provider key
   and attested that Groq zero data retention is enabled.
 - The 2026-09-18 hardening (authentication and size checks before the request body is read, a 6 MiB body cap,
-  request and provider deadlines) is in this repository but **not deployed**. The deployment last checked, on
-  2026-09-09, ran older code.
+  request and provider deadlines) is merged into `main` (2026-10-22). Render redeploys it if Render's auto-deploy
+  is on for `main` (`render.yaml` names no branch; the setting lives in Render). Whether it redeployed, and the
+  live backend's state, were **not checked** from here. The deployment last checked, on 2026-09-09, ran older code.
 - FastAPI's default `/docs`, `/redoc` and `/openapi.json` routes are enabled and unauthenticated in the code.
 
 Setup, API and limits: [enhancement_backend/README.md](enhancement_backend/README.md).
@@ -394,29 +395,30 @@ Setup, API and limits: [enhancement_backend/README.md](enhancement_backend/READM
 - **A text model session leaks** each time the search backend is rebuilt after an indexing run.
 
 Full lists: [pixelsearch_app/docs/KNOWN_ISSUES.md](pixelsearch_app/docs/KNOWN_ISSUES.md) (a dated note at the
-top names its stale entries; KI-16 is fixed in code, and KI-17, the Linux-only CI failures, is fixed on the branch
-pending a Linux run) and the prioritized register in
+top names its stale entries; KI-16 is fixed in code, and KI-17, the Linux-only CI failures, is fixed and was
+confirmed by the CI run on pull request #1 on 2026-10-22) and the prioritized register in
 [docs/PROJECT_CONTEXT.md §9](docs/PROJECT_CONTEXT.md#9-known-issues-register).
 
 ## Roadmap
 
 From [docs/PROJECT_CONTEXT.md §12](docs/PROJECT_CONTEXT.md#12-next-steps-highest-priority-first), with the
-2026-10-22 changes applied:
+2026-10-22 changes applied (the CI fix is done: it passed on GitHub's Linux runner on pull request #1):
 
-1. Confirm the CI fix on GitHub's Linux runner.
-2. Deploy the backend hardening and verify the live service.
-3. Re-run host Flutter-ONNX Runtime parity for the current preprocessing code, and add a PIL-generated
+1. Check whether Render redeployed the backend hardening merged on 2026-10-22 (not checked from here) and verify
+   the live service; re-enter the backend token on the phone if online features are used (the token is now bound
+   to its HTTPS origin).
+2. Re-run host Flutter-ONNX Runtime parity for the current preprocessing code, and add a PIL-generated
    preprocessing fixture to ModelKit.
-4. Make model selection safe before any FP16 work: load-tested text selection with an FP32 fallback and precision
+3. Make model selection safe before any FP16 work: load-tested text selection with an FP32 fallback and precision
    recorded per embedding. Only then try an FP16-capable execution provider and accept it against FP32 on a phone.
-5. M12 model provisioning (at least in-app guidance when models are missing), then indexing that survives screen-off
+4. M12 model provisioning (at least in-app guidance when models are missing), then indexing that survives screen-off
    and a worker isolate for decoding and inference.
-6. A judged retrieval benchmark (20 to 50 scene queries with a held-out set) before any change to the gate, the
+5. A judged retrieval benchmark (20 to 50 scene queries with a held-out set) before any change to the gate, the
    weights or the lexical policy. Judgments stay private, because they name private photos.
-7. People: the FaceContract v2 build is installed and every photo re-scanned (2026-10-22). Next: the user's larger
+6. People: the FaceContract v2 build is installed and every photo re-scanned (2026-10-22). Next: the user's larger
    review round under v2, which turns automatic grouping back on if it passes; then measure grouping accuracy, and
    check suggestion confirm/reject, the "Same person?" rounds and voice person queries on the phone.
-8. Refresh the stale documents and write the missing architecture decision records.
+7. Refresh the stale documents and write the missing architecture decision records.
 
 ## Repository layout and documentation
 

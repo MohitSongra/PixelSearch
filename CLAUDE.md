@@ -12,7 +12,7 @@ test phone the same day), its "Same person?" confirmations and rounds, and the u
 later that day for the review-ready branch (schema v7 / KI-16, FaceContract v2, the KI-17 CI fix, the interim
 licence), and once more that day when the schema-v7 / FaceContract-v2 build was installed on the test phone and every
 photo was re-scanned under v2, then for the later backups B13 and B14 and a read-only check of the People and review
-screens.** For the deep context read
+screens, and for pull request #1 and its merge.** For the deep context read
 [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md).
 Measured numbers are in [`docs/EVIDENCE_LEDGER.md`](docs/EVIDENCE_LEDGER.md) and the per-file map is in
 [`docs/FILE_MAP.md`](docs/FILE_MAP.md). App-level engineering rules are in
@@ -159,20 +159,22 @@ handbook §5.1.
 
 ## Current state (2026-10-22)
 
-- **Git.** `main` = `origin/main` = `4a7c81f` (2026-09-18). Everything since is committed on the **branch
-  `review-ready-2026-10-22`**, pushed to GitHub on 2026-10-22 as its own branch (no pull request yet; `main`
-  untouched, because pushing `main` can deploy the backend on Render). `git log
-  4a7c81f..review-ready-2026-10-22` lists the commits: privacy redaction of dated reports, backend-token binding,
-  release signing, the combined redesign + People validation recovery + People search commit (these share
-  `search_screen.dart` and `people_repository.dart`), the backend hardening, the security review, the audit
-  handbook, the private-data scan, the CI test-portability fix and workflow hardening, KI-16 (schema v7), FaceContract
-  v2, hygiene commits (dead code, FP32-only wording, map tiles never cached on disk, onboarding copy, in-app licences
-  and explicit assets, the ML Kit metrics notice), the licence, README and docs commit, a formatting-only commit
-  (`f1c7f9d`) with a CI `dart format` check (`9bea6d4`), then two docs commits, an LF line-ending commit
-  (`0f20b8c`, from which the phone's v2 APK was built) and docs commits recording the phone's v2 install, re-scan
-  and later checks (all commits dated 2026-10-22). Each code commit was built and
-  tested in a clean worktree. Run `git status` for any uncommitted doc edits. The pushed history still holds the
-  personal data that the working tree no longer has (ADR-025).
+- **Git.** `main` was `4a7c81f` (2026-09-18) until 2026-10-22. Everything since was committed on the **branch
+  `review-ready-2026-10-22`**, pushed to GitHub on 2026-10-22 and merged into `main` the same day through pull
+  request #1 (opened with 28 commits and 186 files changed) with a merge commit, not squash or rebase: every branch
+  commit keeps its hash, so the hashes cited in the docs and `.git-blame-ignore-revs` stay valid. Nothing was
+  force-pushed; `main` moved forward from `4a7c81f`. `git log 4a7c81f..main` lists the commits: privacy redaction
+  of dated reports, backend-token binding, release signing, the combined redesign + People validation recovery +
+  People search commit (these share `search_screen.dart` and `people_repository.dart`), the backend hardening, the
+  security review, the audit handbook, the private-data scan, the CI test-portability fix and workflow hardening,
+  KI-16 (schema v7), FaceContract v2, hygiene commits (dead code, FP32-only wording, map tiles never cached on
+  disk, onboarding copy, in-app licences and explicit assets, the ML Kit metrics notice), the licence, README and
+  docs commit, a formatting-only commit (`f1c7f9d`) with a CI `dart format` check (`9bea6d4`), then two docs
+  commits, an LF line-ending commit (`0f20b8c`, from which the phone's v2 APK was built) and docs commits recording
+  the phone's v2 install, re-scan and later checks, then the docs commit recording pull request #1 and its merge
+  (all commits dated 2026-10-22). Each code commit was built and tested in a clean worktree. Run `git status` for
+  any uncommitted doc edits. The pushed history still holds the personal data that the working tree no longer has
+  (ADR-025).
 
   The phone runs a debug build of the People-search work, installed in place with `adb install -r` (ten installs on
   2026-10-22; first-install time and signer unchanged). The tenth is the schema-v7 / FaceContract-v2 build, a debug
@@ -184,11 +186,20 @@ handbook §5.1.
   Tables changed only through the user-requested grouping (B3); the user's own answers and naming (B5 to B6); the
   user's resumed processing pass with its automatic grouping (B7 to B8); from B11 to B12, the schema-v7 migration,
   the v2 re-scan and the user's own answers during it (People tables only); and from B12 to B13, the user's later
-  answers (People decisions, faces, persons and the generation counter). The backend hardening is **not deployed**.
-- **CI** failed on the last four pushes (Linux runner only). Cause (KI-17, found by simulation on the Windows host):
-  widget tests loaded a Windows system font as 'Roboto' only when it existed, and one path test used Windows-only
-  literals. Both are fixed on the branch (tests load the bundled Manrope; host-rooted paths) and the workflow is
-  hardened, but the fix has **not yet run on GitHub**; a local Docker run failed because Docker Desktop did not start.
+  answers (People decisions, faces, persons and the generation counter).
+- **Backend.** The 2026-09-18 hardening (`b8c3310`) is merged into `main` (2026-10-22); Render redeploys it if
+  Render's auto-deploy is on for `main` (`render.yaml` names no branch; the setting lives in Render). Whether it
+  redeployed, and the live backend's state, were **not checked** from here. The merged backend keeps the same three
+  environment variables and the same token check (SHA-256 against `PIXELSEARCH_TOKEN_HASHES`), so the server still
+  accepts existing tokens; re-entering the token in the app (it is now bound to its HTTPS origin) is still the
+  user's step if online features are used.
+- **CI** failed on the last four pushes to `main` before 2026-10-22 (Linux runner only). Cause (KI-17, found by
+  simulation on the Windows host): widget tests loaded a Windows system font as 'Roboto' only when it existed, and
+  one path test used Windows-only literals. Both are fixed (tests load the bundled Manrope; host-rooted paths) and
+  the workflow is hardened. The first GitHub run of the fix, on pull request #1 (run 39760306942, head `29b1862`,
+  2026-10-22, `ubuntu-24.04` runner), **passed all four jobs**, so KI-17 is confirmed fixed on Linux. Its test count
+  is not recorded (the job log needs a GitHub sign-in); the local Windows run at the same commit gave 535 passed,
+  1 skipped.
 - **Device** (backups B0 to B14, 2026-10-22, aggregate).
   - Vivo I2214 (API 36) runs FP32 CPU with 1,916 indexed photos and 1,916 embeddings (schema 7 since the v2 install,
     integrity ok in B12; the migration and the re-scan left photos and embeddings unchanged).
@@ -247,8 +258,9 @@ handbook §5.1.
   - the user's new review round under v2 (the install and the re-scan are done, 2026-10-22), which turns automatic
     grouping back on for v2 if it passes; starting it and rating its pairs are the user's. v2 grouping quality is
     unmeasured.
-  - the first GitHub CI run of the KI-17 fix. CI runs only on pushes to `main`/`master` and on pull requests, so it
-    needs a pull request from the pushed branch or a push to `main` (the owner's decision)
+  - checking the Render deploy and the live backend after the 2026-10-22 merge (not checked from here; the
+    deployment URL is deliberately not in this repository), and the backend token re-entry on the phone if online
+    features are used (the token is now bound to its HTTPS origin; the user's step)
   - M12 model manager. Provisioning is manual. The only in-app signal is a transient status line after an
     indexing attempt; it names the expected path and lists the fp16 file first, so do not follow it literally:
     provision only the fp32 files.

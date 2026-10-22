@@ -1,6 +1,12 @@
 # PixelSearch: free online account setup
 
 > **Status note (2026-10-21 audit):** This file says the backend is local and uncommitted. In fact it was committed (`a4081f3`, `f38a72c`) and deployed on 2026-09-09. The working tree adds uncommitted backend hardening (admission/body-limit middleware in `app.py`; `--limit-concurrency 32 --timeout-keep-alive 5` in `render.yaml`), which is not deployed. Separately, it adds an app-side origin-bound token (`backend_credentials.dart`), which is uncommitted and needs a new APK. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record.
+>
+> **Update 2026-10-22:** the backend hardening (`b8c3310`) and the origin-bound app token were committed and
+> merged into `main` through pull request #1 on 2026-10-22. Render redeploys the hardening if its auto-deploy is
+> on for `main` (the setting lives in Render); whether it redeployed was not checked from here. The backend keeps
+> the same environment variables and token check, so existing tokens keep working. In the app the token is now
+> bound to its HTTPS origin, so re-entering it on the phone is still the user's step if online features are used.
 
 Checked against provider documentation on 2026-09-09. Account screens, quotas and
 model availability can change. Stop if a step requires a paid plan or a card.

@@ -13,8 +13,8 @@ B0 to B10; §5.4).
 
 **Update 2026-10-22, later:** the review-ready cleanup on the branch `review-ready-2026-10-22` (§3 note, §5.4,
 §6, §7, ADR-023 to ADR-025, §9, §11, §12): forward redaction, CI fix, KI-16 fixed with schema v7, FaceContract v2
-(64 px), hygiene, interim licence and README. The branch was pushed to GitHub the same day as its own branch (no
-pull request yet; `main` untouched).
+(64 px), hygiene, interim licence and README. The branch was pushed to GitHub the same day as its own branch (at
+first without a pull request; `main` untouched until the merge noted below).
 
 **Update 2026-10-22, afternoon:** the schema-v7 / FaceContract-v2 debug build installed in place on the Vivo (the
 tenth install that day), its migration, the re-scan of all 1,916 photos under v2, the carry-over check and the
@@ -22,6 +22,15 @@ user's own answers during the re-scan (backups B11 and B12; §2, §3.2, §4.4, �
 §13). Later that afternoon backup B13 audited the user's later "Same person?" answers (B12 → B13), the People
 screen and the review screen ("Face settings changed") were viewed read-only on the phone, and backup B14 showed
 that the viewing wrote nothing (B13 → B14 identical; §2, §5.4, §8, §12, §13).
+
+**Update 2026-10-22, pull request #1:** the owner opened pull request #1 from `review-ready-2026-10-22` into `main`
+(28 commits and 186 files changed when opened; base `4a7c81f`). Its first GitHub Actions run (run 39760306942, head
+`29b1862`), the first GitHub run of the KI-17 fix, passed all four jobs on `ubuntu-24.04` (§3.4); CI ran again on
+the docs commit that records this, before the merge. The pull request was then merged into `main` the same day
+with a merge commit, so every branch commit keeps its hash; `git log 4a7c81f..main` lists the work. Updating `main`
+lets Render redeploy the backend hardening if its auto-deploy is on; that was not checked from here (§2, §3, §5.2,
+§5.6, §9, §10, §11, §12, §13, §14). Where later sections contrast `main` with the branch, `main` means `4a7c81f`
+unless the text ties it to the 2026-10-22 merge; since the merge the branch's behaviour is also `main`'s.
 
 Companion documents:
 
@@ -62,9 +71,12 @@ Legend:
 - **Commit**: in `HEAD` (C), partly uncommitted (C+U), or uncommitted only (U).
 - **Device**: accepted on a physical phone (Y), partly (P), or never (N).
 
-> **Update (2026-10-22, later):** the Commit column records the 2026-10-21/22 working-tree state. Everything marked
-> U or C+U is now committed on the branch `review-ready-2026-10-22` (pushed, not merged), so read C as "on `main`
-> (`4a7c81f`)", U as "on the branch only" and C+U as "partly on the branch only"; "HEAD" in the notes means `main`.
+> **Update (2026-10-22, later; merge added the same day):** the Commit column records the 2026-10-21/22
+> working-tree state. Everything marked U or C+U was then committed on the branch `review-ready-2026-10-22`, which
+> pull request #1 merged into `main` on 2026-10-22, so everything is on `main` now. Read the columns as before the
+> merge: C as "on `main` (`4a7c81f`)", U as "on the branch only" and C+U as "partly on the branch only". "HEAD" in
+> the notes means `4a7c81f`, and so does `main` where the handbook contrasts it with the branch, unless the text
+> ties it to the 2026-10-22 merge (the reading rule at the top).
 
 | Capability | Impl | Commit | Device | Notes |
 |---|---|---|---|---|
@@ -73,35 +85,38 @@ Legend:
 | MobileCLIP FP16 / NNAPI / XNNPACK | ❌ | — | N | No execution provider is registered. FP16 v3 artifacts exist on the host only. |
 | In-app model provisioning (M12) | ❌ | — | N | Models are copied in by hand (§5.1) |
 | Semantic search + hybrid rerank + filters | ✅ | C | P | Only 2 judged queries (P@5 0.20 and 0.40) |
-| Keyword fallback | ✅ | C | P | Visible only through a tooltip in the redesign (branch only) |
+| Keyword fallback | ✅ | C | P | Visible only through a tooltip in the redesign (on `main` since the 2026-10-22 merge) |
 | Search diagnostics / evaluation harness | ✅ | C | P | In-app diagnostics used. The device integration test was never accepted. |
 | Background indexing (WorkManager) | ⚠️ | C | N | Initialized but **never scheduled** |
 | Folder-scoped indexing | ✅ | C | Y | Accepted with a small selection on 2026-09-08 |
-| Indexed gallery (Home) | ✅ | C+U | Y | Redesign on the branch only, installed on the Vivo |
+| Indexed gallery (Home) | ✅ | C+U | Y | Redesign (on `main` since the 2026-10-22 merge), installed on the Vivo |
 | Timeline (calendar-day memories, stories) | ✅ | C+U | Y | 215 events / 1,916 photos on 2026-09-10 |
 | Map (EXIF GPS + consented OSM tiles) | ✅ | C+U | P | Tiles worked. 0/1,916 photos located, so no positive pin was ever seen. |
 | Viewer (labels editor, caption, explanation) | ✅ | C+U | P | Live cloud caption never tested |
 | Offline People (SFace, New Faces, naming, name search) | ✅ | C+U | P | Gate: the first round **failed** (2026-09-18); a fresh 20-pair round **passed** (backup B0, 2026-10-22; threshold ≈ 0.462). On 2026-10-22 the user ran "Group similar faces" once (266 automatic assignments, 137 new unnamed groups, backup B3), then resumed processing: all 1,916 photos processed and the validated automatic grouping ran after the pass (backup B8). After the FaceContract v2 install the same day the threshold is null (backup B12), so automatic grouping is off until the user's new review round under v2 passes. |
 | People search (query grammar, similar-face suggestions, multi-select naming, delete person, user-requested grouping, smaller naming list, "Same person?" confirmations and rounds), 2026-10-22 | ✅ | U | P | Host: 526 + 2 skipped tests on the 2026-10-22 working tree; 535 + 1 skipped at the branch tip. Installed in place on the Vivo 2026-10-22; typed person searches, hidden person, suggestions view, grouping and persistence accepted; the "Same person?" card rendered (122 questions); the user named faces and answered the questions on the phone (B5 to B6); after the resumed pass the main-screen prompt showed (70 questions, none answered by the assistant); the user answered more during the FaceContract v2 re-scan (B11 to B12) and after it (B12 to B13, audited by aggregate backup counts). Suggestion confirm/reject and voice input not exercised on the phone. |
-| Online assistant / captions / transcription | ✅ | C+U | P | Assistant live-tested 2026-09-09. Others never live-tested. The client credential binding (`backend_credentials.dart`) and the backend hardening are on the branch only; the deployed backend runs the `f38a72c` code. |
-| Backend security hardening (2026-09-18 review) | ✅ | U | N | On the branch only (`b8c3310`), not deployed |
-| Release signing with an operator key | ✅ | U | N | `main` still signs release builds with the debug key; the branch requires an operator key (`c49f2d2`). No release-signed build made. |
+| Online assistant / captions / transcription | ✅ | C+U | P | Assistant live-tested 2026-09-09. Others never live-tested. The client credential binding (`backend_credentials.dart`) and the backend hardening are on `main` since the 2026-10-22 merge; the live backend was last verified on the `f38a72c` code (2026-09-09), and whether Render redeployed after the merge was not checked. |
+| Backend security hardening (2026-09-18 review) | ✅ | U | N | Merged into `main` on 2026-10-22 (`b8c3310`); Render redeploys it if auto-deploy is on for `main`; not checked from here |
+| Release signing with an operator key | ✅ | U | N | Until the 2026-10-22 merge `main` signed release builds with the debug key; it now requires an operator key (`c49f2d2`). No release-signed build made. |
 | UI redesign (teal theme, Manrope, Privacy Centre) | ✅ | U | Y | Installed on the Vivo 2026-09-18 |
 | Reviewed photo ids (schema v7, KI-16) and FaceContract v2 (64 px), 2026-10-22 | ✅ | U | P | Host-tested (535 + 1 at the branch tip); migration and upgrade rehearsed on a copy of backup B10 (v7, integrity ok, 140 of 140 review rows filled, nothing visible changes before the re-scan). Installed in place on the Vivo 2026-10-22 (the tenth install; backups B11 before, B12 after): the migration ran (schema 7, integrity ok, 140 of 140 review rows filled) and all 1,916 photos were re-scanned under v2; all 2,642 earlier faces kept their ids, and faces with a descriptor rose from 397 to 864. Grouping under v2 is not validated: the threshold is null until the user's new review round under v2 passes. |
 
 ## 3. Repository and working-tree state
 
-> **Update (2026-10-22, later):** everything this section calls *uncommitted* or *untracked* is now committed on the
-> **branch `review-ready-2026-10-22`** (pushed to GitHub on 2026-10-22, not merged; `main` = `origin/main` =
-> `4a7c81f`). On top of it the branch
+> **Update (2026-10-22, later; merge added the same day):** everything this section calls *uncommitted* or
+> *untracked* is now committed on the **branch `review-ready-2026-10-22`** (pushed to GitHub on 2026-10-22 and
+> merged into `main` the same day through pull request #1; until then `main` = `origin/main` = `4a7c81f`).
+> On top of it the branch
 > adds: forward redaction and a private-data scan (ADR-025), the CI test-portability fix and workflow hardening
 > (KI-17), KI-16's fix with schema v7 (ADR-024), FaceContract v2 with a 64 px minimum (ADR-023), hygiene (dead code,
 > FP16 wording, onboarding claims, map tile cache, explicit assets, in-app licences), an interim LICENSE with
 > THIRD_PARTY_NOTICES.md, a rewritten README and community files, then a formatting-only commit (`f1c7f9d`, listed
 > in `.git-blame-ignore-revs`) and a CI `dart format` check (`9bea6d4`), then two docs commits, an LF line-ending
 > commit (`0f20b8c`, from which the phone's v2 APK was built) and docs commits recording the phone's v2 install,
-> re-scan and later checks; all commits are dated 2026-10-22. `git log 4a7c81f..review-ready-2026-10-22` is the
-> authoritative list. The rest of this section is kept as the 2026-10-21 audit record.
+> re-scan and later checks, then the docs commit recording pull request #1 and its merge; all commits are dated
+> 2026-10-22. `git log 4a7c81f..review-ready-2026-10-22` is the authoritative list (after the merge also
+> `git log 4a7c81f..main`; the merge commit kept every branch commit's hash). The rest of this section is kept as
+> the 2026-10-21 audit record.
 
 ### 3.1 Layout (monorepo)
 
@@ -133,7 +148,7 @@ identical apart from line endings and must stay identical.
 | `a4081f3` | 2026-09-09 | Optional backend deployment (Render) |
 | `f38a72c` | 2026-09-09 | Groq output budget (`max_completion_tokens` 512) |
 | `8c7293e` | 2026-09-18 | The five features (schema v5: memories/timeline, explainability, OSM map, captions, voice/assistant client) plus offline People/SFace (schema v6) and New Faces. Developed 2026-09-09/10, committed 2026-09-18. |
-| `4a7c81f` | 2026-09-18 | Repository layout cleanup; state-ownership split (`providers.dart` becomes an export-only barrel). **HEAD = `origin/main`.** |
+| `4a7c81f` | 2026-09-18 | Repository layout cleanup; state-ownership split (`providers.dart` becomes an export-only barrel). **HEAD = `origin/main` at the 2026-10-21 audit; `main` stayed here until the 2026-10-22 merge of pull request #1.** |
 
 Milestones in plain terms:
 
@@ -157,7 +172,8 @@ Milestones in plain terms:
   20 questions on the main screen; later the user resumed People processing. In the afternoon the schema-v7 /
   FaceContract-v2 build was installed in place (the tenth install) and every photo was re-scanned under v2. Later
   that afternoon backup B13 audited the user's "Same person?" answers after B12, and a read-only check of the People
-  and review screens wrote nothing (B14 identical to B13).
+  and review screens wrote nothing (B14 identical to B13). Pull request #1 then merged the branch
+  `review-ready-2026-10-22` into `main` after its CI passed.
 
 Against the original handbook: M9–M11 and M13 are implemented. M14 (faces) is implemented. Automatic grouping is
 gated by a photo-disjoint review: on the Vivo the first round failed (2026-09-18) and a fresh round passed (backup
@@ -273,17 +289,26 @@ Commit-hygiene traps:
 
 It never builds an APK and never runs `integration_test/`, the SFace model test or `test_fp16_conversion.py`.
 
-**CI has failed on the last four pushes, including HEAD.** At HEAD the Flutter job reports 3 failures out of 328.
-HEAD passes locally (Windows, +05:30), so the 3 CI failures depend on something that differs in the CI environment:
-the OS, the timezone, the Flutter SDK version or freshly generated code. The cause has not been identified because
-the run 7 log has not been read. See
+**CI failed on the last four pushes to `main` before 2026-10-22, including `4a7c81f`.** At `4a7c81f` the Flutter
+job reported 3 failures out of 328. `4a7c81f` passes locally (Windows, +05:30), so the 3 CI failures depend on
+something that differs in the CI environment: the OS, the timezone, the Flutter SDK version or freshly generated
+code. The cause has not been identified because the run 7 log has not been read. See
 [EVIDENCE_LEDGER §2](EVIDENCE_LEDGER.md#2-ci-history-github-actions-public-repository).
 
 > **Update (2026-10-22, later):** the cause was found by a Windows-host simulation (KI-17: a Windows-only test font
 > loaded as 'Roboto', and Windows-only path literals in one test) and fixed on the branch. The branch's workflow
 > also runs on `ubuntu-24.04` with a read-only token, enforces the lockfile, checks that regenerated Drift code
-> matches, and checks `dart format`. None of this has run on GitHub yet (nothing pushed), and a local Linux run
+> matches, and checks `dart format`. None of this had run on GitHub then (nothing pushed), and a local Linux run
 > failed because Docker Desktop did not start.
+
+> **Update (2026-10-22, pull request #1):** the first GitHub run of the fix passed. GitHub Actions run 39760306942
+> (event `pull_request`, head `29b1862`, 10:04 to 10:07 UTC, `ubuntu-24.04`) passed all four jobs: repository
+> (Python 3.12), backend (Python 3.12, lockfile-constrained install, pytest), modelkit (Python 3.11) and flutter
+> (3.44.7: `pub get --enforce-lockfile`, `build_runner` with the `app_database.g.dart` diff guard, `analyze`, the
+> `dart format` check, `flutter test test/`). So KI-17 is confirmed fixed on GitHub's Linux runner: the Flutter tests
+> that failed there (3 of 328 at `4a7c81f`, the last of the four failing pushes to `main` before 2026-10-22) now
+> pass. The CI test count is not recorded (the job log needs a GitHub sign-in); the local Windows run at the same
+> commit gave 535 passed, 1 skipped. The branch was then merged into `main` on 2026-10-22.
 
 ## 4. Architecture
 
@@ -346,7 +371,7 @@ The layer list is in [`ARCHITECTURE.md`](../pixelsearch_app/docs/ARCHITECTURE.md
 |---|---|---|
 | Drift SQLite, schema **7** in code since 2026-10-22 (KI-16; on the phone since the 2026-10-22 install, backup B12) | `<appDocuments>/pixelsearch.sqlite` | 14 Drift tables plus raw-SQL `processing_leases` (§7) |
 | Preferences | `<appSupport>/user_preferences.json` (atomic `.pending` + rename) | onboarding flag, online consent and `base_url`, offline speech locales, **label corrections** keyed `photoId\|assetName` |
-| Secure storage | `flutter_secure_storage`: key `backend_connection_v1` on the branch; key `backend_install_token` on `main` | Branch: `{origin, token}`; saving deletes the legacy key without migrating it, so the token must be entered again. `main`: a bare backend token with no origin binding. |
+| Secure storage | `flutter_secure_storage`: key `backend_connection_v1` on the branch (on `main` since the 2026-10-22 merge); key `backend_install_token` on `4a7c81f` (before the merge) | Branch: `{origin, token}`; saving deletes the legacy key without migrating it, so the token must be entered again. `4a7c81f`: a bare backend token with no origin binding. |
 | Thumbnails | `<temp>/thumbnails/<id>.jpg` (256 px, q80) | OS-evictable; display falls back to a gallery thumbnail |
 | MobileCLIP models | `<appSupport>/models/` | provisioned by hand |
 | SFace model | copied from bundled asset to app support after a SHA-256 check | — |
@@ -440,7 +465,7 @@ guaranteed to be byte-identical, so a mismatch with those reference values does 
      hard-codes `byteSize: 0`, so change detection is mtime-only**), `staleVersion` (embedding version differs or
      no embedding), up-to-date, or deleted (only when `canDeleteMissing`).
    - **Delete:** `deleteAssets` cascades to memory members, captions, locations, embeddings and photos. The People
-     cascade (2026-09-18) is on the branch only, not on `main`.
+     cascade (2026-09-18) reached `main` only with the 2026-10-22 merge of the review-ready branch.
    - **Index:** per asset: `originBytes` → EXIF date only → **one** `img.decodeImage` (image 4.9.1 applies JPEG EXIF
      orientation) → 256-px q80 thumbnail → CLIP embedding → ML Kit labels and faces on the original bytes via a
      temp file.
@@ -801,8 +826,8 @@ time, and only with judged held-out evidence.**
 
 - **Routing.** `/` → `StartupScreen`. Then a `StatefulShellRoute.indexedStack` with Search, Timeline, Map and a
   fourth tab at `/home/settings`, labelled "Privacy" (screen title "Privacy Centre") since the redesign (on the
-  branch) and "Settings" on `main`. The viewer, memory detail, story viewer and caption screen are imperative pushes with no
-  deep links.
+  branch) and "Settings" on `4a7c81f` (before the 2026-10-22 merge). The viewer, memory detail, story viewer and
+  caption screen are imperative pushes with no deep links.
 - **Home.** A metadata-only projection of the persisted library, newest first, grouped by local day and month.
   On `main`: exact row extents, month jumps and a draggable date thumb. The redesign (on the branch) also merges the
   search field into one scroll view as a pinned header and offsets month jumps by the pinned extent.
@@ -826,10 +851,11 @@ time, and only with judged held-out evidence.**
     maps consent (2026-10-22, `97404fb`, ADR-025).
   - Device result: 0 of 1,916 photos located.
 - **Viewer.**
-  - Always uses `AppTheme.dark()` (redesign, on the branch). On `main` the viewer has a black background only.
-  - Details shows `photo_rows.lat/lng` (redesign, on the branch; on `main` Details shows no coordinates). They are **always null
-    for device photos on Android 10+**: photo_manager never fills them and the EXIF extractor reads the date only.
-    The map uses a different source, and the two are not reconciled.
+  - Always uses `AppTheme.dark()` (redesign, on the branch). On `4a7c81f` (before the 2026-10-22 merge) the viewer
+    has a black background only.
+  - Details shows `photo_rows.lat/lng` (redesign, on the branch; on `4a7c81f` Details shows no coordinates). They
+    are **always null for device photos on Android 10+**: photo_manager never fills them and the EXIF extractor
+    reads the date only. The map uses a different source, and the two are not reconciled.
   - Labels are corrected through user preferences.
   - Caption **generate** needs consent plus a per-photo preview. Caption **rewrite** sends the caption text with
     feature-level consent only.
@@ -865,9 +891,12 @@ time, and only with judged held-out evidence.**
     and on the branch: only POST requests are authenticated. Live exposure has not been checked.
   - `pytest` ships in the production requirements.
 - **Deployment.** Render free plan via `render.yaml`. The Blueprint pins `GROQ_ZDR_CONFIRMED` to `"false"`, so a
-  re-sync may break the live service. Live code was last verified on 2026-09-09 (`f38a72c`). The hardening is not
-  deployed; on its own it does not change token validation. Token re-entry is forced by the new app build: the
-  branch's `BackendCredentials` binds the token to the backend's HTTPS origin and ignores the legacy
+  re-sync may break the live service. Live code was last verified on 2026-09-09 (`f38a72c`). The hardening was
+  merged into `main` on 2026-10-22 (pull request #1); Render redeploys it if auto-deploy is on for `main` (the
+  setting lives in Render; `render.yaml` names no branch). Whether it redeployed, and the live backend's state,
+  were not checked from here. On its own the hardening does not change token validation: the same three env vars
+  and the same SHA-256 token check, so existing tokens keep working. Token re-entry is forced by the new app build:
+  the branch's `BackendCredentials` binds the token to the backend's HTTPS origin and ignores the legacy
   `backend_install_token`, so users must re-enter the token after installing that build, whether or not the backend
   is redeployed.
 - **Offline speech.**
@@ -877,7 +906,7 @@ time, and only with judged held-out evidence.**
 
 ### 5.7 Evaluation and diagnostics
 
-- **In app.** Privacy Centre (Settings on `main`) → Search diagnostics runs `inspect()`:
+- **In app.** Privacy Centre (Settings on `4a7c81f`, before the merge) → Search diagnostics runs `inspect()`:
   - one embedding and an ungated full scan
   - replays production plus 14 experiments: legacy articles, ML Kit labels, lexical bypass, whole words, pools
     20/50/100/200, and gates off/0/0.1/0.2/0.25/0.3
@@ -1023,11 +1052,12 @@ v2 re-scan). "KI-n" and "TD-n" refer to [`KNOWN_ISSUES.md`](../pixelsearch_app/d
    URL, local user and backup paths, and real names in tests and docs (first names, a full name, and a team roster
    with surnames), in the pushed history. The working tree was redacted forward on 2026-10-22 (ADR-025); making
    the repository private or rewriting history is still open. See §11.
-2. **CI is failing on `main`** (3 Flutter tests on the Linux runner). Cause found by simulation and fixed on the
-   branch (KI-17, 2026-10-22); not yet confirmed on GitHub.
-3. **The work since `4a7c81f` is not on `main` yet.** It is committed on the branch `review-ready-2026-10-22`
-   (2026-10-22), which was pushed to GitHub that day; until it is merged, the public `main` shows none of it, and
-   the backend hardening is not deployed.
+2. **Resolved 2026-10-22: CI was failing on `main`** (on the last four pushes before 2026-10-22; at `4a7c81f`, 3
+   Flutter tests on the Linux runner). Cause found by simulation and fixed on the branch (KI-17); confirmed on
+   GitHub by the first run, on pull request #1, which passed all four jobs on `ubuntu-24.04` (§3.4).
+3. **Resolved 2026-10-22: the work since `4a7c81f` was not on `main`.** The branch `review-ready-2026-10-22` was
+   pushed to GitHub and merged into `main` that day through pull request #1. The backend hardening is on `main`;
+   Render redeploys it if auto-deploy is on for `main`, which was not checked from here (§5.6, §12).
 
 **P1: correctness and safety**
 
@@ -1105,8 +1135,9 @@ v2 re-scan). "KI-n" and "TD-n" refer to [`KNOWN_ISSUES.md`](../pixelsearch_app/d
 - `model_kit/INTERFACE_CONTRACT.md` and `FACE_CONTRACT.md` (content current; the interface contract's header says
   v1.1 while the history reaches v1.3, and it has an FP32-only status note since 2026-10-22; the face contract is
   at v2 since 2026-10-22)
-- `enhancement_backend/README.md` (its 2026-09-18 edit, committed on the branch in `b8c3310`, describes the
-  undeployed hardening, not the live `f38a72c` service)
+- `enhancement_backend/README.md` (its 2026-09-18 edit, committed in `b8c3310` and merged into `main` on
+  2026-10-22, describes the hardening; the live service was last verified on `f38a72c`, and whether Render
+  redeployed after the merge was not checked)
 - `docs/SECURITY_REVIEW_2026-09-18.md`, `docs/architecture/README.md`, `DESIGN.md`, `PRODUCT.md` (untracked at the
   audit; committed on the branch on 2026-10-22, the first two after forward redaction)
 - this handbook set
@@ -1165,8 +1196,9 @@ patterns (local user paths, camera and chat photo filenames, deployment URLs, sh
 phrasing) and, when the git-ignored denylist is present, for its whole-word terms (it never prints them). The list
 below records what the pushed history contains.
 
-- **The GitHub repository `origin` is public**, verified on 2026-10-21. `origin/main` = `4a7c81f` (also HEAD at the
-  audit; HEAD is now the branch `review-ready-2026-10-22`, pushed on 2026-10-22 but not merged).
+- **The GitHub repository `origin` is public**, verified on 2026-10-21. `origin/main` was `4a7c81f` (also HEAD at
+  the audit) until 2026-10-22, when pull request #1 merged the branch `review-ready-2026-10-22` into it with a merge
+  commit. Nothing was force-pushed: `main` moved forward from `4a7c81f`, so the history listed below is still in it.
 - **Tracked, pushed files contain in history** (values deliberately not reproduced here):
   - a full device serial:
     - `pixelsearch_app/docs/ANDROID_FIVE_FEATURE_ACCEPTANCE_2026-09-09.md`
@@ -1213,20 +1245,21 @@ below records what the pushed history contains.
   has no denylist.
 - **Decided 2026-10-22:** forward redaction (done). **Still the owner's decision:** making the repository private
   and rewriting history; neither has been done.
-- **No secrets were found.** Backend secrets are server-side only (`sync:false`). On the branch, release signing
-  material comes only from four env vars (`c49f2d2`); on `main`, release builds are still signed with the debug key.
+- **No secrets were found.** Backend secrets are server-side only (`sync:false`). Release signing material comes
+  only from four env vars (`c49f2d2`, on `main` since the 2026-10-22 merge; before it `main` used the debug key).
   The copyright secret scan's 2 hits are test fixtures.
 - **Accepted limitations:** local data is not independently encrypted; deletion is logical, not forensic; Android
   backup is disabled.
 
 ## 12. Next steps (highest priority first)
 
-> **Update (2026-10-22, later):** step 1's redaction was done forward on the branch (ADR-025); visibility and
-> history rewriting remain the owner's decision. Step 2's cause was found by a Windows-host simulation and fixed on
-> the branch (KI-17); it is confirmed only by a CI run, which happens on a pull request or a push to `main`. Step 3
-> is done: the work is committed on the branch `review-ready-2026-10-22`, pushed to GitHub on 2026-10-22 (no pull
-> request yet); merging it, redeploying the backend hardening and the token re-entry remain. Steps 1 to 3 below
-> are kept as written on 2026-10-21/22.
+> **Update (2026-10-22, later; merge added the same day):** step 1's redaction was done forward on the branch
+> (ADR-025) and is on `main` since the merge; visibility and history rewriting remain the owner's decision. Step 2
+> is done: the cause was found by a Windows-host simulation and fixed on the branch (KI-17), and the first GitHub
+> run, on pull request #1, passed all four jobs. Step 3 is done: the work was committed on the branch
+> `review-ready-2026-10-22`, pushed, and merged into `main` through pull request #1 on 2026-10-22. Checking the
+> Render deploy and the live backend, and the token re-entry on the phone (if online features are used), remain.
+> Steps 1 to 3 below are kept as written on 2026-10-21/22.
 
 1. **Privacy exposure.** With the user, decide on repository visibility, redaction and history rewriting.
 2. **Fix CI.** Read run 7's log while signed in, or reproduce on Linux with Flutter 3.44.7 from a clean checkout of
@@ -1293,13 +1326,13 @@ below records what the pushed history contains.
     person?" answers were checked only through aggregate backup counts (B5 to B6, the answers during the v2 re-scan
     B11 to B12, and those after it B12 to B13)
   - the accuracy of the 85 automatic assignments made after the resumed pass (B8)
-  - whether the KI-17 fix makes CI pass on GitHub (the 3 failures were explained only by a Windows-host simulation
-    on 2026-10-22; the job logs were never read and no Linux run was possible)
+  - the Flutter test count of the passing GitHub CI run (the KI-17 fix passed all four jobs on pull request #1,
+    2026-10-22; the job log needs a GitHub sign-in and was not read)
   - the grouping quality under FaceContract v2 on the phone (installed and re-scanned 2026-10-22, 864 faces with
     descriptors at B12 and B13; no review round under v2 yet at B14, so unmeasured)
   - how many "Same person?" answers the 271 reject rows added from B12 to B13 stand for (a "No" to two groups writes
     a reject row for every face of each group against the other group; at most 20 user actions in all)
-  - which commit Render serves, and whether the service is live
+  - which commit Render serves, and whether the service is live (not checked after the 2026-10-22 merge either)
   - whether Groq ZDR is still enabled and the preview Qwen model still available
   - whether the Vivo originals actually contain GPS
   - HEIC decode behaviour (inferred to fail)
@@ -1329,8 +1362,8 @@ below records what the pushed history contains.
     archive contents in `local_evaluation/` (aggregates only), and made read-only public GitHub API requests.
   - One agent wrote a temporary comparison file to the system temp directory, outside the repository.
   - No code, config or test file was changed by the audit.
-- **Audit changes (2026-10-21, all uncommitted then; committed on the branch in `ecccf18` on 2026-10-22 and pushed
-  that day, but not merged, so the public `main` still has none of them):**
+- **Audit changes (2026-10-21, all uncommitted then; committed on the branch in `ecccf18` on 2026-10-22, pushed
+  that day and merged into `main` the same day through pull request #1):**
   - new, untracked: root `CLAUDE.md`, `docs/PROJECT_CONTEXT.md`, `docs/EVIDENCE_LEDGER.md`, `docs/FILE_MAP.md`
   - edits to `docs/README.md`, `pixelsearch_app/CLAUDE.md` and `model_kit/CLAUDE.md`
   - dated status notes at the top of the stale docs listed in §10, including the late additions `RESEARCH_LOG.md`

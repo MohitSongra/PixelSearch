@@ -19,9 +19,10 @@ A 15-minute reading path:
    results. About 4 minutes.
 2. [Project context](PROJECT_CONTEXT.md): read §1 (what it is), §2 (status matrix) and §5.3 (how search works,
    traced in code). §9 is the prioritized known-issue register and §12 the next steps. About 5 minutes. Its
-   dated updates (2026-10-22) cover schema v7, FaceContract v2, their install and re-scan on the phone, and the
-   later backups B13 and B14 with a read-only check of the People and review screens; older passages that say
-   schema 6 or a 100 px minimum describe the state before that install.
+   dated updates (2026-10-22) cover schema v7, FaceContract v2, their install and re-scan on the phone, the later
+   backups B13 and B14 with a read-only check of the People and review screens, and pull request #1 (its passing
+   CI run and the merge into `main`); older passages that say schema 6 or a 100 px minimum describe the state
+   before the schema-v7 install.
 3. [Evidence ledger](EVIDENCE_LEDGER.md): every measured number with its date, device or host, precision and
    caveats, and the list of things never measured (§10). About 3 minutes.
 4. [App architecture](../pixelsearch_app/docs/ARCHITECTURE.md): layers, state ownership, and the indexing and
@@ -120,7 +121,7 @@ issues and the test plan also take new dated entries. The full list of stale cla
 | [RESEARCH_LOG.md](../pixelsearch_app/docs/RESEARCH_LOG.md) | Investigations and findings by date | Calls FP16 a validated on-device artifact, which is false. |
 | [BENCHMARK_RESULTS.md](../pixelsearch_app/docs/BENCHMARK_RESULTS.md) | Host benchmarks | Claims FP16 was validated on a device (false); device sections still say PENDING. |
 | [ARCHITECTURE_DECISIONS.md](../pixelsearch_app/docs/ARCHITECTURE_DECISIONS.md) | ADR-001 to ADR-025 | ADR-006 (two repositories) is superseded; ADR-015's early-cancel replay is defeated. ADR-018 to ADR-025 were added on 2026-10-22; the newest are ADR-023 (FaceContract v2), ADR-024 (schema v7) and ADR-025 (publication guardrails). |
-| [KNOWN_ISSUES.md](../pixelsearch_app/docs/KNOWN_ISSUES.md) | Known issues KI-1 to KI-17 | KI-5, KI-8, KI-11 and KI-13 are stale. KI-16 is marked fixed (schema v7, 2026-10-22); KI-17 (Linux-only CI failures) is fixed on the branch but not yet confirmed on a Linux runner. |
+| [KNOWN_ISSUES.md](../pixelsearch_app/docs/KNOWN_ISSUES.md) | Known issues KI-1 to KI-17 | KI-5, KI-8, KI-11 and KI-13 are stale. KI-16 is marked fixed (schema v7, 2026-10-22); KI-17 (Linux-only CI failures) is fixed and confirmed by GitHub CI on pull request #1 (all four jobs passed, 2026-10-22). |
 | [TECHNICAL_DEBT.md](../pixelsearch_app/docs/TECHNICAL_DEBT.md) | Deliberate shortcuts TD-1 onwards | TD-11 says the device adapters were never run; TD-17 to TD-19 remain open. |
 | [TEST_PLAN.md](../pixelsearch_app/docs/TEST_PLAN.md) | Tests added per milestone | Older sections are stale; the two 2026-10-22 sections at the top (the review-ready cleanup and People search) are current. |
 | [INDEXING_ARCHITECTURE.md](../pixelsearch_app/docs/INDEXING_ARCHITECTURE.md) | M5 indexing engine design | WorkManager, empty-gallery and EXIF GPS claims. |

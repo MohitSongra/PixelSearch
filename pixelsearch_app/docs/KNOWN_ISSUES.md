@@ -64,16 +64,18 @@ with the review rows, which is a schema change and is not done. A skipped test i
 `test/people_validation_recovery_test.dart` documents the bug. Mitigation: do not start a new review
 after editing reviewed photos until this is fixed.
 
-## KI-17 (Fixed in the branch 2026-10-22; Linux confirmation pending) - CI failed on Linux only
+## KI-17 (Fixed 2026-10-22; confirmed on GitHub CI, pull request #1) - CI failed on Linux only
 GitHub CI failed tests on the Linux runner that passed on Windows. Two causes, found by simulation on the
-Windows host (2026-10-22) because the job logs need admin rights: four widget-test files loaded the Windows
+Windows host (2026-10-22) because the job logs need a GitHub sign-in: four widget-test files loaded the Windows
 font `segoeui.ttf` as 'Roboto' only when it existed, so on Linux text used the wide FlutterTest font and
 320 px layouts overflowed; and `modelkit_paths_test.dart` built Windows-only path literals. Both are fixed in
 test code (`test/support/test_fonts.dart`, now used by five widget-test files, loads the bundled Manrope on
-every host; the path test builds paths from the host root). The fix has not yet run on a Linux runner: a local
-Docker run failed because Docker Desktop did not start, and nothing was pushed. CI runs on pushes to
-`main`/`master` and on pull requests, so the first run of a pull request from the branch (or of a push to
-`main`) confirms or reopens this.
+every host; the path test builds paths from the host root). A local Docker run of the fix (2026-10-22) failed
+because Docker Desktop did not start. The first GitHub run of the fix (2026-10-22: Actions run 39760306942, pull
+request #1, head `29b1862`, `ubuntu-24.04` runner) passed all four jobs, so the Flutter tests that failed there
+before (3 of 328 at `4a7c81f`, the last of the four failing pushes to `main` before 2026-10-22) now pass. The CI
+test count is not recorded (the job log needs a GitHub sign-in); the local Windows run at the same commit gave
+535 passed, 1 skipped.
 
 ## KI-12 (Critical testing safety) - device-test cleanup removed private app data
 On 2026-09-08, a new semantic diagnostics integration test was run without `--no-uninstall`.

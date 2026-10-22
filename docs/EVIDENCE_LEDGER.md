@@ -4,11 +4,12 @@
 "Same person?" questions, the user's answers and the resumed processing pass §4.2 and §6, test counts §8), then
 for the review-ready branch (host runs §1, CI cause §2), then for the tenth install, the schema 6 → 7 migration and
 the FaceContract v2 re-scan on the phone (§1, §4.2, §6, §9, §10), then for backups B13 and B14 and a view-only check
-of the People and review screens on the phone (§4.2, §6, §9, §10) · **Repository state:** `main` = `origin/main` at
-`4a7c81f` (2026-09-18); since 2026-10-22 the former working tree is committed on the branch
-`review-ready-2026-10-22` (schema 7, FaceContract v2), pushed to GitHub that day and not yet merged. Since the
-tenth in-place install (2026-10-22, a debug build of `0f20b8c`) the phone runs schema 7 and FaceContract v2, with
-all 1,916 photos re-scanned under v2.
+of the People and review screens on the phone (§4.2, §6, §9, §10), then for pull request #1, its CI run and
+the merge (§1, §2, §9, §10) · **Repository state:** `main` was `4a7c81f` (2026-09-18) until 2026-10-22. That day
+the former working tree, committed on the branch `review-ready-2026-10-22` (schema 7, FaceContract v2), was pushed,
+passed CI on GitHub as pull request #1 (§2) and was merged into `main` with a merge commit, so the branch hashes
+cited here stay valid. Since the tenth in-place install (2026-10-22, a debug build of `0f20b8c`) the phone runs
+schema 7 and FaceContract v2, with all 1,916 photos re-scanned under v2.
 
 This ledger lists every measured result found in the repository, with its date, device, precision, scope and the
 quality of its evidence. It exists so that future work cites measurements correctly instead of copying numbers
@@ -82,14 +83,16 @@ These runs follow code changes, so they are not read-only like the audit runs ab
 | `flutter build apk --debug --no-pub` | Built (2026-10-22 12:33); bundles only the listed model files, the licence texts and Manrope; `assets/branding/` no longer bundled. The build predates `99433c5` (committed 12:52): its asset list has no `MATERIAL_ICONS_LICENSE.txt` or `ONNXRUNTIME_LICENSE.txt` (checked 2026-10-22 by listing the APK); the ML Kit notice came in the same commit. Rebuild from the branch tip before installing (done at 13:12, next row). |
 | `flutter build apk --debug --no-pub` at `0f20b8c` (branch tip then, clean working tree) | Built 2026-10-22 13:12; versionCode 1, same signer as the phone's install; contains the five licence texts (SFace, CLIP tokenizer, Manrope OFL, Material Icons, ONNX Runtime) and no MobileCLIP or fp16 ONNX file. Installed in place as the tenth install (§4.2). |
 | `flutter test --no-pub test/` (`pixelsearch_app/`) at `9bea6d4` (after the formatting commits), re-run during the doc check | **535 passed, 1 skipped** (Windows host, 2026-10-22) |
-| Linux run of the test suite (KI-17) | **Not run**: Docker Desktop failed to start (an error in its own AI-inference socket), and nothing was pushed to GitHub |
+| `flutter test --no-pub test/` (`pixelsearch_app/`) at `29b1862` (the head of pull request #1's CI run, §2) | **535 passed, 1 skipped** (Windows host, 2026-10-22) |
+| Linux run of the test suite (KI-17) | **Not run** locally: Docker Desktop failed to start (an error in its own AI-inference socket). The suite ran on GitHub's Linux runner later that day instead (pull request #1, all four CI jobs passed; §2) |
 
 No 2026-10-22 run is recorded for the SFace-enabled suite or `integration_test/`.
 
 ## 2. CI history (GitHub Actions, public repository)
 
-Checked on 2026-10-21 through unauthenticated, read-only GitHub API requests. Job logs require authentication and
-were not read.
+Rows 1 to 7 were checked on 2026-10-21 through unauthenticated, read-only GitHub API requests. Job logs require
+authentication and were not read. Row 8 (2026-10-22) is the pull request #1 run; it is CI on a Linux runner, not a
+device result.
 
 | Run | Commit | Date (UTC) | Result |
 |---|---|---|---|
@@ -100,15 +103,26 @@ were not read.
 | 5 | `a4081f3` | 2026-09-09 | failure |
 | 6 | `f38a72c` | 2026-09-09 | failure |
 | 7 | `4a7c81f` (`main`; HEAD at the audit) | 2026-09-18 | failure: only the Flutter job failed, at `flutter test test/`, with "324 tests passed, 3 failed, 1 skipped". The repository, backend and ModelKit jobs passed. |
+| 8 (id 39760306942) | `29b1862` (then the branch tip; pull request #1, event `pull_request`) | 2026-10-22 (10:04–10:07) | **success** on the `ubuntu-24.04` runner: all four jobs passed (details below the table). |
 
-The same commit passes locally on Windows with the committed generated code (327 + 1 skip, §1). CI differs in OS,
+Run 7's commit passes locally on Windows with the committed generated code (327 + 1 skip, §1). CI differs in OS,
 timezone, run date (2026-09-18 vs 2026-10-21) and a `build_runner` regeneration step, so the cause of the three
 failures is not established. Which tests fail, and why, is **unknown** from the logs. Update 2026-10-22 (KI-17): a
 Windows-host simulation reproduced the exact counts with two causes, a Windows-only test font loaded as 'Roboto' and
-Windows-only path literals in one test; both are fixed on the branch `review-ready-2026-10-22`, which has not run
-on GitHub yet. A timezone dependence was not found. To confirm, open a pull request from the branch or push it to
-`main` (the owner's decision; `ci.yml` runs only on pushes to `main`/`master` and on pull requests, so pushing the
-branch alone runs nothing), or run `flutter test test/` on a Linux machine.
+Windows-only path literals in one test; both are fixed on the branch `review-ready-2026-10-22`. A timezone
+dependence was not found.
+
+Confirmed on GitHub on 2026-10-22: pull request #1 (28 commits, base `main` at `4a7c81f`) ran CI on `29b1862`,
+then the branch tip (run 8, id 39760306942, event `pull_request`, `ubuntu-24.04`), and all four jobs passed: the
+repository check (Python 3.12), the backend tests (Python 3.12,
+`pip install -r requirements.txt -c requirements.lock`, pytest), the ModelKit metric tests (Python 3.11) and the
+Flutter job (Flutter 3.44.7: `flutter pub get --enforce-lockfile`, `build_runner` with the `app_database.g.dart`
+diff guard, `flutter analyze`, the `dart format` check, `flutter test test/`). So KI-17 is fixed on GitHub's Linux
+runner: the Flutter tests that failed there before (3 of 328 at run 7, `4a7c81f`; runs 4 to 6 also failed, on the
+last four pushes to `main` before 2026-10-22) now pass. The CI test count is not recorded (the job log needs a
+GitHub sign-in); the local Windows host run at the same commit gave 535 passed, 1 skipped (§1). CI ran again on the
+commit that records this, and the merge waited for that run to pass; the pull request was then merged into `main`
+on 2026-10-22 with a merge commit (no force-push), so every branch hash cited in this ledger stays valid.
 
 ## 3. Model and parity evidence (host)
 
@@ -176,7 +190,7 @@ All runs: debug APK, MobileCLIP **FP32 on CPU**, 4 intra-op threads, models prov
 | 2026-09-18 | Redesign Home scroll | pinned search-field bounds verified after swipes | In-place update of the then-uncommitted redesign build | raw log (`.impeccable/review/`, local only; git-ignored since 2026-10-22) |
 | 2026-10-22 | Backup B0 (before any install) | installed debug build versionCode 1, last updated 2026-09-18; SQLite integrity ok, schema 6; 1,916 photos with 1,916 embeddings; People state in §6 | Aggregate only | private raw |
 | 2026-10-22 | In-place install of the People-search build | Backup B0b identical to B0 in every table → `adb install -r` → first-install time unchanged, signature unchanged, installed binary identical to the built APK, `run-as` works. Backup B1 after the first launch: every table identical to B0b (only app assets, the image cache, the WorkManager database and shader-cache files changed). Two later builds were installed the same way; backup B2, taken before the second install, has tables identical to B1, so the acceptance searches wrote nothing. | Three installs of the People-search build on 2026-10-22 (ten in all with the later builds below); never uninstalled or cleared | private raw |
-| 2026-10-22 | People-search acceptance | 8 typed person queries matched the values expected from backup B1 (table below); hidden person, suggestions view, grouping and persistence checked | Driven over adb through the accessibility tree at the user's request, with no screenshots; the assistant confirmed or rejected no identity | prose (`PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22.md`, committed on the branch) |
+| 2026-10-22 | People-search acceptance | 8 typed person queries matched the values expected from backup B1 (table below); hidden person, suggestions view, grouping and persistence checked | Driven over adb through the accessibility tree at the user's request, with no screenshots; the assistant confirmed or rejected no identity | prose (`PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22.md`, committed on the branch, merged into `main` on 2026-10-22) |
 | 2026-10-22 | "Group similar faces" (user-approved) | 266 automatic assignments, 137 new unnamed groups; see §6 | One run; processing stayed paused | private raw (backup B3) |
 | 2026-10-22 | In-place installs of the "Same person?" build | Two more installs the same way; backups B4 and B5 taken before them; tables identical from B3 to B5, so viewing the questions wrote nothing | Same signer, versionCode 1 | private raw |
 | 2026-10-22 | "Same person?" questions on the phone | People tile "Same person? \| 122 quick questions": 3 verify questions and 119 group pairs at or above the user's lowest "same" review score (≈ 0.398); see §6 | View only, read over adb through the accessibility tree; the assistant answered no question | observed on the phone; private raw (host simulation on a copy of backup B3) |
@@ -261,7 +275,7 @@ its backup-only branch has been exercised on a device.
 | Scan coverage | 485 of 1,916 photos processed; 2,342 detections; **336 ready descriptors** (2,006 "small face" observations below 100 px). Unchanged in backup B0 (2026-10-22) and up to B7. After the user resumed processing (backup B8, 2026-10-22): **1,916 of 1,916** photos processed, 2,642 detections, **397 ready descriptors**. After the FaceContract v2 re-scan (backup B12, 2026-10-22): 1,916 of 1,916 photos scanned under v2, 2,642 detections, **864 ready descriptors**. |
 | Original review, 2026-09-18 (failed) | calibration 31 Same / 9 Different; cutoff 0.4307765197209109; validation 16 Same / 4 Different; 15/16 Same accepted; **1 false join** (pair 55, cosine 0.5594) |
 | Final corrected snapshot, 2026-09-18 | validation 15 Same / 5 Different; conflict pair 56 (Different, cosine 0.4392 > cutoff). **Gate still failed on that date. Automatic grouping was OFF. People processing was left paused by the user.** Superseded by the fresh round below. |
-| Note | The documentation says "correcting a rating" (singular). The private before/after reports show three ratings changed (pairs 55, 56, 57). The test `pixelsearch_app/test/people_domain_test.dart:193-212` (on the branch `review-ready-2026-10-22`, not on `main` `4a7c81f`) encodes the *original* review, not the corrected one (its boundary cosines rounded to four decimals since 2026-10-22, `ea1ba79`; the outcome is unchanged). The People-validation fix described in `PEOPLE_VALIDATION_2026-09-18.md` is also on the branch only. |
+| Note | The documentation says "correcting a rating" (singular). The private before/after reports show three ratings changed (pairs 55, 56, 57). The test `pixelsearch_app/test/people_domain_test.dart:193-212` (on the branch `review-ready-2026-10-22`, merged into `main` on 2026-10-22; not in `4a7c81f`) encodes the *original* review, not the corrected one (its boundary cosines rounded to four decimals since 2026-10-22, `ea1ba79`; the outcome is unchanged). The People-validation fix described in `PEOPLE_VALIDATION_2026-09-18.md` came with the same merge (not in `4a7c81f`). |
 | Fresh round (backup B0, 2026-10-22) | An archived round (40 calibration + 20 validation pairs) and a current round (60 calibration + 20 fresh validation pairs). Saved calibration **passed**: calibration 46 Same / 14 Different; validation 16 Same / 4 Different; **0 false joins**, 16 true joins; threshold ≈ 0.462. The app says "Passed this reviewed sample; not a general accuracy guarantee". The holdout has only 4 Different pairs. |
 | People data before grouping (backups B0 to B2, 2026-10-22) | People enabled and paused; 5 named persons (1 "This is me", 0 hidden); assignments 6 manual, 0 automatic; 7 faces marked Not a face; decisions 6 accept / 1 reject. No named person shared a photo with the "This is me" person. |
 | Face sizes and duplicates (backup analysis, 2026-10-22) | 2,342 detected faces in 430 photos; 336 at least 100 px (descriptor); 2,006 smaller, which FaceContract v1 (the phone's build then) can never group (v2 lowers the minimum to 64 px, ADR-023); 67 photos with 10 or more faces; 26 overlapping same-photo detection pairs and about 20 near-identical cross-photo pairs (the same image saved twice). Duplicates are a minor factor. Measured under v2 after the re-scan (backup B12, 2026-10-22, all 2,642 faces): **864 of 2,642** have a descriptor (about 33 %, against 397, about 15 %, under v1 in B8); 467 faces of 64 to under 100 px in the prepared image gained one; 1,778 stay under 64 px (width or height) and have none. |
@@ -275,8 +289,8 @@ its backup-only branch has been exercised on a device.
 | Recognition accuracy | Never measured (including the 266 automatic assignments of the grouping run and the 85 after the resumed pass) |
 
 Evidence: `pixelsearch_app/docs/PEOPLE_VALIDATION_2026-09-18.md` and
-`pixelsearch_app/docs/PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22.md` (both committed on the branch, the first after
-forward redaction). Raw anonymised before/after
+`pixelsearch_app/docs/PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22.md` (both committed on the branch, merged into
+`main` on 2026-10-22; the first after forward redaction). Raw anonymised before/after
 JSON and backups are in the git-ignored `local_evaluation/`.
 
 ## 7. Online / backend evidence
@@ -324,10 +338,10 @@ Backend: 14 → 19 → 27 → 51 (the 51 includes `test_security.py`) → **51 o
 | Claim | Where | Reality |
 |---|---|---|
 | fp16 "validated on-device (NNAPI/XNNPACK)", fp16 "shipped" | `pixelsearch_app/docs/BENCHMARK_RESULTS.md` §2/§6/§7; `model_kit/parity/README.md` | No execution provider is registered (`lib/ai/onnx_encoder.dart:62-73`). No recorded device run used an fp16 artifact, and Android fp16 load, inference and parity have never been accepted (KI-2, KI-9). Whether an fp16 file was ever copied to a phone is not documented. |
-| "Both precisions are numerically verified" | `lib/core/model_locator.dart:35-41` (code comment on `main`) | fp16 parity was never measured. The comment was replaced on the branch on 2026-10-22 (`40cf6fb`): FP32 CPU is the only accepted configuration. |
+| "Both precisions are numerically verified" | `lib/core/model_locator.dart:35-41` (code comment on `main` at `4a7c81f`) | fp16 parity was never measured. The comment was replaced on the branch on 2026-10-22 (`40cf6fb`) and merged into `main` that day: FP32 CPU is the only accepted configuration. |
 | On-device performance "PENDING" | `BENCHMARK_RESULTS.md` §3/§5 | Device fp32 numbers exist (§4). The file was never updated. |
 | End-to-end query "dominated by the ~42 ms text embed" | `BENCHMARK_RESULTS.md` | The end-to-end mean (35.1 ms) is below the text-embed mean (41.7 ms). These were separate runs and cannot be combined. |
-| "Results in under two seconds" | onboarding UI copy (`onboarding_screen.dart:89-90` on `main`) | No device end-to-end query latency has been measured. This is a target from the archived plan. The copy was removed on the branch on 2026-10-22 (`462d7af`). |
+| "Results in under two seconds" | onboarding UI copy (`onboarding_screen.dart:89-90` on `main` at `4a7c81f`) | No device end-to-end query latency has been measured. This is a target from the archived plan. The copy was removed on the branch on 2026-10-22 (`462d7af`) and merged into `main` that day. |
 | Every photo gets tags (best-3 fallback; 0 of 512 unlabelled) | `CHANGELOG.md` | The fallback was removed in `5f6f074`. Current policy: confidence ≥ 0.5 or no labels. |
 | Blackbook figure "6 samples"; raw-cosine ×0.70 formula; name-dependent face term | `reports/blackbook/` (untracked) | 30 iterations; the code uses `clamp(cos/0.35)`; the face term is min(faceCount, 3) / 3, applied only when the query contains a face-intent keyword (people, person, selfie, group, family, etc.) and faceCount > 0; it does not depend on person names |
 | 358 tests (October) | blackbook evidence notes | No October log existed at the 2026-10-21 audit (372 + 1 skip that day). The current count is 535 passed + 1 skipped (branch `review-ready-2026-10-22`, 2026-10-22; 526 + 2 on the working tree earlier that day). |
@@ -335,6 +349,7 @@ Backend: 14 → 19 → 27 → 51 (the 51 includes `test_security.py`) → **51 o
 | "Device acceptance of the 2026-10-22 build is pending" | notes written earlier on 2026-10-22 | Superseded the same day: the build was installed in place and accepted (§4.2). |
 | "The schema-v7 / FaceContract-v2 build is not installed", "the v2 re-scan is pending", 397 of 2,642 faces comparable as the current count | notes written earlier on 2026-10-22 | Superseded the same day: tenth in-place install, schema 6 → 7 migration and a full v2 re-scan (1,916 of 1,916 photos); 864 of 2,642 faces now have a descriptor (§4.2, §6). |
 | The "Face settings changed" message as host-tested only and not viewed on the phone; the user's answers after backup B12 as not audited by a backup; "1487 to name" as the latest reading | notes written earlier on 2026-10-22 | True as the state at backup B12 (13:56; the 1487 reading was at 13:51). Superseded the same day: backup B13 (14:43) audits the later answers; at about 14:50 the review screen with the message, the People screen ("1488 to name") and the Home prompt were viewed on the phone; backup B14 shows the viewing wrote nothing (§4.2, §6). |
+| "The branch is not pushed" or "not merged", "the KI-17 fix has not run on GitHub" | notes written earlier on 2026-10-22 | Superseded the same day: pull request #1 passed CI on GitHub's Linux runner (run 39760306942, all four jobs) and was merged into `main` with a merge commit (§2). |
 
 ## 10. Never measured (known gaps)
 
@@ -353,7 +368,8 @@ Backend: 14 → 19 → 27 → 51 (the 51 includes `test_security.py`) → **51 o
   its descriptor yield (864 of 2,642 faces), the user's later answers (backup B13) and a view-only check of the
   People and review screens with the "Face settings changed" message were measured or viewed on the phone on
   2026-10-22 (§4.2, §6).
-- Any CI run of the KI-17 fix on GitHub, or any Linux run of the suite.
+- The live backend after the 2026-10-22 merge: whether Render redeployed the hardened backend (`b8c3310`) was not
+  checked from here (§7's live checks predate it, `f38a72c`).
 - Background (WorkManager) indexing on any device.
 - Positive GPS pins; offline and cloud speech accuracy; live caption flows.
 - Release-signed build or install.
