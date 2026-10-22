@@ -1,8 +1,36 @@
 # TEST PLAN
 
-> **Status note (2026-10-21 audit):** This file is stale. The test count today is 372 passed + 1 skipped on the working tree. Web builds are not a CI target, and the "on-device fp16 golden on NNAPI/XNNPACK" item has never run. CI has failed on every push since 2026-09-09 (runs 4–7). At HEAD (`4a7c81f`, run 7, 2026-09-18) only the Flutter job failed: 324 passed, 3 failed, 1 skipped on the Linux runner. The causes of runs 4–6, and which 3 tests failed, are unknown (job logs not read). Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record. **Update 2026-10-22:** the working tree now passes 526 + 2 skipped on the Windows host, and the People search build passed device acceptance; see [People search (2026-10-22)](#people-search-2026-10-22), the only section added since.
+> **Status note (2026-10-21 audit):** This file is stale. The test count today is 372 passed + 1 skipped on the working tree. Web builds are not a CI target, and the "on-device fp16 golden on NNAPI/XNNPACK" item has never run. CI has failed on every push since 2026-09-09 (runs 4–7). At HEAD (`4a7c81f`, run 7, 2026-09-18) only the Flutter job failed: 324 passed, 3 failed, 1 skipped on the Linux runner. The causes of runs 4–6, and which 3 tests failed, are unknown (job logs not read). Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The content below is kept unchanged as a historical record. **Update 2026-10-22:** the branch `review-ready-2026-10-22` (where the former working tree is now committed) passes 535 + 1 skipped on the Windows host, the People search build passed device acceptance, and the three Linux-only CI failures are explained and fixed on the branch (KI-17; not yet run on GitHub); see the two sections added since: [Review-ready cleanup](#review-ready-cleanup-facecontract-v2-and-schema-v7-2026-10-22-later) and [People search (2026-10-22)](#people-search-2026-10-22).
 
 Testing scales with the milestone. Principle: every milestone lands with the tests that prove it.
+
+## Review-ready cleanup, FaceContract v2 and schema v7 (2026-10-22, later)
+
+Windows host, 2026-10-22: `flutter analyze --no-pub` reports no issues and `flutter test --no-pub test/` gives
+**535 passed, 1 skipped** (the real SFace worker test, which needs `--dart-define=SFACE_MODEL_TEST=true`); the same
+after the formatting commits (`9bea6d4`). The KI-16 bug test is no longer skipped. New or changed tests:
+
+- `test/people_contract_upgrade_test.dart` (4, new; ADR-023): a re-scan under v2 continues each matching face with
+  its name, "Not a face" and decisions, drops unmatched unassigned observations and keeps unmatched named ones on
+  record; earlier faces stay visible until their photo is re-scanned and only v2 scans count as processed; reviews
+  under v1 keep grouping off with the "Face settings changed" reason; archived "same" answers keep the question
+  floor. The carry-over and floor tests fail without their fixes.
+- `test/people_migration_test.dart` (+1; ADR-024): v6 -> v7 adds the two photo-id columns, fills them from the faces
+  that still exist (null when a face is gone) and leaves the photo, face and state tables unchanged.
+- `test/people_validation_recovery_test.dart`: the KI-16 test now runs and passes (it fails without the fix); the
+  review seed stores photo ids as the app does.
+- `test/third_party_licenses_test.dart` (2, new): the licence page lists SFace, the CLIP vocabulary, Manrope, the
+  Material Icons font and the native ONNX Runtime; the Privacy Centre shows the ML Kit metrics notice, and
+  Settings > About opens the dialog with "All rights reserved" and "View licenses".
+- `test/map_tile_client_test.dart` (+1): consented tiles use a disabled disk cache.
+- `test/widget_test.dart`: onboarding makes no speed claim and states the online-feature exception;
+  `test/startup_and_labels_test.dart` scrolls to the onboarding buttons, which the longer copy moves below the
+  fold on short screens.
+- `test/people_domain_test.dart`: the device-derived boundary cosines in the gate test are rounded to four decimals
+  (same order, same outcome).
+- `test/support/test_fonts.dart` (new) replaces the font loaders of five widget-test files, four of which loaded
+  the Windows-only Segoe font as 'Roboto'; `test/modelkit_paths_test.dart` builds host-rooted paths (KI-17). Real
+  names in fixtures were replaced with placeholders (ADR-025).
 
 ## People search (2026-10-22)
 
@@ -70,7 +98,7 @@ values taken from backups. The "Same person?" screen was first only viewed (122 
 B3 to B5). The user then named faces and answered the questions on the phone (B5 to B6, checked through backup
 counts; "photos of me with" a named person then gave 2 results). The rounds build followed (no question left), the
 user resumed People processing (all 1,916 photos processed, 70 new questions, the main-screen prompt shown), and
-two builds with the later fixes were installed; nine in-place installs in all. Suggestion decisions, answering
+three builds with the later fixes were installed; nine in-place installs in all. Suggestion decisions, answering
 through the rounds and voice input remain host-tested only. Results:
 `PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22.md`.
 

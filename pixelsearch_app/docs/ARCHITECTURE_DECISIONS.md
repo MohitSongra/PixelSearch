@@ -2,7 +2,58 @@
 
 > **Status note (2026-10-21 audit):** Some records below no longer match the code. ADR-006 (two separate repositories) is superseded: the app, `model_kit` and the backend now live as sibling folders in one repository, with the same ownership rule. ADR-015's early-cancel replay is defeated, because `IndexingService.run()` clears the cancel flag on entry. ADR-016 (fp16 v3) remains unaccepted on Android. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The decisions below are kept unchanged as the historical record.
 
+> **Status note (2026-10-22, later):** ADR-023 (FaceContract v2, on the branch `review-ready-2026-10-22`) lowers the descriptor minimum from 100 px to 64 px, so the "at least 100 px" statements in ADR-018, ADR-021 and ADR-020 describe FaceContract v1 (still the phone's installed build), and ADR-020's "Lowering `minFacePixels` … not done" is superseded. ADR-024 fixes KI-16 with schema v7. ADR-025 records the publication guardrails.
+
 Format: each record is a decision, its context, and its consequences. Newest first.
+
+## ADR-025 - Publication guardrails: forward redaction, private-data scan, interim licence (2026-10-22)
+**Context:** the public repository and the working tree held a device serial, local user and backup paths,
+private photo filenames, the backend URL, APK and backup digests, share links and real names in test fixtures
+and an archived team roster. The owner chose forward redaction (no history rewrite) and an interim licence
+until all four co-authors agree on an open-source licence.
+**Decision:** replace the identifiers with placeholders in the working tree (dated reports keep their
+measurements and get a dated redaction note; model digests stay as contract evidence); use placeholder names
+in tests that keep prefix cases (`Bob`/`Bobson`, `Casey`/`Caseyann`); ignore the local deliverable folders;
+extend `tool/check_repository.py` with a scan of tracked and addable files for generic personal-data shapes and,
+from a git-ignored denylist, whole-word terms it never prints; publish an "all rights reserved, for academic
+evaluation" LICENSE with THIRD_PARTY_NOTICES.md and show the bundled components' licences in the app (SFace,
+the CLIP vocabulary, Manrope, Material Icons, the native ONNX Runtime); tell users in the Privacy Centre that ML
+Kit sends usage metrics to Google, as its terms require; never cache consented map tiles on disk.
+**Consequences:** the pushed history (`4a7c81f` and earlier) still contains the old values; making the
+repository private or rewriting history remains the owner's choice. The scan can flag legitimate text; it
+does not prove the absence of personal data. CI has no denylist, so it checks only the generic patterns.
+
+## ADR-024 - Reviewed photo ids on review rows, schema v7 (2026-10-22)
+**Context:** KI-16. Review rows named faces only, and face ids include the photo revision, so an edited
+reviewed photo could be sampled into a new review round, weakening the photo-disjoint holdout.
+**Decision:** add nullable `left_photo_id` and `right_photo_id` to `people_reviews`. The v6 -> v7 step adds them
+and fills them from the faces that still exist; a database older than v6 creates the table with them. New and
+carried review rows store their photo ids, and the reviewed-photo set is the union of stored ids and the old
+face join. `AppDatabase.schemaVersion` and `AiContract.schemaVersion` are 7.
+**Consequences:** additive; no other table changes (migration test). Rows written before v7 whose faces were
+already gone keep null ids, so such photos stay unprotected. A host rehearsal on a copy of the phone's latest
+backup (B10) filled all 140 review rows; the migration has not yet run on the phone.
+
+## ADR-023 - FaceContract v2: compare faces from 64 px, keeping identities across the re-scan (2026-10-22)
+**Context:** on the test phone only 397 of 2,642 detected faces (all photos processed) reached the 100 px SFace
+minimum, so most faces could never be grouped, suggested or asked about. The owner chose to lower the minimum
+to 64 px, accepting a re-scan and a new review round before automatic grouping uses the smaller faces.
+**Decision:** `FaceContract.id` becomes `sface-2021dec-mlkit-landmarks-v2` with `minFacePixels` 64 (ModelKit
+`FACE_CONTRACT.md` is updated in the same change). Detection, alignment, the model and the descriptor are unchanged, so a
+face of 100 px or more gets a bit-identical descriptor. `commitPhoto` continues identities: a new detection whose
+box overlaps an earlier observation of the same photo revision (IoU >= 0.5, best match first) keeps its id,
+person, assignment, "Not a face" and every decision or review naming it, and takes the new box, quality, crop and
+descriptor. Unmatched earlier observations are dropped unless they belong to a person (manually or
+automatically assigned) or are marked "Not a face"; those stay on record but are no longer shown. Until a photo
+is re-scanned, its v1 faces stay visible (`FaceContract.compatible`); only v2 scans count as processed. Reviews
+under v1 cannot validate a v2 cutoff: calibration says "Face settings changed" and grouping stays off until a
+new round passes; existing automatic assignments are kept. While the new round is unjudged, the "Same person?"
+floor uses the archived rounds' "same" answers.
+**Consequences:** no schema change for v2 itself. Faces from 64 to 99 px are upscaled to 112x112; whether they
+group reliably is decided only by the user's new review round. A host rehearsal on a copy of the phone's latest
+backup showed nothing visible changes before the re-scan (2,642 faces, 35 manual, 324 automatic, 152 groups,
+70 questions; grouping off with the new message). The device re-scan results are recorded in the evidence
+ledger once measured.
 
 ## ADR-022 - "Same person?" rounds on the main screen (2026-10-22)
 **Context:** the user asked for "Same person?" questions to come back every time the app opens, 20 at a time,

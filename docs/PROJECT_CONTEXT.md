@@ -11,12 +11,17 @@ and device acceptance on the Vivo, the user-requested grouping there, the "Same 
 rounds on the main screen, the user's own answers, and the user's decision to resume People processing (backups
 B0 to B10; §5.4).
 
+**Update 2026-10-22, later:** the review-ready cleanup on the local branch `review-ready-2026-10-22` (§3 note, §5.4,
+§6, §7, ADR-023 to ADR-025, §9, §11, §12): forward redaction, CI fix, KI-16 fixed with schema v7, FaceContract v2
+(64 px), hygiene, interim licence and README.
+
 Companion documents:
 
 - [EVIDENCE_LEDGER.md](EVIDENCE_LEDGER.md): every measured number, with date, device, precision and caveats.
 - [FILE_MAP.md](FILE_MAP.md): one line per file.
 - [`pixelsearch_app/docs/ARCHITECTURE.md`](../pixelsearch_app/docs/ARCHITECTURE.md): the concise layer and ownership
-  overview. It is accurate; this file adds verified detail rather than repeating it.
+  overview. It is accurate, except that it still says "schema 6" (the code is at schema 7 since 2026-10-22); this
+  file adds verified detail rather than repeating it.
 - [`model_kit/INTERFACE_CONTRACT.md`](../model_kit/INTERFACE_CONTRACT.md) and
   [`model_kit/FACE_CONTRACT.md`](../model_kit/FACE_CONTRACT.md): the frozen model contracts.
 
@@ -50,6 +55,10 @@ Legend:
 - **Commit**: in `HEAD` (C), partly uncommitted (C+U), or uncommitted only (U).
 - **Device**: accepted on a physical phone (Y), partly (P), or never (N).
 
+> **Update (2026-10-22, later):** the Commit column records the 2026-10-21/22 working-tree state. Everything marked
+> U or C+U is now committed on the local branch `review-ready-2026-10-22` (not pushed), so read C as "on `main`
+> (`4a7c81f`)", U as "on the branch only" and C+U as "partly on the branch only"; "HEAD" in the notes means `main`.
+
 | Capability | Impl | Commit | Device | Notes |
 |---|---|---|---|---|
 | Incremental gallery indexing (scan, plan, batch commit, cancel, resume) | ✅ | C+U | P | Vivo: 140 assets on 2026-09-08, then a 1,916-photo library. Full 19k-photo completion was never run. |
@@ -57,22 +66,33 @@ Legend:
 | MobileCLIP FP16 / NNAPI / XNNPACK | ❌ | — | N | No execution provider is registered. FP16 v3 artifacts exist on the host only. |
 | In-app model provisioning (M12) | ❌ | — | N | Models are copied in by hand (§5.1) |
 | Semantic search + hybrid rerank + filters | ✅ | C | P | Only 2 judged queries (P@5 0.20 and 0.40) |
-| Keyword fallback | ✅ | C | P | Visible only through a tooltip in the uncommitted redesign |
+| Keyword fallback | ✅ | C | P | Visible only through a tooltip in the redesign (branch only) |
 | Search diagnostics / evaluation harness | ✅ | C | P | In-app diagnostics used. The device integration test was never accepted. |
 | Background indexing (WorkManager) | ⚠️ | C | N | Initialized but **never scheduled** |
 | Folder-scoped indexing | ✅ | C | Y | Accepted with a small selection on 2026-09-08 |
-| Indexed gallery (Home) | ✅ | C+U | Y | Redesign uncommitted but installed on the Vivo |
+| Indexed gallery (Home) | ✅ | C+U | Y | Redesign on the branch only, installed on the Vivo |
 | Timeline (calendar-day memories, stories) | ✅ | C+U | Y | 215 events / 1,916 photos on 2026-09-10 |
 | Map (EXIF GPS + consented OSM tiles) | ✅ | C+U | P | Tiles worked. 0/1,916 photos located, so no positive pin was ever seen. |
 | Viewer (labels editor, caption, explanation) | ✅ | C+U | P | Live cloud caption never tested |
 | Offline People (SFace, New Faces, naming, name search) | ✅ | C+U | P | Gate: the first round **failed** (2026-09-18); a fresh 20-pair round **passed** (backup B0, 2026-10-22; threshold ≈ 0.462). On 2026-10-22 the user ran "Group similar faces" once (266 automatic assignments, 137 new unnamed groups, backup B3), then resumed processing: all 1,916 photos processed and the validated automatic grouping ran after the pass (backup B8). |
-| People search (query grammar, similar-face suggestions, multi-select naming, delete person, user-requested grouping, smaller naming list, "Same person?" confirmations and rounds), 2026-10-22 | ✅ | U | P | Host: 526 + 2 skipped tests. Installed in place on the Vivo 2026-10-22; typed person searches, hidden person, suggestions view, grouping and persistence accepted; the "Same person?" card rendered (122 questions); the user named faces and answered the questions on the phone (B5 to B6); after the resumed pass the main-screen prompt showed (70 questions, none answered by the assistant). Suggestion confirm/reject and voice input not exercised on the phone. |
-| Online assistant / captions / transcription | ✅ | C+U | P | Assistant live-tested 2026-09-09. Others never live-tested. The client credential binding (`backend_credentials.dart`) and the backend hardening are uncommitted; the deployed backend runs the `f38a72c` code. |
-| Backend security hardening (2026-09-18 review) | ✅ | U | N | Not committed, not deployed |
-| Release signing with an operator key | ✅ | U | N | HEAD still signs release builds with the debug key |
+| People search (query grammar, similar-face suggestions, multi-select naming, delete person, user-requested grouping, smaller naming list, "Same person?" confirmations and rounds), 2026-10-22 | ✅ | U | P | Host: 526 + 2 skipped tests on the 2026-10-22 working tree; 535 + 1 skipped at the branch tip. Installed in place on the Vivo 2026-10-22; typed person searches, hidden person, suggestions view, grouping and persistence accepted; the "Same person?" card rendered (122 questions); the user named faces and answered the questions on the phone (B5 to B6); after the resumed pass the main-screen prompt showed (70 questions, none answered by the assistant). Suggestion confirm/reject and voice input not exercised on the phone. |
+| Online assistant / captions / transcription | ✅ | C+U | P | Assistant live-tested 2026-09-09. Others never live-tested. The client credential binding (`backend_credentials.dart`) and the backend hardening are on the branch only; the deployed backend runs the `f38a72c` code. |
+| Backend security hardening (2026-09-18 review) | ✅ | U | N | On the branch only (`b8c3310`), not deployed |
+| Release signing with an operator key | ✅ | U | N | `main` still signs release builds with the debug key; the branch requires an operator key (`c49f2d2`). No release-signed build made. |
 | UI redesign (teal theme, Manrope, Privacy Centre) | ✅ | U | Y | Installed on the Vivo 2026-09-18 |
+| Reviewed photo ids (schema v7, KI-16) and FaceContract v2 (64 px), 2026-10-22 | ✅ | U | N | Host-tested (535 + 1 at the branch tip); migration and upgrade rehearsed on a copy of backup B10 (v7, integrity ok, 140 of 140 review rows filled, nothing visible changes before the re-scan). Not installed: the phone still runs schema 6 and FaceContract v1. |
 
 ## 3. Repository and working-tree state
+
+> **Update (2026-10-22, later):** everything this section calls *uncommitted* or *untracked* is now committed on the
+> **local branch `review-ready-2026-10-22`** (not pushed; `main` = `origin/main` = `4a7c81f`). On top of it the branch
+> adds: forward redaction and a private-data scan (ADR-025), the CI test-portability fix and workflow hardening
+> (KI-17), KI-16's fix with schema v7 (ADR-024), FaceContract v2 with a 64 px minimum (ADR-023), hygiene (dead code,
+> FP16 wording, onboarding claims, map tile cache, explicit assets, in-app licences), an interim LICENSE with
+> THIRD_PARTY_NOTICES.md, a rewritten README and community files, then a formatting-only commit (`f1c7f9d`, listed
+> in `.git-blame-ignore-revs`) and a CI `dart format` check (`9bea6d4`); 22 commits in all on 2026-10-22.
+> `git log 4a7c81f..review-ready-2026-10-22` is the authoritative list. The rest of this section is kept as the
+> 2026-10-21 audit record.
 
 ### 3.1 Layout (monorepo)
 
@@ -84,7 +104,7 @@ Legend:
 | `tool/check_repository.py` | CI publication-boundary check |
 | `docs/` | Index, security review, architecture overview (untracked), archive, and these handbook files |
 | `.github/workflows/ci.yml` | 4 CI jobs (§3.4) |
-| `reports/`, `PIXELSEARCH_COPYRIGHT_SOURCE/`, `.impeccable/` | **Untracked and not git-ignored** local deliverables: blackbook report, copyright package, redesign tooling. Do not `git add -A`. |
+| `reports/`, `PIXELSEARCH_COPYRIGHT_SOURCE/`, `.impeccable/` | Local deliverables (blackbook report, copyright package, redesign tooling): untracked and not git-ignored at the audit; **git-ignored since 2026-10-22** and never committed (the note above does not apply to them). Do not `git add -A`. |
 | `output/`, `tmp/` | Ignored local deliverables (posters, presentation, handbook builds) |
 | `pixelsearch_app/local_evaluation/`, `pixelsearch_app/docs/RAW_SEMANTIC_DIAGNOSIS.md` | **Ignored private device data**: backups, judgments, traces. Never publish. |
 
@@ -192,7 +212,8 @@ the same day (ledger §4.2). No schema, model, ranking-constant or `FaceContract
   `lib/features/people/person_suggestions_screen.dart`, `same_person_screen.dart`.
 - New, untracked tests (4): `test/people_query_parser_test.dart` (52), `test/people_membership_test.dart` (21),
   `test/people_suggestions_test.dart` (27, including 5 for `groupNow`, grouping safety and the naming list),
-  `test/people_same_person_test.dart` (21, including 4 for rounds and the home prompt). Extended:
+  `test/people_same_person_test.dart` (24, including 4 for rounds and the home prompt and 3 from the second
+  verification pass). Extended:
   `people_validation_recovery_test.dart` (+3),
   `people_widgets_test.dart` (+21), `voice_search_widgets_test.dart` (+7); `people_repository_test.dart` now expects
   `deleteAssets` to keep review rows.
@@ -245,6 +266,12 @@ the OS, the timezone, the Flutter SDK version or freshly generated code. The cau
 the run 7 log has not been read. See
 [EVIDENCE_LEDGER §2](EVIDENCE_LEDGER.md#2-ci-history-github-actions-public-repository).
 
+> **Update (2026-10-22, later):** the cause was found by a Windows-host simulation (KI-17: a Windows-only test font
+> loaded as 'Roboto', and Windows-only path literals in one test) and fixed on the branch. The branch's workflow
+> also runs on `ubuntu-24.04` with a read-only token, enforces the lockfile, checks that regenerated Drift code
+> matches, and checks `dart format`. None of this has run on GitHub yet (nothing pushed), and a local Linux run
+> failed because Docker Desktop did not start.
+
 ## 4. Architecture
 
 ### 4.1 Layers
@@ -270,7 +297,7 @@ The layer list is in [`ARCHITECTURE.md`](../pixelsearch_app/docs/ARCHITECTURE.md
 - `people_providers.dart` is **not** exported through the barrel; import it directly.
 - No state file may import the barrel. CI detects only the relative form `import 'providers.dart'`; a `package:`
   import of the barrel from `lib/state` is not caught.
-- Exceptions to "state lives in `lib/state`" (all also present at HEAD):
+- Exceptions to "state lives in `lib/state`" (all also present on `main`):
   - `features/map/map_screen.dart`: `locationRepositoryProvider`, `locatedPhotosProvider`,
     `locationSummaryProvider`, `mapTileFactoryProvider`.
   - `features/timeline/timeline_screen.dart`: `memoryRepositoryProvider`, `memoriesProvider`,
@@ -304,9 +331,9 @@ The layer list is in [`ARCHITECTURE.md`](../pixelsearch_app/docs/ARCHITECTURE.md
 
 | Store | Location | Contents |
 |---|---|---|
-| Drift SQLite, schema **6** | `<appDocuments>/pixelsearch.sqlite` | 14 Drift tables plus raw-SQL `processing_leases` (§7) |
+| Drift SQLite, schema **7** in code since 2026-10-22 (KI-16; the phone's installed build is still schema 6) | `<appDocuments>/pixelsearch.sqlite` | 14 Drift tables plus raw-SQL `processing_leases` (§7) |
 | Preferences | `<appSupport>/user_preferences.json` (atomic `.pending` + rename) | onboarding flag, online consent and `base_url`, offline speech locales, **label corrections** keyed `photoId\|assetName` |
-| Secure storage | `flutter_secure_storage`: key `backend_install_token` at HEAD; key `backend_connection_v1` in the uncommitted design | HEAD: a bare backend token with no origin binding. Uncommitted: `{origin, token}`; saving deletes the legacy key without migrating it, so the token must be entered again. |
+| Secure storage | `flutter_secure_storage`: key `backend_connection_v1` on the branch; key `backend_install_token` on `main` | Branch: `{origin, token}`; saving deletes the legacy key without migrating it, so the token must be entered again. `main`: a bare backend token with no origin binding. |
 | Thumbnails | `<temp>/thumbnails/<id>.jpg` (256 px, q80) | OS-evictable; display falls back to a gallery thumbnail |
 | MobileCLIP models | `<appSupport>/models/` | provisioned by hand |
 | SFace model | copied from bundled asset to app support after a SHA-256 check | — |
@@ -326,15 +353,16 @@ transfer) exclude the root, file, database, sharedpref and external domains; the
    - "Index my photos" opens the folder picker. That triggers the photo permission request and starts indexing
      without awaiting it.
    - Onboarding is then marked complete **whatever the outcome**.
-   - The onboarding copy claims "Results in under two seconds". That figure is unmeasured.
+   - The onboarding copy claimed "Results in under two seconds", an unmeasured figure, until 2026-10-22, when the
+     claim was removed on the branch (`462d7af`).
 2. If no MobileCLIP image model exists, `runDeviceIndexing` returns `modelMissing` before any scan, so no rows are
    written. The only signal is one grey status line naming the expected path. It is held in memory and lost on
    restart. **The app gives no in-app guidance.** That line lists `mobileclip_image_fp16.onnx` before
    `mobileclip_image.onnx` (`ModelLocator.describeMissing`), so do not follow it literally: provision only the FP32
    files.
-3. Without a text model, search falls back to keyword matching. In the uncommitted working tree the only indication
-   is tooltip text; at HEAD a visible keyword/semantic mode icon (`_ModeBadge`) showed it. Diagnostics refuse to
-   run.
+3. Without a text model, search falls back to keyword matching. Since the redesign (on the branch) the only
+   indication is tooltip text; on `main` a visible keyword/semantic mode icon (`_ModeBadge`) showed it. Diagnostics
+   refuse to run.
 4. After models are added, nothing notices automatically. The user re-runs indexing. Because nothing was written,
    every selected asset is planned `added`.
 
@@ -342,9 +370,9 @@ transfer) exclude the root, file, database, sharedpref and external domains; the
 
 Generate the exports with `cd model_kit && python prepare_model.py` (it uses a relative `out/`, so run it from
 inside `model_kit/`). It writes both the FP32 files (`mobileclip_image.onnx`, `mobileclip_text.onnx`) and the FP16
-files to `model_kit/out/`. Push only the FP32 files. Ignore the "ship the fp16 files" message in
-`model_kit/README.md` and `prepare_model.py`: it is stale for Android, where FP16 is not accepted (KI-2,
-`ANDROID_SMOKE_TEST_2026-09-08.md`).
+files to `model_kit/out/`. Push only the FP32 files: FP16 is not accepted on Android (KI-2,
+`ANDROID_SMOKE_TEST_2026-09-08.md`). (`model_kit/README.md` and `prepare_model.py` said to ship the FP16 files
+until 2026-10-22, when that text was corrected.)
 
 On Windows, run the block below in PowerShell or cmd. In Git Bash, prefix each command with `MSYS_NO_PATHCONV=1`
 (or export it once first); otherwise MSYS rewrites every `/data/...` argument into a Windows path.
@@ -399,7 +427,7 @@ guaranteed to be byte-identical, so a mismatch with those reference values does 
      hard-codes `byteSize: 0`, so change detection is mtime-only**), `staleVersion` (embedding version differs or
      no embedding), up-to-date, or deleted (only when `canDeleteMissing`).
    - **Delete:** `deleteAssets` cascades to memory members, captions, locations, embeddings and photos. The People
-     cascade is uncommitted.
+     cascade (2026-09-18) is on the branch only, not on `main`.
    - **Index:** per asset: `originBytes` → EXIF date only → **one** `img.decodeImage` (image 4.9.1 applies JPEG EXIF
      orientation) → 256-px q80 thumbnail → CLIP embedding → ML Kit labels and faces on the original bytes via a
      temp file.
@@ -430,7 +458,7 @@ Known defects (inferred from code, untested):
   `_cancelRequested`.
 - Any run-level error (scan, plan, delete, batch commit or checkpoint) is caught inside `run()`, logged, and
   surfaces only as "Indexing stopped unexpectedly after N photos". The cause is visible only in the log.
-- The uncommitted `onDispose` People cleanup runs inside the bridge's `finally`. A throw there would replace a
+- The `onDispose` People cleanup (2026-09-18, on the branch) runs inside the bridge's `finally`. A throw there would replace a
   successful result.
 - The background lease has no `onLost` handler.
 - The checkpoint row (`index_state_rows`) is written but never read in production.
@@ -511,8 +539,8 @@ Known defects (inferred from code, untested):
    matched terms and metadata, gate, pool), shown in the viewer under "Why this matched". Keyword-backend results
    (no model, web, name-only People queries) carry only lexical evidence. Browse results carry none, and the viewer
    says so.
-7. **Mode visibility.** The uncommitted redesign shows semantic versus keyword mode **only in tooltip text**. HEAD
-   had a mode-specific icon. `isSemantic` stays true with an empty index even though the response mode says keyword.
+7. **Mode visibility.** The redesign (on the branch) shows semantic versus keyword mode **only in tooltip text**.
+   `main` had a mode-specific icon. `isSemantic` stays true with an empty index even though the response mode says keyword.
 
 Calibration status: the gate comes from six probes, and the band and weights are uncalibrated (KI-5/KI-13). On the
 1,916-photo library the judged relevant "dog" photo has a lower cosine than irrelevant ones, so no gate can fix it.
@@ -525,7 +553,8 @@ time, and only with judged held-out evidence.**
   only. Its work list is the indexed `photo_rows`, and it never enumerates the gallery. It does open each indexed
   photo's original file through photo_manager (`AssetEntity.fromId` → `originFile`) to detect faces, and under
   limited permission the accessibility check calls `AssetEntity.fromId` for every indexed photo.
-- **Contract `sface-2021dec-mlkit-landmarks-v1`:**
+- **Contract `sface-2021dec-mlkit-landmarks-v2`** in code since 2026-10-22 (ADR-023); the phone's installed build
+  still runs `sface-2021dec-mlkit-landmarks-v1`. The two differ only in the minimum face size:
   - `PeopleImageDecoder.kt` decodes with a power-of-two downsample (longest side ≤ 2048), applies EXIF rotation, and
     writes a q95 JPEG.
   - ML Kit runs in accurate mode with landmarks and `minFaceSize` 0.02.
@@ -534,17 +563,21 @@ time, and only with judged held-out evidence.**
   - The input is raw 0..255 RGB in CHW layout; the graph normalizes internally.
   - The bundled OpenCV Zoo SFace FP32 model (SHA-256 `0ba9fbfa…`) outputs `fc1`, 128-d. It is L2-normalized and must
     satisfy |Σx² − 1| ≤ 0.002.
-  - Only faces with 5 landmarks and a box ≥ 100 px on both sides get a descriptor.
+  - Only faces with 5 landmarks and a box ≥ 64 px on both sides get a descriptor (FaceContract v2 since 2026-10-22,
+    ADR-023; 100 px under v1). A re-scan under a new contract continues each matching earlier face by box overlap,
+    keeping its id, name, assignment, "Not a face" and decisions; v1 faces stay visible until their photo is
+    re-scanned, and reviews under v1 keep grouping off ("Face settings changed") until a new round passes.
 - **Storage.**
   - Descriptors are 512-byte little-endian float32 blobs in `people_faces.vector`, never in `embedding_rows`.
-  - The face id is derived from photo, revision, contract and index. A changed photo revision drops its faces.
+  - The face id is derived from photo, revision, contract and index; a face continued across a contract upgrade
+    keeps its earlier id (ADR-023). A changed photo revision drops its faces.
   - Commits fail closed if People is disabled or paused, or if the generation or revision changed.
     `insertOrIgnore` preserves user corrections.
 - **Grouping gate.** No default threshold exists. Automatic grouping writes nothing unless `calibration()` passes:
   - At least 40 frozen pairs must exist and all must be judged (Same/Different/Unsure; none pending). Unsure counts
     toward the 40 but is ignored by the cutoff, and each subset needs at least one Same and one Different.
     - Pairs are photo-disjoint. The first review splits photos by `stableHash(photoId) % 3 == 0` (validation). In a
-      fresh round (uncommitted), all earlier pairs become calibration and 20 validation pairs are sampled from
+      fresh round (the 2026-09-18 recovery, on the branch), all earlier pairs become calibration and 20 validation pairs are sampled from
       never-reviewed photos. `calibration()` blocks any subset overlap.
     - Up to 40 calibration and 20 validation pairs are sampled from 3 nearest neighbours plus 1 farthest per face.
   - The cutoff is the calibration Same cosine with the most true joins and zero calibration false joins.
@@ -554,16 +587,17 @@ time, and only with judged held-out evidence.**
     cosine and a judgment). A pair whose face is gone makes calibration fail closed ("A reviewed photo changed or is
     unavailable. Start a new review.") instead of re-scoring the remaining pairs, which might pass. "Disable and
     delete People data" still removes them.
-  - **KI-16 (pre-existing, found 2026-10-22):** reviewed photos are identified through current face ids, which
-    include the photo revision. An edited reviewed photo can therefore be sampled into a new round, which weakens
-    photo-disjointness. The fix needs photo ids stored with review rows (a schema change, not done). Until then, do
-    not start a new review after editing reviewed photos.
+  - **KI-16 (found and fixed 2026-10-22, ADR-024):** reviewed photos were identified only through current face ids,
+    which include the photo revision, so an edited reviewed photo could be sampled into a new round. Schema v7
+    stores the reviewed photo ids on review rows (filled from existing faces by the migration), and the
+    reviewed-photo set unions them with the old face join.
 - **User-requested grouping (Wave 3, 2026-10-22; ADR-020).** `groupNow()` runs the existing validated grouping
   (`groupFaces`, complete-link, the saved review cutoff) once at the user's explicit request, even while processing
   stays paused. It returns 0 unless People is enabled and the review gate passed. `applyGrouping()` (after a full
   processing pass, or after a passed review) still never runs while paused. UI: People ⋮ "Group similar faces",
   enabled only when the gate passed, behind a confirmation dialog; the review result loads with the screen. Only
-  faces with descriptors (≥ 100 px) take part; wrong faces are fixed by moving or removing them.
+  faces with descriptors take part (≥ 100 px under v1, the phone's build; ≥ 64 px under v2 after a re-scan, and only
+  once a review round under v2 passes); wrong faces are fixed by moving or removing them.
 - **Naming list (Wave 3, 2026-10-22; ADR-020).** `PeopleSnapshot.smallOrDuplicateFaces` (computed once per snapshot)
   holds faces under 40 px in the prepared image (`facePixels`, which halves the size as the Android decoder does
   until the long side fits 2048) and second detections that overlap a larger face in the same photo by IoU > 0.5.
@@ -580,8 +614,8 @@ time, and only with judged held-out evidence.**
   - Before grouping (backups B0 to B2): 0 automatic and 6 manual assignments, 5 named persons (1 marked "This is
     me", 0 hidden) and 7 faces marked Not a face.
   - Why the same person appeared many times (aggregate, from the backups): 2,342 detected faces in 430 photos; only
-    336 are large enough (≥ 100 px) for an SFace descriptor, and the other 2,006 can never be grouped under the
-    current contract. 67 photos have 10 or more faces. Duplicates are a minor factor: 26 overlapping same-photo
+    336 are large enough (≥ 100 px) for an SFace descriptor, and the other 2,006 can never be grouped under
+    contract v1 (the phone's build; v2 lowers the minimum to 64 px, ADR-023). 67 photos have 10 or more faces. Duplicates are a minor factor: 26 overlapping same-photo
     detection pairs and about 20 near-identical cross-photo pairs (the same image saved twice).
   - "Group similar faces", run once at the user's request (backup B3): 266 faces assigned `automatic` (3 of them to
     a named person, whose photos went from 1 to 4; the rest into 137 new unnamed groups, 142 persons in all). Only
@@ -613,8 +647,8 @@ time, and only with judged held-out evidence.**
     improve face groups · 1 of 20". A host simulation on a copy of B8 counted the same 70 questions: all group
     pairs, 5 of them offering a named person, closest-face scores 0.399–0.983 (15 at 0.5 or more). None was answered
     by the assistant.
-  - Two more builds with the later fixes were installed in place (backups B9 and B10, each identical to the one
-    before).
+  - Three more builds with the later fixes were installed in place (the seventh to ninth installs, after backups B8,
+    B9 and B10): B9 is identical to B8 in every table, and B10 differs from B9 only by one processing-lease row.
 - **Naming.** The New Faces picker supports assign or new person, remove assignment, and dismiss ("Not a face").
   The name dialog offers "This is me" (adds the aliases `me`/`myself`). The person screen (`PersonScreen`) offers
   merge (the source name becomes an alias of the target), hide/unhide and choose cover. Manual decisions are
@@ -640,7 +674,8 @@ time, and only with judged held-out evidence.**
   - Suggestions never assign a face without the user's confirmation of that face. Apart from the user-requested
     `groupNow` (above) and the user's own "Same person?" answers (below), no new code groups faces, resumes, calls
     `pause(false)` or kicks processing.
-  - Coverage is limited (KI-14): on the phone, at most 336 faces have descriptors.
+  - Coverage is limited (KI-14): on the phone (contract v1), 397 faces have descriptors after the full pass (backup
+    B8; 336 before it). Contract v2 (64 px, ADR-023) adds faces from 64 to 99 px after a re-scan.
   - On the Vivo (2026-10-22, view only): for the person with one large manual face, "Review similar faces (58)", the
     explanation, the paused note and "1994 unnamed faces are too small to compare" rendered; people whose only faces
     are small see "Needs a clear, large face of X first." No suggestion was confirmed or rejected on the phone.
@@ -686,7 +721,8 @@ time, and only with judged held-out evidence.**
     loads (`samePersonBusy`); after a failed reload no question is shown. Every answer is stored, so no question
     repeats. At the user's choice only pairs at or above the floor are asked. On the full screen each card shows
     two 160 px crops with "Open photo"; the compact card on the main screen caps them at 72 px without "Open photo".
-  - Only faces with descriptors (≥ 100 px) can be asked about, so small faces still need manual naming (KI-14).
+  - Only faces with descriptors can be asked about (≥ 100 px under v1, the phone's build; ≥ 64 px under v2 after a
+    re-scan), so smaller faces still need manual naming (KI-14).
 - **Privacy.**
   - The assistant refuses person queries before any HTTP call. Since Wave 3 its guard checks every saved name,
     hidden people included, and blocks any person filter, mention, or "or"/"without" person query. The payload never
@@ -702,12 +738,12 @@ time, and only with judged held-out evidence.**
 ### 5.5 Gallery, timeline, map, viewer
 
 - **Routing.** `/` → `StartupScreen`. Then a `StatefulShellRoute.indexedStack` with Search, Timeline, Map and a
-  fourth tab at `/home/settings`, labelled "Settings" at HEAD and "Privacy" (screen title "Privacy Centre") in the
-  uncommitted working tree. The viewer, memory detail, story viewer and caption screen are imperative pushes with no
+  fourth tab at `/home/settings`, labelled "Privacy" (screen title "Privacy Centre") since the redesign (on the
+  branch) and "Settings" on `main`. The viewer, memory detail, story viewer and caption screen are imperative pushes with no
   deep links.
 - **Home.** A metadata-only projection of the persisted library, newest first, grouped by local day and month.
-  Committed: exact row extents, month jumps and a draggable date thumb. Uncommitted: the redesign merges the search
-  field into one scroll view as a pinned header and offsets month jumps by the pinned extent.
+  On `main`: exact row extents, month jumps and a draggable date thumb. The redesign (on the branch) also merges the
+  search field into one scroll view as a pinned header and offsets month jumps by the pinned extent.
 - **Thumbnails.** `DeviceThumbnailImage` tries the cached file, then a 512-px photo_manager thumbnail, then a
   transparent pixel. It is display-only.
 - **Timeline.**
@@ -722,11 +758,14 @@ time, and only with judged held-out evidence.**
     `photo_locations`, keyed to the photo's mtime revision. Missing GPS is never stored as 0,0.
   - Tiles load only with maps consent, while resumed, and with `TickerMode` on. Requests go only to
     `tile.openstreetmap.org`, with no redirects.
-  - One oversized tile or a timeout closes the client for that view until Retry (uncommitted bounds).
+  - One oversized tile or a timeout closes the client for that view until Retry (bounds added 2026-09-18, on the
+    branch).
+  - Tiles are never written to disk: flutter_map's built-in tile cache is disabled, so no tile outlives a revoked
+    maps consent (2026-10-22, `97404fb`, ADR-025).
   - Device result: 0 of 1,916 photos located.
 - **Viewer.**
-  - Always uses `AppTheme.dark()` (uncommitted). At HEAD the viewer has a black background only.
-  - Details shows `photo_rows.lat/lng` (uncommitted; at HEAD Details shows no coordinates). They are **always null
+  - Always uses `AppTheme.dark()` (redesign, on the branch). On `main` the viewer has a black background only.
+  - Details shows `photo_rows.lat/lng` (redesign, on the branch; on `main` Details shows no coordinates). They are **always null
     for device photos on Android 10+**: photo_manager never fills them and the EXIF extractor reads the date only.
     The map uses a different source, and the two are not reconciled.
   - Labels are corrected through user preferences.
@@ -746,9 +785,12 @@ time, and only with judged held-out evidence.**
     vectors, filenames or person IDs.
   - **Transcription:** one AAC clip (≤ 30 s) after a per-recording dialog.
   - **Maps:** OSM tile GETs, which expose the IP address and tile coordinates.
+  - **ML Kit usage metrics:** ML Kit sends metrics about its performance and use to Google (photos are not sent);
+    indexing and People use ML Kit whatever the online settings. Since 2026-10-22 the Privacy Centre says so, as the
+    ML Kit terms require (on the branch, `99433c5`, ADR-025).
 - **`EnhancementClient`.** HTTPS only, no redirects, 4 MiB upload, 64 KiB response, 100 s timeout. Every 429 is
-  shown as "Free quota reached". Binding the token to the exact HTTPS origin is the uncommitted `BackendCredentials`
-  change; the base URL itself may still contain a path.
+  shown as "Free quota reached". Binding the token to the exact HTTPS origin is the `BackendCredentials` change (on
+  the branch, `ea639d5`); the base URL itself may still contain a path.
 - **Backend (`enhancement_backend/app.py`).**
   - A stateless broker to `api.groq.com`.
   - Pinned models: `qwen/qwen3.6-27b` (JSON output, `max_completion_tokens` 512, reasoning effort none) and
@@ -757,13 +799,13 @@ time, and only with judged held-out evidence.**
     requests per 60 s per token, in-process.
   - Returns 503 unless `GROQ_API_KEY` is set and `GROQ_ZDR_CONFIRMED == "true"` (an operator attestation).
   - `/health` is unauthenticated.
-  - FastAPI's default `/docs`, `/redoc` and `/openapi.json` are enabled and unauthenticated in code, both at HEAD
-    and in the working tree: only POST requests are authenticated. Live exposure has not been checked.
+  - FastAPI's default `/docs`, `/redoc` and `/openapi.json` are enabled and unauthenticated in code, both on `main`
+    and on the branch: only POST requests are authenticated. Live exposure has not been checked.
   - `pytest` ships in the production requirements.
 - **Deployment.** Render free plan via `render.yaml`. The Blueprint pins `GROQ_ZDR_CONFIRMED` to `"false"`, so a
   re-sync may break the live service. Live code was last verified on 2026-09-09 (`f38a72c`). The hardening is not
   deployed; on its own it does not change token validation. Token re-entry is forced by the new app build: the
-  uncommitted `BackendCredentials` binds the token to the backend's HTTPS origin and ignores the legacy
+  branch's `BackendCredentials` binds the token to the backend's HTTPS origin and ignores the legacy
   `backend_install_token`, so users must re-enter the token after installing that build, whether or not the backend
   is redeployed.
 - **Offline speech.**
@@ -773,7 +815,7 @@ time, and only with judged held-out evidence.**
 
 ### 5.7 Evaluation and diagnostics
 
-- **In app.** Settings (Privacy Centre in the working tree) → Search diagnostics runs `inspect()`:
+- **In app.** Privacy Centre (Settings on `main`) → Search diagnostics runs `inspect()`:
   - one embedding and an ungated full scan
   - replays production plus 14 experiments: legacy articles, ML Kit labels, lexical bypass, whole words, pools
     20/50/100/200, and gates off/0/0.1/0.2/0.25/0.3
@@ -822,7 +864,7 @@ time, and only with judged held-out evidence.**
   - The native env is process-global and ref-counted (inferred). The face worker's release is balanced.
   - **Leak:** each `searchBackendProvider` rebuild orphans the previous text session.
 - **Versions** (`lib/core/ai_contract.dart`): `modelVersion '1.0'`, `embeddingVersion '1'`, `artifactVersion '3'`,
-  `schemaVersion 6`.
+  `schemaVersion 7` (v7, 2026-10-22: reviewed photo ids on People review rows).
   - `AiContract.schemaVersion` is documentation only. The effective Drift version is the literal in
     `AppDatabase.schemaVersion` (`app_database.dart`), and the two must be bumped together.
   - Bump `embeddingVersion`, which forces a resumable full re-index, when the weights or image preprocessing change.
@@ -853,9 +895,10 @@ time, and only with judged held-out evidence.**
 | v3 → v4 | `indexing_preferences_rows` (folder IDs) |
 | v4 → v5 | `memory_events`, `memory_members` (one memory per photo), `saved_captions`, `photo_locations` |
 | v5 → v6 | Six People tables, three raw indexes and the raw `processing_leases` table (no `IF NOT EXISTS`) |
+| v6 → v7 | `people_reviews.left_photo_id` and `right_photo_id` (nullable), filled from existing faces (KI-16, 2026-10-22) |
 
 - All steps are additive.
-- Migration fixture tests exist for v3, v4 and v5 → 6. The v3 and v5 fixtures are synthesized from the current
+- Migration fixture tests exist for v3, v4, v5 → 6 and v6 → 7. The v3 and v5 fixtures are synthesized from the current
   schema; v4 uses hand-written DDL.
 - There are no v1/v2 fixtures and no Drift schema-verification harness.
 - Embedding BLOBs are little-endian float32, 2048 bytes, keyed `(photo_id, model_id)`.
@@ -866,7 +909,7 @@ time, and only with judged held-out evidence.**
 ## 8. Decisions
 
 The ADR log is [`pixelsearch_app/docs/ARCHITECTURE_DECISIONS.md`](../pixelsearch_app/docs/ARCHITECTURE_DECISIONS.md)
-(newest first; ADR-018 to ADR-022 were added on 2026-10-22). Current status of each:
+(newest first; ADR-018 to ADR-025 were added on 2026-10-22). Current status of each:
 
 | ADR | Decision | Status now |
 |---|---|---|
@@ -887,11 +930,14 @@ The ADR log is [`pixelsearch_app/docs/ARCHITECTURE_DECISIONS.md`](../pixelsearch
 | 015 | Conditional-import index bridge, DB-backed library | **Partly broken.** The early-cancel replay the ADR promises is defeated because `IndexingService.run()` clears the cancel flag on entry (§9 P2). The controller now lives in `indexing_providers.dart`. |
 | 016 | fp16 repair, artifact v3 | Current; Android acceptance pending |
 | 017 | Folder-scoped candidates with gallery-wide deletion reconciliation | Current. Folder scope and retention are device-verified (Vivo, 2026-09-08). Deletion reconciliation and the limited-access no-prune rule are host-tested only. |
-| 018 | Similar-face suggestions are ranking-only and confirmed per face; deleting photos keeps review pairs (2026-10-22) | Current (uncommitted). Suggestions screen viewed on the Vivo 2026-10-22; confirm/reject host-tested only. |
-| 019 | Person-query grammar ("me", "or", "without") and hidden-people semantics (2026-10-22) | Current (uncommitted). Accepted on the Vivo 2026-10-22 with typed queries; voice input not exercised. |
-| 020 | User-requested validated grouping (`groupNow`, runs while paused but only after a passed gate) and a smaller naming list that hides small or duplicate faces without deleting them (2026-10-22) | Current (uncommitted). Run once on the Vivo at the user's request (266 automatic assignments, backup B3). |
-| 021 | "Same person?" confirmations: verify automatic faces in named people and ask about group pairs, with Yes / No / Not sure; answers are the user's decisions; `unsure` is a new decision value (no schema change) that never overwrites and that grouping ignores; pairs below the user's lowest "same" review score are not asked (2026-10-22) | Current (uncommitted). Improves grouping accuracy only through the user's answers; only faces with descriptors (≥ 100 px) are asked about. Shown on the Vivo 2026-10-22 (122 questions); the user answered on the phone (B5 to B6, checked through aggregate backup counts). |
-| 022 | "Same person?" rounds: 20 per launch with in-memory counters, never repeated, a Search-home prompt (`SamePersonPrompt`) and a full screen; answers disabled while one saves and until the next question loads (2026-10-22) | Current (uncommitted). On the Vivo after the resumed pass: 70 questions and "Help improve face groups · 1 of 20" on the main screen; no answer given by the assistant, so answering through the rounds is host-tested only. |
+| 018 | Similar-face suggestions are ranking-only and confirmed per face; deleting photos keeps review pairs (2026-10-22) | Current (branch `review-ready-2026-10-22`). Suggestions screen viewed on the Vivo 2026-10-22; confirm/reject host-tested only. |
+| 019 | Person-query grammar ("me", "or", "without") and hidden-people semantics (2026-10-22) | Current (branch `review-ready-2026-10-22`). Accepted on the Vivo 2026-10-22 with typed queries; voice input not exercised. |
+| 020 | User-requested validated grouping (`groupNow`, runs while paused but only after a passed gate) and a smaller naming list that hides small or duplicate faces without deleting them (2026-10-22) | Current (branch `review-ready-2026-10-22`). Run once on the Vivo at the user's request (266 automatic assignments, backup B3). |
+| 021 | "Same person?" confirmations: verify automatic faces in named people and ask about group pairs, with Yes / No / Not sure; answers are the user's decisions; `unsure` is a new decision value (no schema change) that never overwrites and that grouping ignores; pairs below the user's lowest "same" review score are not asked (2026-10-22) | Current (branch `review-ready-2026-10-22`). Improves grouping accuracy only through the user's answers; only faces with descriptors are asked about (≥ 100 px under FaceContract v1, ≥ 64 px once a photo is re-scanned under v2). Shown on the Vivo 2026-10-22 (122 questions); the user answered on the phone (B5 to B6, checked through aggregate backup counts). |
+| 022 | "Same person?" rounds: 20 per launch with in-memory counters, never repeated, a Search-home prompt (`SamePersonPrompt`) and a full screen; answers disabled while one saves and until the next question loads (2026-10-22) | Current (branch `review-ready-2026-10-22`). On the Vivo after the resumed pass: 70 questions and "Help improve face groups · 1 of 20" on the main screen; no answer given by the assistant, so answering through the rounds is host-tested only. |
+| 023 | FaceContract v2: faces from 64 px; a re-scan continues matching v1 faces (id, name, decisions) by box overlap; v1 reviews cannot validate v2, so grouping waits for a new round (2026-10-22) | Current (branch). Rehearsed on a copy of backup B10; device install and re-scan pending. |
+| 024 | Reviewed photo ids on review rows, schema v7 (KI-16, 2026-10-22) | Current (branch). Migration rehearsed on a copy of backup B10 (140 of 140 rows filled). |
+| 025 | Publication guardrails: forward redaction, private-data scan, interim licence, in-app licences, no map tile disk cache (2026-10-22) | Current (branch). History not rewritten. |
 
 Decisions in code with **no ADR yet** (write these):
 
@@ -913,11 +959,12 @@ Prioritized as of 2026-10-21; People items updated 2026-10-22 (after the device 
 
 1. **The public repository exposes personal data**: a device serial, personal photo filenames, the deployed backend
    URL, local user and backup paths, and real names in tests and docs (first names, a full name, and a team roster
-   with surnames). See §11.
-2. **CI is failing at HEAD** (3 Flutter tests on the Linux runner, not identified).
-3. **A large uncommitted working tree** that is already installed on the device: security fixes, redesign, People
-   recovery. It is at risk of loss or confusion, and the backend hardening is not deployed. (2026-10-22: Waves 2 and
-   3 are uncommitted too, and have been installed on the Vivo since 2026-10-22.)
+   with surnames), in the pushed history. The working tree was redacted forward on 2026-10-22 (ADR-025); making
+   the repository private or rewriting history is still open. See §11.
+2. **CI is failing on `main`** (3 Flutter tests on the Linux runner). Cause found by simulation and fixed on the
+   branch (KI-17, 2026-10-22); not yet confirmed on GitHub.
+3. **The work since `4a7c81f` is committed only on a local branch** (`review-ready-2026-10-22`, 2026-10-22); until it
+   is pushed and merged, the public repository shows none of it, and the backend hardening is not deployed.
 
 **P1: correctness and safety**
 
@@ -939,9 +986,8 @@ Prioritized as of 2026-10-21; People items updated 2026-10-22 (after the device 
     them through the "Same person?" questions, ADR-021). The user then resumed processing, so `applyGrouping` now
     runs after each full pass (85 more automatic assignments after the first full pass, backup B8), on the same
     small holdout. The descriptor yield is low (397 of 2,642 detections with all photos processed).
-11. **KI-16 (pre-existing bug, found 2026-10-22).** An edited reviewed photo can be sampled into a new review round,
-    which weakens photo-disjointness. The fix needs photo ids on review rows (a schema change). Mitigation: no new
-    review after editing reviewed photos.
+11. **KI-16 (fixed 2026-10-22, schema v7, ADR-024).** An edited reviewed photo could be sampled into a new review
+    round; review rows now store photo ids.
 
 **P2: functional gaps and drift**
 
@@ -958,10 +1004,11 @@ Prioritized as of 2026-10-21; People items updated 2026-10-22 (after the device 
 - No in-app "delete all local data". Thumbnails, evaluation reports and correction keys are never cleaned up.
 - The assistant's "last year" is a rolling year; every 429 shows as a quota message.
 - Cloud transcription has no person-name guard.
-- **KI-14 (2026-10-22): person-search coverage.** Only assigned faces in processed photos count. On the phone 485 of
-  1,916 photos are processed, and 336 of 2,342 detections have descriptors (2,006 are smaller than 100 px), so
-  suggestions, grouping and "Same person?" questions can reach at most 336 faces. The rest can only be named by
-  hand; the naming list hides faces under 40 px and same-photo duplicates behind "Show small faces" (ADR-020).
+- **KI-14 (2026-10-22): person-search coverage.** Only assigned faces in processed photos count. On the phone
+  (FaceContract v1) all 1,916 photos are processed since the resumed pass, and 397 of 2,642 detections have
+  descriptors (backup B8; 336 of 2,342 at 485 photos before it), so suggestions, grouping and "Same person?"
+  questions can reach at most 397 faces. FaceContract v2 (64 px, ADR-023, on the branch, not installed) adds faces
+  from 64 to 99 px after a re-scan; the count is unmeasured. The rest can only be named by hand; the naming list hides faces under 40 px and same-photo duplicates behind "Show small faces" (ADR-020).
   While the user's own face in a photo is unnamed (for example a small face in a large group photo), "photos of me
   with X" leaves that photo out.
 - **KI-15 (2026-10-22): person-query wording.** Exclusion covers assigned faces only. Names that are common words
@@ -977,24 +1024,26 @@ Prioritized as of 2026-10-21; People items updated 2026-10-22 (after the device 
 
 - Stale docs (§10).
 - No `.gitattributes` (CRLF churn).
-- Untracked deliverable folders are not ignored.
 - Theme mode is not persisted.
-- The `applicationId` template TODO is still present.
-- The onboarding performance claim is unmeasured.
+- Fixed on the branch 2026-10-22: the deliverable folders are git-ignored; the `applicationId` template TODO is
+  replaced by a never-change warning (`c06d524`); the unmeasured onboarding speed claim is removed (`462d7af`).
 
 ## 10. Documentation status
 
 **Current and reliable:**
 
 - `README.md`, `HANDOFF.md`
-- `pixelsearch_app/README.md` (current at HEAD; its "still uses debug signing" paragraph must be updated in the same
-  commit as `build.gradle.kts`), `pixelsearch_app/docs/ARCHITECTURE.md`
-- `MIGRATIONS.md` (except §B)
-- `model_kit/INTERFACE_CONTRACT.md` and `FACE_CONTRACT.md` (content current; the header says v1.1 while the history
-  reaches v1.3)
-- `enhancement_backend/README.md` (its uncommitted 2026-09-18 edit describes the undeployed hardening, not the live
-  `f38a72c` service)
-- `docs/SECURITY_REVIEW_2026-09-18.md`, `docs/architecture/README.md`, `DESIGN.md`, `PRODUCT.md` (all untracked)
+- `pixelsearch_app/README.md` (its release-signing paragraph and FP32-only provisioning steps were updated on the
+  branch, `c06d524`), `pixelsearch_app/docs/ARCHITECTURE.md` (except "Database schema 6": the code is at schema 7
+  since 2026-10-22)
+- `MIGRATIONS.md` (except §B; it has the v6 → v7 row)
+- `model_kit/INTERFACE_CONTRACT.md` and `FACE_CONTRACT.md` (content current; the interface contract's header says
+  v1.1 while the history reaches v1.3, and it has an FP32-only status note since 2026-10-22; the face contract is
+  at v2 since 2026-10-22)
+- `enhancement_backend/README.md` (its 2026-09-18 edit, committed on the branch in `b8c3310`, describes the
+  undeployed hardening, not the live `f38a72c` service)
+- `docs/SECURITY_REVIEW_2026-09-18.md`, `docs/architecture/README.md`, `DESIGN.md`, `PRODUCT.md` (untracked at the
+  audit; committed on the branch on 2026-10-22, the first two after forward redaction)
 - this handbook set
 
 **Dated historical records** (accurate for their date; do not edit their measurements):
@@ -1005,12 +1054,13 @@ Prioritized as of 2026-10-21; People items updated 2026-10-22 (after the device 
   `INDEXED_GALLERY_2026-09-09`, `ONLINE_BACKEND_ACCEPTANCE_2026-09-09`, `SPEECH_SEARCH_FOLLOWUP_2026-09-09`
 - `VOICE_MAP_TIMELINE_2026-09-10`, `OFFLINE_PEOPLE_2026-09-10`, `NEW_FACES_2026-09-10`, `NEW_FACES_DEVICE_2026-09-10`
 - `PEOPLE_VALIDATION_2026-09-18`, `PEOPLE_NAME_SEARCH_DEVICE_ACCEPTANCE`, `PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22`
-  (untracked)
+  (untracked at the audit; committed on the branch on 2026-10-22)
 - `docs/archive/*`
 
 **Stale against code.** Every Markdown file below carries a dated status note at its top (the notes for
 `RESEARCH_LOG.md` and `ARCHITECTURE_DECISIONS.md` were added last, during the 2026-10-21 review). `.env.example` is
-a config template and was left unchanged. Older docs not listed here may still contain stale claims.
+a config template without a status note; its stale claim was corrected on 2026-10-22 (`c06d524`). Older docs not
+listed here may still contain stale claims.
 
 | Doc | Stale claim |
 |---|---|
@@ -1029,7 +1079,7 @@ a config template and was left unchanged. Older docs not listed here may still c
 | `ENGINEERING_AUDIT_AND_ROADMAP.md` | Lexical union |
 | `SEARCH_EVALUATION.md` | Diagnostics tab; replay list |
 | `FIVE_FEATURE_DEVICE_CHECKLIST.md` | Header ("not yet performed") |
-| `.env.example` | "No cloud calls" |
+| `.env.example` | "No cloud calls" (fixed on the branch 2026-10-22, `c06d524`: the app reads no variables; the backend holds its own secrets) |
 | `model_kit/SPIKE_REPORT.md` | "Resize 256×256" |
 | `model_kit/parity/README.md` | fp16 validated; old paths |
 
@@ -1050,7 +1100,8 @@ patterns (local user paths, camera and chat photo filenames, deployment URLs, sh
 phrasing) and, when the git-ignored denylist is present, for its whole-word terms (it never prints them). The list
 below records what the pushed history contains.
 
-- **The GitHub repository `origin` is public**, verified on 2026-10-21. `origin/main == HEAD == 4a7c81f`.
+- **The GitHub repository `origin` is public**, verified on 2026-10-21. `origin/main` = `4a7c81f` (also HEAD at the
+  audit; HEAD is now the unpushed branch `review-ready-2026-10-22`).
 - **Tracked, pushed files contain in history** (values deliberately not reproduced here):
   - a full device serial:
     - `pixelsearch_app/docs/ANDROID_FIVE_FEATURE_ACCEPTANCE_2026-09-09.md`
@@ -1074,7 +1125,9 @@ below records what the pushed history contains.
   - the team roster with surnames in `docs/archive/initial-plan/PixelSearch_Mobile_Implementation_Handbook.md`,
     tracked since the first commit `14ed4c2` (and probably its `.docx`, a binary that was not opened)
   - Most of the rest arrived in commit `8c7293e`.
-- **Untracked files with similar material:**
+- **Files untracked at the audit with similar material** (2026-10-21 record; all were redacted forward before they
+  were committed on the branch on 2026-10-22, and the repository check with the denylist passes on the working tree;
+  the deliverable folders stay git-ignored and uncommitted):
   - `people_name_search_test.dart` and `PEOPLE_NAME_SEARCH_DEVICE_ACCEPTANCE.md`, which breaks that doc's own
     no-names rule (the test maps a real first name to "me" and turns another into a two-part name)
   - Eraser share links with tokens, a hosted link to the rendered diagram and a pointer to a local `links.json` in
@@ -1085,21 +1138,29 @@ below records what the pushed history contains.
   - one more use of an already-exposed real first name in a working-tree test added to `people_widgets_test.dart`
     (2026-10-18 wave)
   - student names in `reports/` and `PIXELSEARCH_COPYRIGHT_SOURCE/`
-  - Found again by the 2026-10-22 verification pass, with redaction text proposed for each; none was changed,
-    because redaction is the owner's decision. The 2026-10-22 People-search docs and tests use slot labels and
-    placeholder names only.
-- **`tool/check_repository.py` does not scan file content for personal data or secrets.** It checks tracked paths,
-  extensions and sizes, plus a few structural rules (export-only `providers.dart`, no barrel imports, bundled samples
-  referenced by tests). It does not inspect images.
-- **Decide with the user** whether to make the repository private or scrub these items, and whether to rewrite
-  history. Neither has been done.
-- **No secrets were found.** Backend secrets are server-side only (`sync:false`). In the working tree (uncommitted),
-  signing material comes only from four env vars; at HEAD, release builds are still signed with the debug key. The
-  copyright secret scan's 2 hits are test fixtures.
+  - Found again by the 2026-10-22 verification pass, with redaction text proposed for each; none was changed then,
+    because redaction is the owner's decision. Later that day the owner chose forward redaction (above). The
+    2026-10-22 People-search docs and tests use slot labels and placeholder names only.
+- **`tool/check_repository.py`** checks tracked paths, extensions and sizes, plus a few structural rules
+  (export-only `providers.dart`, no barrel imports, bundled samples referenced by tests). At the audit it did not
+  scan file content; since 2026-10-22 (`d4b4a59`) it scans tracked and addable text files for the generic patterns
+  and denylist terms above. It still does not inspect images or other binaries (such as the archive `.docx`), and CI
+  has no denylist.
+- **Decided 2026-10-22:** forward redaction (done). **Still the owner's decision:** making the repository private
+  and rewriting history; neither has been done.
+- **No secrets were found.** Backend secrets are server-side only (`sync:false`). On the branch, release signing
+  material comes only from four env vars (`c49f2d2`); on `main`, release builds are still signed with the debug key.
+  The copyright secret scan's 2 hits are test fixtures.
 - **Accepted limitations:** local data is not independently encrypted; deletion is logical, not forensic; Android
   backup is disabled.
 
 ## 12. Next steps (highest priority first)
+
+> **Update (2026-10-22, later):** step 1's redaction was done forward on the branch (ADR-025); visibility and
+> history rewriting remain the owner's decision. Step 2's cause was found by a Windows-host simulation and fixed on
+> the branch (KI-17); it is confirmed only by a CI run, which happens on a pull request or a push to `main`. Step 3
+> is done: the work is committed on the local branch `review-ready-2026-10-22`; redeploying the backend hardening
+> and the token re-entry remain. Steps 1 to 3 below are kept as written on 2026-10-21/22.
 
 1. **Privacy exposure.** With the user, decide on repository visibility, redaction and history rewriting.
 2. **Fix CI.** Read run 7's log while signed in, or reproduce on Linux with Flutter 3.44.7 from a clean checkout of
@@ -1133,16 +1194,13 @@ below records what the pushed history contains.
      2026-10-22 (none left on B7); after the resumed pass the phone offers 70 new group-pair questions, 20 per launch
      on the main screen. Answer Not sure when in doubt; the floor that selects the questions is not an identity
      threshold.
-   - **Smaller-face contract (proposal, not started).** Faces under 100 px cannot be grouped under the current
-     `FaceContract` (`minFacePixels` 100). Grouping more of them needs a new `FaceContract.id` with a lower minimum
-     (for example 48 px), carrying the existing manual assignments over to the re-detected faces, a full re-scan
-     of all photos, and a new review round that re-validates the cutoff for lower-resolution faces before automatic
-     grouping uses them.
+   - **Smaller faces (FaceContract v2, built 2026-10-22, ADR-023; owner chose 64 px).** Remaining: back up the
+     phone, install the build in place (schema v7 migrates the database; rehearsed on a copy of backup B10), keep
+     the app open for the re-scan, check from a new backup that names, decisions and "Not a face" carried over, then
+     the user rates a new review round (identity decisions are the user's) so grouping can use faces from 64 px.
    - **Processing resumed (user's decision, 2026-10-22).** The first full pass is done (backup B8). `applyGrouping`
      runs after each full pass on a holdout with only 4 Different pairs, so a larger review round would make the
      cutoff more trustworthy. Never alter ratings.
-   - **Fix KI-16**: store photo ids with review rows (an additive schema step with both version bumps, a
-     `MIGRATIONS.md` row and a migration test), then remove the skipped bug test.
    - Device checks still open: confirming and rejecting suggestions, answering through the main-screen rounds
      (shown on the phone, not answered by the assistant) and voice input. Naming and "Same person?" answers were done
      by the user on the phone (B5 to B6).
@@ -1160,7 +1218,9 @@ below records what the pushed history contains.
   - suggestion confirm/reject and voice person queries on the phone (host-tested only); the user's naming and "Same
     person?" answers were checked only through aggregate backup counts (B5 to B6)
   - the accuracy of the 85 automatic assignments made after the resumed pass (B8)
-  - which 3 CI tests fail
+  - whether the KI-17 fix makes CI pass on GitHub (the 3 failures were explained only by a Windows-host simulation
+    on 2026-10-22; the job logs were never read and no Linux run was possible)
+  - the face counts and grouping quality under FaceContract v2 on the phone (the v2 build is not installed)
   - which commit Render serves, and whether the service is live
   - whether Groq ZDR is still enabled and the preview Qwen model still available
   - whether the Vivo originals actually contain GPS
@@ -1191,7 +1251,8 @@ below records what the pushed history contains.
     archive contents in `local_evaluation/` (aggregates only), and made read-only public GitHub API requests.
   - One agent wrote a temporary comparison file to the system temp directory, outside the repository.
   - No code, config or test file was changed by the audit.
-- **Audit changes (2026-10-21, all uncommitted; the public HEAD has none of them):**
+- **Audit changes (2026-10-21, all uncommitted then; committed on the local branch in `ecccf18` on 2026-10-22, so
+  the public `main` still has none of them):**
   - new, untracked: root `CLAUDE.md`, `docs/PROJECT_CONTEXT.md`, `docs/EVIDENCE_LEDGER.md`, `docs/FILE_MAP.md`
   - edits to `docs/README.md`, `pixelsearch_app/CLAUDE.md` and `model_kit/CLAUDE.md`
   - dated status notes at the top of the stale docs listed in §10, including the late additions `RESEARCH_LOG.md`

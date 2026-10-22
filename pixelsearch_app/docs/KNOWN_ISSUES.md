@@ -9,8 +9,8 @@ People search and similar-face suggestions use assigned faces (manual or automat
 People processing was paused by the user at 485 of 1,916 photos until 2026-10-22, when the user resumed it;
 all 1,916 photos are now processed (backup B8: 2,642 detections, 397 with descriptors). Root cause of the same
 person being listed many times: only 336 of 2,342 detections (at 485 photos) reach the 100 px SFace descriptor minimum
-(`FaceContract.minFacePixels`); the other 2,006 have no descriptor, so the current face contract can never
-group or suggest them. Duplicate detections are a minor factor (26 overlapping same-photo pairs, about 20
+(`FaceContract.minFacePixels`); the other 2,006 have no descriptor, so face contract v1 (the phone's installed
+build) can never group or suggest them. Duplicate detections are a minor factor (26 overlapping same-photo pairs, about 20
 near-identical cross-photo pairs). The first review round failed (one false join); a backup taken on
 2026-10-22 shows the later fresh round passed (validation 16 same / 4 different pairs, 0 false joins,
 saved threshold about 0.462). That is a small holdout, not a general accuracy result.
@@ -20,13 +20,18 @@ total).
 New faces went from 2,329 face entries to 1,402 to name, with 798 small or duplicate faces hidden behind
 "Show small faces" (not deleted, still nameable). The suggestions screen counts 1,994 unnamed faces as too
 small to compare; those still need manual naming. Grouping them needs a new `FaceContract.id` with a lower
-minimum, a full re-scan and a new review round; not started. The automatic grouping after a processing
+minimum, a full re-scan and a new review round (built later on 2026-10-22 as FaceContract v2; see the update
+below). The automatic grouping after a processing
 pass (`applyGrouping`) never runs while paused; since the user resumed processing it runs after each full pass
 (after the first one: 85 more automatic assignments, 127 to 152 groups, none added to a named person; New faces
 shows 1,497 to name). Older docs that say the gate failed and the threshold is empty describe the first round.
 The "Same person?" questions (ADR-021, 2026-10-22) also only cover faces with descriptors: the face asked
-about is always at least 100 px (only the confirmed face shown beside it may be smaller), so an unnamed
-small face is never the subject of a question and still needs manual naming.
+about is always at least the minimum size (only the confirmed face shown beside it may be smaller), so an
+unnamed small face is never the subject of a question and still needs manual naming.
+**Update 2026-10-22 (ADR-023):** at the owner's request `FaceContract` v2 lowers the minimum to 64 px. After the
+re-scan, faces from 64 to 99 px get descriptors, so they can be suggested, asked about and, once a new review
+round passes, grouped; faces under 64 px still need manual naming. How many faces that adds on the phone is
+measured only after the device re-scan (pending when this was written; see the evidence ledger).
 
 ## KI-15 (Low, by design) - person-query wording limits (2026-10-22)
 "without X" excludes only photos where X's face is assigned. A saved name that is also a common word
@@ -37,7 +42,10 @@ falls back to requiring everyone. Pre-existing and not by design: a name typed i
 from the saved one (for example Devanagari for a Latin-script name) is not matched, so the online guard
 cannot recognise it either.
 
-## KI-16 (Medium, People validation) - an edited reviewed photo can be sampled into a new review (2026-10-22)
+## KI-16 (Fixed 2026-10-22, schema v7) - an edited reviewed photo can be sampled into a new review
+**Fixed (ADR-024):** review rows now store the reviewed photo ids (schema v7; the v6 -> v7 step fills them
+from the faces that still exist), and the reviewed-photo set unions those ids with the old face join. The
+former skipped bug test now runs and passes. Original description, kept as a record:
 Pre-existing, found by the 2026-10-22 tests. `_reviewedPhotos` finds reviewed photos through their
 current face ids, and face ids include the photo revision. After a reviewed photo is edited (a new
 revision), that photo can be sampled again into a new review round (calibration or a fresh holdout),
@@ -45,6 +53,17 @@ which weakens the photo-disjoint guarantee of the validation gate. A proper fix 
 with the review rows, which is a schema change and is not done. A skipped test in
 `test/people_validation_recovery_test.dart` documents the bug. Mitigation: do not start a new review
 after editing reviewed photos until this is fixed.
+
+## KI-17 (Fixed in the branch 2026-10-22; Linux confirmation pending) - CI failed on Linux only
+GitHub CI failed tests on the Linux runner that passed on Windows. Two causes, found by simulation on the
+Windows host (2026-10-22) because the job logs need admin rights: four widget-test files loaded the Windows
+font `segoeui.ttf` as 'Roboto' only when it existed, so on Linux text used the wide FlutterTest font and
+320 px layouts overflowed; and `modelkit_paths_test.dart` built Windows-only path literals. Both are fixed in
+test code (`test/support/test_fonts.dart`, now used by five widget-test files, loads the bundled Manrope on
+every host; the path test builds paths from the host root). The fix has not yet run on a Linux runner: a local
+Docker run failed because Docker Desktop did not start, and nothing was pushed. CI runs on pushes to
+`main`/`master` and on pull requests, so the first run of a pull request from the branch (or of a push to
+`main`) confirms or reopens this.
 
 ## KI-12 (Critical testing safety) - device-test cleanup removed private app data
 On 2026-09-08, a new semantic diagnostics integration test was run without `--no-uninstall`.

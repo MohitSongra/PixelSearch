@@ -8,8 +8,9 @@ only, no redirects, size-capped), not through the broker. It is a final-year maj
 standards.
 
 **Last full audit: 2026-10-21; updated 2026-10-22 for the People-search wave (host-verified, then accepted on the
-test phone the same day), its "Same person?" confirmations and rounds, and the user's resumed People processing.**
-For the deep context read
+test phone the same day), its "Same person?" confirmations and rounds, and the user's resumed People processing;
+later that day for the review-ready branch (schema v7 / KI-16, FaceContract v2, the KI-17 CI fix, the interim
+licence).** For the deep context read
 [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md).
 Measured numbers are in [`docs/EVIDENCE_LEDGER.md`](docs/EVIDENCE_LEDGER.md) and the per-file map is in
 [`docs/FILE_MAP.md`](docs/FILE_MAP.md). App-level engineering rules are in
@@ -26,7 +27,7 @@ Measured numbers are in [`docs/EVIDENCE_LEDGER.md`](docs/EVIDENCE_LEDGER.md) and
 | `tool/check_repository.py` | Publication-boundary check (CI) |
 | `docs/` | Index, handbook (`PROJECT_CONTEXT`, `EVIDENCE_LEDGER`, `FILE_MAP`), security review, archive |
 | `pixelsearch_app/docs/` | Architecture, ADRs, contracts mirror, migrations, dated acceptance reports, status docs (several stale; see the handbook §10) |
-| `reports/`, `PIXELSEARCH_COPYRIGHT_SOURCE/`, `.impeccable/`, root `DESIGN.md` and `PRODUCT.md` | Untracked and **not git-ignored**. Never `git add -A`. The three folders are local deliverables, not for commit; whether `DESIGN.md`/`PRODUCT.md` are committed is the owner's decision. Untracked files that *are* meant to be committed: this `CLAUDE.md`, `docs/PROJECT_CONTEXT.md`, `docs/EVIDENCE_LEDGER.md`, `docs/FILE_MAP.md`, and the wave-1 to wave-3 untracked source, tests and docs (handbook §3.3). Stage by explicit path. |
+| `reports/`, `PIXELSEARCH_COPYRIGHT_SOURCE/`, `.impeccable/` | Local deliverables, git-ignored since 2026-10-22 (tracked `.gitignore` and `.git/info/exclude`). Never commit them. Still stage by explicit path, never `git add -A`. A git-ignored `.privacy-denylist.txt` at the root (real names, the serial) feeds the private-data scan in `tool/check_repository.py`; never commit it. |
 | `pixelsearch_app/local_evaluation/`, `pixelsearch_app/docs/RAW_SEMANTIC_DIAGNOSIS.md` | Git-ignored private device data. Never publish, never quote. |
 
 ## Non-negotiable rules
@@ -47,9 +48,10 @@ Measured numbers are in [`docs/EVIDENCE_LEDGER.md`](docs/EVIDENCE_LEDGER.md) and
 
 - Never add personal photo filenames, person names, face data, GPS, device serials, deployment URLs, share links,
   backup paths or secrets to tracked files or docs. Cite files and aggregate numbers instead.
-- Existing exposures are listed in the handbook §11; redacting them is a user decision.
+- The working tree was redacted forward on 2026-10-22 (ADR-025); the pushed history still holds the exposures
+  listed in the handbook §11. Making the repository private or rewriting history is the owner's decision.
 - Never commit MobileCLIP ONNX exports, device databases, APKs or AABs, keystores, `.env`, `local_evaluation/` or
-  the untracked deliverable folders. Only the bundled SFace ONNX is tracked.
+  the git-ignored deliverable folders. Only the bundled SFace ONNX is tracked.
 - Do not commit or push unless the user asks. Pushing `main` can trigger Render's deploy workflow.
 
 **Model and contract (ModelKit is the source of truth; any mismatch is a critical bug)**
@@ -57,7 +59,7 @@ Measured numbers are in [`docs/EVIDENCE_LEDGER.md`](docs/EVIDENCE_LEDGER.md) and
 - Never change preprocessing, the tokenizer, embedding size (512), image size (256), normalization, ONNX names or
   dtypes, or the opset without explicit approval, a version bump and re-verification.
 - `AiContract` (`lib/core/ai_contract.dart`): `modelVersion '1.0'`, `embeddingVersion '1'`, `artifactVersion '3'`,
-  `schemaVersion 6`.
+  `schemaVersion 7` (v7 adds reviewed photo ids, KI-16, 2026-10-22).
   - Bump `embeddingVersion` (which forces a full re-index) **if and only if** the weights or image preprocessing
     change.
 - Keep `model_kit/INTERFACE_CONTRACT.md` and `pixelsearch_app/docs/INTERFACE_CONTRACT.md` identical.
@@ -92,7 +94,9 @@ Measured numbers are in [`docs/EVIDENCE_LEDGER.md`](docs/EVIDENCE_LEDGER.md) and
   uploads also need per-item approval. No redirects, no silent retries, no cloud fallback for on-device speech.
 - Labels: ML Kit confidence ≥ 0.5 or no labels. There is no fallback; it was removed on purpose in `5f6f074`.
 - People: no default identity threshold. Automatic grouping only after a photo-disjoint validation with zero false
-  joins. Any change to the face pipeline needs a new `FaceContract.id`.
+  joins. Any change to the face pipeline needs a new `FaceContract.id`. Current: `sface-2021dec-mlkit-landmarks-v2`
+  (minimum face 64 px, 2026-10-22, ADR-023); a re-scan continues matching v1 faces by box overlap, and grouping
+  stays off until a review round under v2 passes.
 - People search (2026-10-22; ADR-018 to ADR-022):
   - Similar-face suggestions only order faces (no threshold, no score shown). Nothing is assigned until the user
     confirms that face.
@@ -109,7 +113,8 @@ Measured numbers are in [`docs/EVIDENCE_LEDGER.md`](docs/EVIDENCE_LEDGER.md) and
   - `groupNow` ("Group similar faces") runs only when the user asks, after a confirmation dialog, and returns 0
     unless the review gate passed. It is the only grouping that runs while paused; `applyGrouping` (after a full
     processing pass) never runs while processing is paused. Now that the user has resumed processing,
-    `applyGrouping` runs after each full pass on the phone, still only with a passed gate.
+    `applyGrouping` runs after each full pass on the phone's installed (FaceContract v1) build, still only with a
+    passed gate; under v2 it stays off until a review round under v2 passes.
   - Unassigned small or duplicate faces (under 40 px in the prepared image, or overlapping a larger face in the same
     photo by IoU > 0.5) are hidden from the naming list behind "Show small faces", never deleted.
   - `deleteAssets` keeps review pairs, so calibration fails closed after a reviewed photo goes away. Never delete
@@ -127,13 +132,13 @@ All commands start from the repository root.
 # App (Flutter 3.44.7 / Dart 3.12.2; keep pubspec.lock)
 cd pixelsearch_app && flutter pub get && dart run build_runner build --delete-conflicting-outputs   # what CI runs; not run 2026-10-21 (no dependency resolution in the audit)
 cd pixelsearch_app && flutter analyze --no-pub      # --no-pub skips dependency resolution; no issues 2026-10-22
-cd pixelsearch_app && flutter test --no-pub test/   # 526 passed + 2 skipped on the working tree (2026-10-22): the SFace worker test and the KI-16 bug test; tokenizer tests read ../model_kit fixtures
+cd pixelsearch_app && flutter test --no-pub test/   # 535 passed + 1 skipped (2026-10-22, branch review-ready-2026-10-22): the SFace worker test; tokenizer tests read ../model_kit fixtures
 cd pixelsearch_app && flutter test --dart-define=SFACE_MODEL_TEST=true   # adds the real SFace worker test (needs a native ORT library); not run in this audit
-cd pixelsearch_app && flutter build apk --debug --no-pub   # built 2026-10-22 (versionCode 1, same signer as the phone's install) and installed with adb install -r; release builds need PIXELSEARCH_KEYSTORE_PATH, _KEYSTORE_PASSWORD, _KEY_ALIAS, _KEY_PASSWORD (uncommitted signing config)
+cd pixelsearch_app && flutter build apk --debug --no-pub   # built 2026-10-22 (versionCode 1, same signer as the phone's install) and installed with adb install -r; release builds need PIXELSEARCH_KEYSTORE_PATH, _KEYSTORE_PASSWORD, _KEY_ALIAS, _KEY_PASSWORD (operator-supplied values, never committed)
 
 # Repository and ModelKit checks
 python tool/check_repository.py                    # passed 2026-10-22 (run as python -I)
-cd model_kit && python eval/test_metrics.py
+cd model_kit && python eval/test_metrics.py        # passed 2026-10-22
 
 # Backend: use the project venv (the system Python 3.14 has starlette 1.3.1, below the required 1.6)
 cd enhancement_backend && .venv/Scripts/python -m pytest -q   # 51 passed
@@ -152,28 +157,32 @@ handbook §5.1.
 
 ## Current state (2026-10-22)
 
-- **Git.** `main` = `origin/main` = `4a7c81f` (2026-09-18), with a **large uncommitted tree**: about 40 modified
-  tracked files from three waves (code, config, tests and the backend README), plus the audit's documentation
-  edits, and about 30 untracked entries. Run `git status` for the live state. The waves contain:
-  - 2026-09-18: the backend security hardening, origin-bound backend token, map-tile bounds, release-signing
-    config, People deletion cascade and validation recovery, and the UI redesign (teal, Manrope, Privacy Centre).
-  - 2026-10-18: a person-search empty state.
-  - 2026-10-22, People search: the person-query grammar ("me", "or", "without"), similar-face suggestions,
-    multi-select naming, delete person, the "Not a face" restore screen, the user-requested "Group similar faces"
-    action, a smaller naming list, the "Same person?" confirmations and their rounds on the main screen. It adds
-    7 untracked lib files and 4 untracked test files; `people_query.dart` is tracked and modified.
+- **Git.** `main` = `origin/main` = `4a7c81f` (2026-09-18). Everything since is committed on the **local branch
+  `review-ready-2026-10-22`** (not pushed; pushing `main` can deploy the backend on Render). `git log
+  4a7c81f..review-ready-2026-10-22` lists the commits: privacy redaction of dated reports, backend-token binding,
+  release signing, the combined redesign + People validation recovery + People search commit (these share
+  `search_screen.dart` and `people_repository.dart`), the backend hardening, the security review, the audit
+  handbook, the private-data scan, the CI test-portability fix and workflow hardening, KI-16 (schema v7), FaceContract
+  v2, hygiene commits (dead code, FP32-only wording, map tiles never cached on disk, onboarding copy, in-app licences
+  and explicit assets, the ML Kit metrics notice), the licence, README and docs commit, and a formatting-only commit
+  (`f1c7f9d`) with a CI `dart format` check (`9bea6d4`, 22 commits on 2026-10-22). Each code commit was built and
+  tested in a clean worktree. Run `git status` for any uncommitted doc edits. The pushed history still holds the
+  personal data that the working tree no longer has (ADR-025).
 
-  A debug build of this working tree (all three waves) is installed on the test phone, in place with
-  `adb install -r` (nine installs on 2026-10-22; first-install time and signer unchanged). The backups show that
-  no install, acceptance search or viewing of the questions changed a table (B0b, B1 and B2 identical; B3, B4 and
-  B5 identical; B6 and B7 identical; B8 and B9 identical; B10 differs only by a processing-lease row). Tables
-  changed only through the user-requested grouping (B3), the user's own answers and naming (B5 to B6) and the
-  user's resumed processing pass with its automatic grouping (B7 to B8). The backend hardening is **not deployed**.
-- **CI is failing** on the last four pushes, including HEAD: 3 of 328 Flutter tests fail on the Linux runner, while
-  the same HEAD passes locally. The cause is not identified. A probable lead from 2026-10-22, not confirmed on
-  Linux: the 320px widget tests pass on Windows only because the Segoe font is loaded as Roboto.
+  The phone runs a debug build of the People-search work, installed in place with `adb install -r` (nine installs on
+  2026-10-22; first-install time and signer unchanged); the build with schema v7 and FaceContract v2 is not
+  installed yet. The backups show that no install, acceptance search or viewing of the questions changed a table
+  (B0b, B1 and B2 identical; B3, B4 and B5 identical; B6 and B7 identical; B8 and B9 identical; B10 differs only by a
+  processing-lease row). Tables changed only through the user-requested grouping (B3), the user's own answers and
+  naming (B5 to B6) and the user's resumed processing pass with its automatic grouping (B7 to B8). The backend
+  hardening is **not deployed**.
+- **CI** failed on the last four pushes (Linux runner only). Cause (KI-17, found by simulation on the Windows host):
+  widget tests loaded a Windows system font as 'Roboto' only when it existed, and one path test used Windows-only
+  literals. Both are fixed on the branch (tests load the bundled Manrope; host-rooted paths) and the workflow is
+  hardened, but the fix has **not yet run on GitHub**; a local Docker run failed because Docker Desktop did not start.
 - **Device** (backups B0 to B10, 2026-10-22, aggregate).
-  - Vivo I2214 (API 36) runs FP32 CPU with 1,916 indexed photos and 1,916 embeddings (schema 6, integrity ok).
+  - Vivo I2214 (API 36) runs FP32 CPU with 1,916 indexed photos and 1,916 embeddings (schema 6 on the installed build,
+    integrity ok; the code is at schema 7).
   - People is enabled and, since the user resumed it on 2026-10-22, **not paused**. All 1,916 photos are now
     processed (backup B8): 2,642 faces, of which 397 are large enough for a descriptor (485 photos, 2,342 faces and
     336 descriptors before). The first review round failed on 2026-09-18 (1 false join). A fresh 20-pair round then
@@ -197,9 +206,13 @@ handbook §5.1.
   - 0 photos with GPS were found; no positive map pin has been seen.
   - Only 2 judged search queries exist (P@5 0.20 and 0.40).
 - **Not done:**
-  - grouping faces under 100 px (needs a new `FaceContract.id` with a lower minimum, a full re-scan of all photos
-    and a new review round; proposed, not started)
-  - the KI-16 fix (review rows need photo ids, which is a schema change)
+  - installing the schema-v7 / FaceContract-v2 build on the phone and its re-scan (rehearsed on a copy of backup
+    B10: the migration fills all 140 review rows and nothing visible changes before the re-scan), then the user's
+    new review round, which turns automatic grouping back on for v2. The debug APK built at 12:33 predates
+    `99433c5` (its two licence texts are missing from the APK; the ML Kit notice came in the same commit); rebuild
+    from the branch tip before installing.
+  - the first GitHub CI run of the KI-17 fix. CI runs only on pushes to `main`/`master` and on pull requests, so it
+    needs a pull request from the branch or a push to `main` (the owner's decision)
   - M12 model manager. Provisioning is manual. The only in-app signal is a transient status line after an
     indexing attempt; it names the expected path and lists the fp16 file first, so do not follow it literally:
     provision only the fp32 files.
@@ -220,22 +233,14 @@ handbook §5.1.
 - **Search mode** (semantic or keyword fallback) is shown only by tooltip in the redesign. `isSemantic` stays true
   with an empty index.
 - **`searchBackendProvider` rebuilds** after every indexing run and orphans the previous text ORT session (leak).
-- **Commit coupling.**
-  - Committing `pubspec.yaml` needs the untracked `assets/fonts/`.
-  - `build.gradle.kts` needs the untracked `docs/ANDROID_RELEASE_SIGNING.md`.
-  - Committing `enhancement_client.dart` or `online_settings.dart` without the untracked
-    `lib/data/enhancements/backend_credentials.dart` (and its test) breaks compilation.
-  - The 2026-10-22 wave's tracked files import its 7 untracked lib files (for example `search_providers.dart`
-    imports `people_membership.dart`, and `people_screen.dart` imports `same_person_screen.dart`). Commit them
-    together.
-  - A release-signed APK cannot update the debug-signed install in place.
-- **Small faces.** Only 397 of the phone's 2,642 detected faces (all photos processed, backup B8) reach the 100 px
-  SFace minimum; the rest have no descriptor, so grouping, suggestions and "Same person?" questions can never reach
-  them under the current `FaceContract`, and they are named by hand (of the first 485 processed photos, 67 have 10
-  or more faces). Same-photo duplicate detections are a minor factor.
-- **Reviewed photos (KI-16).** Reviewed photos are found through face ids, which include the photo revision. After a
-  reviewed photo is edited it can be sampled into a new review round, so do not start a new review after editing
-  reviewed photos until KI-16 is fixed.
+- **Release signing.** A release-signed APK cannot update the debug-signed install in place.
+- **Small faces.** Under FaceContract v1 only 397 of the phone's 2,642 detected faces (backup B8) reached the 100 px
+  minimum. v2 (64 px) adds descriptors for faces from 64 to 99 px after the re-scan; faces under 64 px still have
+  none and are named by hand. Same-photo duplicate detections are a minor factor.
+- **Contract upgrade.** After installing a build with a new `FaceContract.id`, People shows the earlier faces until
+  each photo is re-scanned (only while the app is open); calibration says "Face settings changed" until the user
+  starts a new review (New review archives the v1 round), and automatic grouping stays off until that round
+  passes. A new round needs photos never reviewed before. Do not judge the review pairs for the user.
 - **Parity currency.** Host Flutter-ORT parity has not been re-run since `a76d3b6` (2026-08-08). The preprocessing
   fingerprint is Dart-captured, not PIL-derived.
 

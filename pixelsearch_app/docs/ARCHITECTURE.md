@@ -68,8 +68,8 @@ flowchart LR
 
 The planner handles new, changed, stale and deleted records. Cancellation preserves
 committed work. Original photos remain gallery assets; the app stores metadata,
-thumbnail paths, vectors and additional user choices. Database schema 6 includes
-People records. See [migrations](MIGRATIONS.md).
+thumbnail paths, vectors and additional user choices. Database schema 7 (2026-10-22)
+includes People records, with reviewed photo ids on review rows. See [migrations](MIGRATIONS.md).
 
 Core image processing still contains synchronous work on the foreground path.
 Yielding between assets is not a completed worker migration. WorkManager adapters
