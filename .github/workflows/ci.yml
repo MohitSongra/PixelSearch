@@ -5,26 +5,37 @@ on:
     branches: [ main, master ]
   pull_request:
 
+# Read-only token; no job writes to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   repository:
     name: Repository layout and publication boundaries
-    runs-on: ubuntu-latest
+    # Pinned: the ubuntu-latest label moves to a new image over time.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - run: python tool/check_repository.py
 
   backend:
     name: Enhancement backend contract tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: enhancement_backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements.txt -c requirements.lock
@@ -32,18 +43,21 @@ jobs:
 
   flutter:
     name: Flutter analyze + unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: pixelsearch_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.44.7'
           channel: stable
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - run: dart run build_runner build --delete-conflicting-outputs
+      # The generated database code is committed; regeneration must not change it.
+      - run: git diff --exit-code -- lib/data/local/app_database.g.dart
       - run: flutter analyze
       - run: flutter test test/
       # NOTE: integration_test/ (image/text parity, golden, benchmark) needs a real
@@ -52,13 +66,14 @@ jobs:
 
   modelkit:
     name: ModelKit metric tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: model_kit
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - run: python eval/test_metrics.py
