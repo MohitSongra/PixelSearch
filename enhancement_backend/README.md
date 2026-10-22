@@ -55,6 +55,12 @@ fallback, model substitution, persistent upload store or gallery API.
 | `POST /transcribe` | one multipart `file`, at most 4 MiB | transcript and model ID |
 
 Every POST requires `Authorization: Bearer <installation-token>` and Content-Length.
+Authentication, per-token throttling, and capacity admission happen before body
+parsing. Actual received bodies are capped at 6 MiB (including multipart overhead),
+not just checked against the declared length. At most two POST requests per worker
+are processed at once; excess work gets 429 instead of waiting in a memory queue.
+Requests have a 60-second total deadline, provider calls a 45-second deadline, and
+provider response bodies a 64 KiB cap. Error responses do not echo submitted input.
 No photo IDs, filenames, inventory or embeddings are accepted by the assistant.
 Dates are calendar dates; `until` is exclusive. Album/place phrases are resolved
 against local metadata by the app, not against an uploaded gallery catalog.
@@ -92,6 +98,13 @@ The app requires HTTPS; plain localhost HTTP is only for backend developer check
 - Groq ZDR and API access must be checked in the real account before live testing.
 - Free quotas, model availability and service terms may change. Public rollout
   needs a separate hosting/security review; do not market this as an SLA-backed service.
+- Rate and active-request counters are per process. This blueprint runs one worker.
+  Scaling to multiple workers or replicas needs shared rate limiting and an ingress
+  request-size/connection limit. The ASGI limit cannot protect a proxy that buffers
+  uploads before passing them to the app.
+- App credentials are now bound to an HTTPS origin (host and port). Existing phone
+  tokens must be re-entered once after this update because the legacy storage did
+  not record their server. Switching hosts never reuses the old token implicitly.
 
 References: [Groq data controls](https://console.groq.com/docs/your-data),
 [model availability](https://console.groq.com/docs/models),

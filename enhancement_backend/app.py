@@ -12,10 +12,13 @@ from datetime import date
 from typing import Literal
 
 import httpx
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from PIL import Image, ImageOps
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from starlette.datastructures import Headers, MutableHeaders
+from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
 app = FastAPI(title="PixelSearch enhancements", version="1.0.0")
 VISION_MODEL = "qwen/qwen3.6-27b"
@@ -23,29 +26,17 @@ SPEECH_MODEL = "whisper-large-v3-turbo"
 # Short captions/search JSON must fit the observed 1,000 OTPM free-tier limit.
 MAX_COMPLETION_TOKENS = 512
 MAX_FILE = 4 * 1024 * 1024
+MAX_REQUEST_BODY = 6 * 1024 * 1024
+MAX_PROVIDER_BODY = 65536
+MAX_ACTIVE_REQUESTS = 2
+REQUEST_TIMEOUT = 60
+PROVIDER_TIMEOUT = 45
 _requests = defaultdict(deque)
-_slots = asyncio.Semaphore(2)
 Image.MAX_IMAGE_PIXELS = 20_000_000
 
 
-@app.middleware("http")
-async def limits(request: Request, call_next):
-    if request.method == "POST":
-        length = request.headers.get("content-length")
-        if length is None:
-            return JSONResponse({"detail": "Content-Length required"}, status_code=411)
-        try:
-            if int(length) > 6 * 1024 * 1024 or int(length) < 0:
-                return JSONResponse({"detail": "Request too large"}, status_code=413)
-        except ValueError:
-            return JSONResponse({"detail": "Invalid length"}, status_code=400)
-    response = await call_next(request)
-    response.headers["Cache-Control"] = "no-store"
-    return response
-
-
-def authorize(request: Request):
-    token = request.headers.get("authorization", "")
+def authorize(headers: Headers):
+    token = headers.get("authorization", "")
     if not token.startswith("Bearer "):
         raise HTTPException(401, "Per-install token required")
     digest = hashlib.sha256(token[7:].encode()).hexdigest()
@@ -61,6 +52,68 @@ def authorize(request: Request):
     queue.append(now)
 
 
+class AdmissionMiddleware:
+    """Authenticate and bound work before FastAPI parses/spools request bodies."""
+
+    def __init__(self, app):
+        self.app = RequestBodyLimitMiddleware(app, max_body_size=MAX_REQUEST_BODY)
+        self.active = 0
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        started = False
+
+        async def no_store(message):
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+                MutableHeaders(scope=message)["Cache-Control"] = "no-store"
+            await send(message)
+
+        if scope["method"] != "POST":
+            return await self.app(scope, receive, no_store)
+        try:
+            headers = Headers(scope=scope)
+            # No await between admission checks and reservation: one event loop,
+            # no thread-pool race and no queue of waiting uploads.
+            authorize(headers)
+            length = headers.get("content-length")
+            if length is None:
+                raise HTTPException(411, "Content-Length required")
+            try:
+                size = int(length)
+            except ValueError as exc:
+                raise HTTPException(400, "Invalid length") from exc
+            if size < 0 or size > MAX_REQUEST_BODY:
+                raise HTTPException(413, "Request too large")
+            if self.active >= MAX_ACTIVE_REQUESTS:
+                raise HTTPException(429, "Enhancement service busy", headers={"Retry-After": "5"})
+        except HTTPException as exc:
+            response = JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
+            return await response(scope, receive, no_store)
+        self.active += 1
+        try:
+            async with asyncio.timeout(REQUEST_TIMEOUT):
+                await self.app(scope, receive, no_store)
+        except TimeoutError:
+            if started:
+                raise
+            response = JSONResponse({"detail": "Request timed out"}, status_code=408)
+            await response(scope, receive, no_store)
+        finally:
+            self.active -= 1
+
+
+app.add_middleware(AdmissionMiddleware)
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request, exc):
+    # FastAPI's default errors echo submitted text and invalid input bodies.
+    return JSONResponse({"detail": "Invalid request fields"}, status_code=422)
+
+
 def provider_headers():
     key = os.getenv("GROQ_API_KEY", "")
     if not key or os.getenv("GROQ_ZDR_CONFIRMED") != "true":
@@ -71,15 +124,26 @@ def provider_headers():
 async def groq(path: str, **kwargs):
     headers = provider_headers()
     try:
-        async with _slots:
-            async with httpx.AsyncClient(timeout=45, follow_redirects=False) as client:
-                response = await client.post(f"https://api.groq.com/openai/v1/{path}", headers=headers, **kwargs)
-        if response.status_code == 429:
-            raise HTTPException(429, "Provider quota reached", headers={"Retry-After": "60"})
-        if response.status_code != 200:
-            raise HTTPException(503, "Configured enhancement model is unavailable")
-        return response.json()
-    except (httpx.HTTPError, ValueError) as exc:
+        async with asyncio.timeout(PROVIDER_TIMEOUT):
+            async with httpx.AsyncClient(timeout=PROVIDER_TIMEOUT, follow_redirects=False) as client:
+                async with client.stream("POST", f"https://api.groq.com/openai/v1/{path}", headers=headers, **kwargs) as response:
+                    if response.status_code == 429:
+                        raise HTTPException(429, "Provider quota reached", headers={"Retry-After": "60"})
+                    if response.status_code != 200:
+                        raise HTTPException(503, "Configured enhancement model is unavailable")
+                    data = bytearray()
+                    async for chunk in response.aiter_bytes():
+                        if len(data) + len(chunk) > MAX_PROVIDER_BODY:
+                            raise HTTPException(502, "Provider response too large")
+                        data.extend(chunk)
+        try:
+            result = json.loads(data)
+        except (ValueError, RecursionError) as exc:
+            raise HTTPException(502, "Invalid provider response") from exc
+        if not isinstance(result, dict):
+            raise HTTPException(502, "Invalid provider response")
+        return result
+    except (httpx.HTTPError, TimeoutError) as exc:
         raise HTTPException(503, "Enhancement service unavailable") from exc
 
 
@@ -92,10 +156,12 @@ async def completion(system: str, content):
     })
     try:
         choice = result["choices"][0]
+        if not isinstance(choice, dict):
+            raise TypeError("Invalid choice")
         if choice.get("finish_reason") != "stop":
             raise HTTPException(502, "Model response did not complete; shorten the request and retry explicitly")
         return json.loads(choice["message"]["content"])
-    except (KeyError, IndexError, TypeError, ValueError) as exc:
+    except (KeyError, IndexError, TypeError, ValueError, RecursionError) as exc:
         raise HTTPException(502, "Invalid model response") from exc
 
 
@@ -149,7 +215,7 @@ async def health():
             "max_completion_tokens": MAX_COMPLETION_TOKENS}
 
 
-@app.post("/caption", dependencies=[Depends(authorize)])
+@app.post("/caption")
 async def caption(file: UploadFile = File(...)):
     data = await file.read(MAX_FILE + 1)
     await file.close()
@@ -176,7 +242,7 @@ async def caption(file: UploadFile = File(...)):
     return {"caption": result.text, "model": VISION_MODEL, "provider": "groq"}
 
 
-@app.post("/rewrite", dependencies=[Depends(authorize)])
+@app.post("/rewrite")
 async def rewrite(body: RewriteRequest):
     result = validate(TextResult, await completion(
         'Rewrite the provided caption in the requested style. Preserve its factual meaning; add no '
@@ -185,7 +251,7 @@ async def rewrite(body: RewriteRequest):
     return {"text": result.text, "model": VISION_MODEL}
 
 
-@app.post("/assistant", dependencies=[Depends(authorize)])
+@app.post("/assistant")
 async def assistant(body: AssistantRequest):
     result = validate(AssistantResult, await completion(
         'Translate/refine a local photo search using only the supplied user message and current search state. '
@@ -201,7 +267,7 @@ async def assistant(body: AssistantRequest):
     return {**result.model_dump(mode="json", by_alias=True), "model": VISION_MODEL}
 
 
-@app.post("/transcribe", dependencies=[Depends(authorize)])
+@app.post("/transcribe")
 async def transcribe(file: UploadFile = File(...)):
     data = await file.read(MAX_FILE + 1)
     await file.close()
@@ -209,4 +275,6 @@ async def transcribe(file: UploadFile = File(...)):
         raise HTTPException(413, "Audio size invalid")
     result = await groq("audio/transcriptions", files={"file": ("speech.m4a", data, "audio/mp4")},
                         data={"model": SPEECH_MODEL, "response_format": "json"})
+    if not isinstance(result, dict):
+        raise HTTPException(502, "Invalid transcription response")
     return {"text": validate(TextResult, {"text": result.get("text")}).text, "model": SPEECH_MODEL}
