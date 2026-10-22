@@ -91,8 +91,8 @@ id. A new detection whose box overlaps an earlier observation of the same photo
 revision (intersection over union of at least 0.5, best match first) continues that
 observation: it keeps the face id, the person, the assignment, "Not a face" and every
 decision or review that names it, and takes the new box, quality, crop and descriptor.
-Unmatched earlier observations are dropped unless the user named or dismissed them;
-those stay on record but are not shown. Reviews made under an earlier contract do not
+Unmatched earlier observations are dropped unless they are assigned to a person (manually
+or automatically) or marked "Not a face"; those stay on record but are not shown. Reviews made under an earlier contract do not
 validate a cutoff for the new one: automatic grouping stays off ("Face settings
 changed") until a new review round passes. Existing automatic assignments are kept.
 

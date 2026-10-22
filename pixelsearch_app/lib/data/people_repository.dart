@@ -470,8 +470,9 @@ class PeopleRepository {
               .write(faces[i].copyWith(id: const Value.absent()));
         }
       }
-      // An earlier observation nothing matched is dropped unless it carries
-      // the user's decision, which stays on record (it is no longer shown).
+      // An earlier observation nothing matched is dropped unless it is
+      // assigned to a person or marked "Not a face"; such a row stays on
+      // record but is no longer shown.
       final kept = carried.values.map((f) => f.id).toSet();
       final dropped = [
         for (final f in earlier)
