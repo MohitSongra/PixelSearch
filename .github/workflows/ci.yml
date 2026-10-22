@@ -59,6 +59,8 @@ jobs:
       # The generated database code is committed; regeneration must not change it.
       - run: git diff --exit-code -- lib/data/local/app_database.g.dart
       - run: flutter analyze
+      # Generated drift code is excluded; build_runner owns its layout.
+      - run: dart format --output=none --set-exit-if-changed $(git ls-files '*.dart' | grep -v '\.g\.dart$')
       - run: flutter test test/
       # NOTE: integration_test/ (image/text parity, golden, benchmark) needs a real
       # ONNX Runtime host (desktop/emulator) and the model artifacts. Run those on a
