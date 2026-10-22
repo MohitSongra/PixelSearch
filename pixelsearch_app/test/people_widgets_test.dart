@@ -5,7 +5,6 @@ import 'package:drift/native.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pixelsearch/data/local/app_database.dart';
@@ -26,6 +25,8 @@ import 'package:pixelsearch/state/people_providers.dart';
 import 'package:pixelsearch/state/providers.dart';
 
 import 'people_repository_test.dart' show addFaces;
+
+import 'support/test_fonts.dart';
 
 class IdlePeople extends PeopleController {
   IdlePeople(super.ref, super.repository, super.service);
@@ -288,17 +289,7 @@ List<String> resultIds(ProviderContainer scope) => scope
     .toList();
 
 void main() {
-  setUpAll(() async {
-    final font = File('C:/Windows/Fonts/segoeui.ttf');
-    if (await font.exists()) {
-      await (FontLoader(
-        'Roboto',
-      )..addFont(font.readAsBytes().then(ByteData.sublistView))).load();
-    }
-    await (FontLoader(
-      'MaterialIcons',
-    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
-  });
+  setUpAll(loadTestFonts);
 
   Future<(ProviderContainer, PeopleRepository)> fixture(
     WidgetTester tester, {

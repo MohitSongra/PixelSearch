@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pixelsearch/core/theme.dart';
 import 'package:pixelsearch/features/search/search_screen.dart';
 import 'package:pixelsearch/features/viewer/photo_viewer.dart';
 import 'package:pixelsearch/state/providers.dart';
+
+import 'support/test_fonts.dart';
 
 import 'indexed_gallery_widgets_test.dart'
     show TestLibrary, fixtures, galleryPosition, scope;
@@ -50,14 +51,7 @@ void _expectSearchVisible(WidgetTester tester) {
 }
 
 void main() {
-  setUpAll(() async {
-    await (FontLoader(
-      'Manrope',
-    )..addFont(rootBundle.load('assets/fonts/Manrope.ttf'))).load();
-    await (FontLoader(
-      'MaterialIcons',
-    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
-  });
+  setUpAll(loadTestFonts);
 
   testWidgets('Home scrolls from its introduction, suggestions and photos', (
     tester,

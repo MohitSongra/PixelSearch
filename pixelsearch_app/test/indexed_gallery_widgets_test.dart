@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:drift/native.dart';
@@ -17,6 +16,8 @@ import 'package:pixelsearch/features/search/indexed_gallery_view.dart';
 import 'package:pixelsearch/features/viewer/photo_viewer.dart';
 import 'package:pixelsearch/models/photo.dart';
 import 'package:pixelsearch/state/providers.dart';
+
+import 'support/test_fonts.dart';
 
 class TestLibrary extends PhotoLibrary {
   TestLibrary(super.ref, List<Photo> photos) {
@@ -91,17 +92,7 @@ Future<void> mount(
 }
 
 void main() {
-  setUpAll(() async {
-    final font = File('C:/Windows/Fonts/segoeui.ttf');
-    if (await font.exists()) {
-      await (FontLoader(
-        'Roboto',
-      )..addFont(font.readAsBytes().then(ByteData.sublistView))).load();
-    }
-    await (FontLoader(
-      'MaterialIcons',
-    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
-  });
+  setUpAll(loadTestFonts);
 
   testWidgets(
     'main page is a lazy indexed gallery with live suggestions and unchanged query wiring',

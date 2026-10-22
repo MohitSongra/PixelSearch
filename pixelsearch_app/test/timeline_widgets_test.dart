@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pixelsearch/core/theme.dart';
@@ -15,6 +14,8 @@ import 'package:pixelsearch/features/timeline/memory_story_viewer.dart';
 import 'package:pixelsearch/features/timeline/timeline_photo_image.dart';
 import 'package:pixelsearch/features/timeline/timeline_screen.dart';
 import 'package:pixelsearch/models/photo.dart';
+
+import 'support/test_fonts.dart';
 
 Photo photo(String id, DateTime date, {int faces = 0, String? asset}) => Photo(
   id: id,
@@ -136,17 +137,7 @@ Future<void> capture(WidgetTester tester, GlobalKey key, String name) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(() async {
-    final font = File('C:/Windows/Fonts/segoeui.ttf');
-    if (await font.exists()) {
-      await (FontLoader(
-        'Roboto',
-      )..addFont(font.readAsBytes().then(ByteData.sublistView))).load();
-    }
-    await (FontLoader(
-      'MaterialIcons',
-    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
-  });
+  setUpAll(loadTestFonts);
 
   testWidgets('empty timeline never fabricates a year or a story', (
     tester,
