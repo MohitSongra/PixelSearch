@@ -134,6 +134,18 @@ class SettingsScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
               child: IndexingStatus(state: indexing),
             ),
+          // Required by the ML Kit terms: users are told about Google's
+          // processing of ML Kit's usage metrics.
+          const ListTile(
+            key: ValueKey('mlkit-metrics-notice'),
+            leading: Icon(Icons.info_outline),
+            title: Text('Google ML Kit on this device'),
+            subtitle: Text(
+              'Photo labels and face detection run on this device with '
+              'Google ML Kit. Your photos are not sent, but ML Kit sends '
+              'metrics about its performance and use to Google.',
+            ),
+          ),
           _header(context, 'Appearance'),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),

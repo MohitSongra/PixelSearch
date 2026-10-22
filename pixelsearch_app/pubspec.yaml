@@ -65,3 +65,5 @@ flutter:
     - assets/evaluation/
     - assets/fonts/OFL.txt
     - assets/licenses/CLIP_TOKENIZER_LICENSE.txt
+    - assets/licenses/MATERIAL_ICONS_LICENSE.txt
+    - assets/licenses/ONNXRUNTIME_LICENSE.txt

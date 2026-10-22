@@ -29,11 +29,18 @@ void main() {
       allOf(contains('Copyright (c) 2021 OpenAI'), contains('MIT License')),
     );
     expect(textOf('Manrope font'), contains('SIL OPEN FONT LICENSE'));
+    expect(
+      textOf('Material Icons font'),
+      contains('Attribution 4.0 International'),
+    );
+    expect(
+      textOf('ONNX Runtime (native library)'),
+      contains('Copyright (c) Microsoft Corporation'),
+    );
   });
 
-  testWidgets('About PixelSearch opens the about dialog with the licences', (
-    tester,
-  ) async {
+  testWidgets('Settings tells users about ML Kit metrics, and About opens the '
+      'licences', (tester) async {
     // Tall enough that the lazily built Settings list includes its last tile.
     tester.view.physicalSize = const Size(800, 4000);
     tester.view.devicePixelRatio = 1;
@@ -51,6 +58,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(
+      find.textContaining('ML Kit sends metrics about its performance and use'),
+      findsOneWidget,
+    );
     await tester.tap(find.byKey(const ValueKey('about-pixelsearch')));
     await tester.pumpAndSettle();
     expect(find.textContaining('All rights reserved'), findsOneWidget);
