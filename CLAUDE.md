@@ -159,8 +159,9 @@ handbook §5.1.
 
 ## Current state (2026-10-22)
 
-- **Git.** `main` = `origin/main` = `4a7c81f` (2026-09-18). Everything since is committed on the **local branch
-  `review-ready-2026-10-22`** (not pushed; pushing `main` can deploy the backend on Render). `git log
+- **Git.** `main` = `origin/main` = `4a7c81f` (2026-09-18). Everything since is committed on the **branch
+  `review-ready-2026-10-22`**, pushed to GitHub on 2026-10-22 as its own branch (no pull request yet; `main`
+  untouched, because pushing `main` can deploy the backend on Render). `git log
   4a7c81f..review-ready-2026-10-22` lists the commits: privacy redaction of dated reports, backend-token binding,
   release signing, the combined redesign + People validation recovery + People search commit (these share
   `search_screen.dart` and `people_repository.dart`), the backend hardening, the security review, the audit
@@ -247,7 +248,7 @@ handbook §5.1.
     grouping back on for v2 if it passes; starting it and rating its pairs are the user's. v2 grouping quality is
     unmeasured.
   - the first GitHub CI run of the KI-17 fix. CI runs only on pushes to `main`/`master` and on pull requests, so it
-    needs a pull request from the branch or a push to `main` (the owner's decision)
+    needs a pull request from the pushed branch or a push to `main` (the owner's decision)
   - M12 model manager. Provisioning is manual. The only in-app signal is a transient status line after an
     indexing attempt; it names the expected path and lists the fp16 file first, so do not follow it literally:
     provision only the fp32 files.

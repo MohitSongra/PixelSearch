@@ -31,7 +31,8 @@ Handbook files added by the 2026-10-21 audit: [`../CLAUDE.md`](../CLAUDE.md), [P
 `people_same_person_test.dart` were added last that day), and the rows of the files that wave changed (now
 *modified*). Rows not named in that wave keep their 2026-10-21 state.
 
-**Updated 2026-10-22, later** for the review-ready cleanup on the local branch `review-ready-2026-10-22`: rows
+**Updated 2026-10-22, later** for the review-ready cleanup on the branch `review-ready-2026-10-22` (pushed to GitHub
+that day, not merged): rows
 marked "branch (2026-10-22)" changed or were added then; every file listed as untracked or modified above is
 now committed on that branch (not on `main`). The formatting-only commit `f1c7f9d` (`dart format`, 38 Dart files:
 24 in `lib/`, 14 in `test/`; listed in `.git-blame-ignore-revs`) is not reflected row by row. The local

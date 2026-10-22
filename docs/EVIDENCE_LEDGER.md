@@ -5,9 +5,10 @@
 for the review-ready branch (host runs §1, CI cause §2), then for the tenth install, the schema 6 → 7 migration and
 the FaceContract v2 re-scan on the phone (§1, §4.2, §6, §9, §10), then for backups B13 and B14 and a view-only check
 of the People and review screens on the phone (§4.2, §6, §9, §10) · **Repository state:** `main` = `origin/main` at
-`4a7c81f` (2026-09-18); since 2026-10-22 the former working tree is committed on the local, unpushed branch
-`review-ready-2026-10-22` (schema 7, FaceContract v2). Since the tenth in-place install (2026-10-22, a debug build of
-`0f20b8c`) the phone runs schema 7 and FaceContract v2, with all 1,916 photos re-scanned under v2.
+`4a7c81f` (2026-09-18); since 2026-10-22 the former working tree is committed on the branch
+`review-ready-2026-10-22` (schema 7, FaceContract v2), pushed to GitHub that day and not yet merged. Since the
+tenth in-place install (2026-10-22, a debug build of `0f20b8c`) the phone runs schema 7 and FaceContract v2, with
+all 1,916 photos re-scanned under v2.
 
 This ledger lists every measured result found in the repository, with its date, device, precision, scope and the
 quality of its evidence. It exists so that future work cites measurements correctly instead of copying numbers

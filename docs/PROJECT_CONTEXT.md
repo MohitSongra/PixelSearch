@@ -11,9 +11,10 @@ and device acceptance on the Vivo, the user-requested grouping there, the "Same 
 rounds on the main screen, the user's own answers, and the user's decision to resume People processing (backups
 B0 to B10; §5.4).
 
-**Update 2026-10-22, later:** the review-ready cleanup on the local branch `review-ready-2026-10-22` (§3 note, §5.4,
+**Update 2026-10-22, later:** the review-ready cleanup on the branch `review-ready-2026-10-22` (§3 note, §5.4,
 §6, §7, ADR-023 to ADR-025, §9, §11, §12): forward redaction, CI fix, KI-16 fixed with schema v7, FaceContract v2
-(64 px), hygiene, interim licence and README.
+(64 px), hygiene, interim licence and README. The branch was pushed to GitHub the same day as its own branch (no
+pull request yet; `main` untouched).
 
 **Update 2026-10-22, afternoon:** the schema-v7 / FaceContract-v2 debug build installed in place on the Vivo (the
 tenth install that day), its migration, the re-scan of all 1,916 photos under v2, the carry-over check and the
@@ -62,7 +63,7 @@ Legend:
 - **Device**: accepted on a physical phone (Y), partly (P), or never (N).
 
 > **Update (2026-10-22, later):** the Commit column records the 2026-10-21/22 working-tree state. Everything marked
-> U or C+U is now committed on the local branch `review-ready-2026-10-22` (not pushed), so read C as "on `main`
+> U or C+U is now committed on the branch `review-ready-2026-10-22` (pushed, not merged), so read C as "on `main`
 > (`4a7c81f`)", U as "on the branch only" and C+U as "partly on the branch only"; "HEAD" in the notes means `main`.
 
 | Capability | Impl | Commit | Device | Notes |
@@ -91,7 +92,8 @@ Legend:
 ## 3. Repository and working-tree state
 
 > **Update (2026-10-22, later):** everything this section calls *uncommitted* or *untracked* is now committed on the
-> **local branch `review-ready-2026-10-22`** (not pushed; `main` = `origin/main` = `4a7c81f`). On top of it the branch
+> **branch `review-ready-2026-10-22`** (pushed to GitHub on 2026-10-22, not merged; `main` = `origin/main` =
+> `4a7c81f`). On top of it the branch
 > adds: forward redaction and a private-data scan (ADR-025), the CI test-portability fix and workflow hardening
 > (KI-17), KI-16's fix with schema v7 (ADR-024), FaceContract v2 with a 64 px minimum (ADR-023), hygiene (dead code,
 > FP16 wording, onboarding claims, map tile cache, explicit assets, in-app licences), an interim LICENSE with
@@ -1023,8 +1025,9 @@ v2 re-scan). "KI-n" and "TD-n" refer to [`KNOWN_ISSUES.md`](../pixelsearch_app/d
    the repository private or rewriting history is still open. See §11.
 2. **CI is failing on `main`** (3 Flutter tests on the Linux runner). Cause found by simulation and fixed on the
    branch (KI-17, 2026-10-22); not yet confirmed on GitHub.
-3. **The work since `4a7c81f` is committed only on a local branch** (`review-ready-2026-10-22`, 2026-10-22); until it
-   is pushed and merged, the public repository shows none of it, and the backend hardening is not deployed.
+3. **The work since `4a7c81f` is not on `main` yet.** It is committed on the branch `review-ready-2026-10-22`
+   (2026-10-22), which was pushed to GitHub that day; until it is merged, the public `main` shows none of it, and
+   the backend hardening is not deployed.
 
 **P1: correctness and safety**
 
@@ -1163,7 +1166,7 @@ phrasing) and, when the git-ignored denylist is present, for its whole-word term
 below records what the pushed history contains.
 
 - **The GitHub repository `origin` is public**, verified on 2026-10-21. `origin/main` = `4a7c81f` (also HEAD at the
-  audit; HEAD is now the unpushed branch `review-ready-2026-10-22`).
+  audit; HEAD is now the branch `review-ready-2026-10-22`, pushed on 2026-10-22 but not merged).
 - **Tracked, pushed files contain in history** (values deliberately not reproduced here):
   - a full device serial:
     - `pixelsearch_app/docs/ANDROID_FIVE_FEATURE_ACCEPTANCE_2026-09-09.md`
@@ -1221,8 +1224,9 @@ below records what the pushed history contains.
 > **Update (2026-10-22, later):** step 1's redaction was done forward on the branch (ADR-025); visibility and
 > history rewriting remain the owner's decision. Step 2's cause was found by a Windows-host simulation and fixed on
 > the branch (KI-17); it is confirmed only by a CI run, which happens on a pull request or a push to `main`. Step 3
-> is done: the work is committed on the local branch `review-ready-2026-10-22`; redeploying the backend hardening
-> and the token re-entry remain. Steps 1 to 3 below are kept as written on 2026-10-21/22.
+> is done: the work is committed on the branch `review-ready-2026-10-22`, pushed to GitHub on 2026-10-22 (no pull
+> request yet); merging it, redeploying the backend hardening and the token re-entry remain. Steps 1 to 3 below
+> are kept as written on 2026-10-21/22.
 
 1. **Privacy exposure.** With the user, decide on repository visibility, redaction and history rewriting.
 2. **Fix CI.** Read run 7's log while signed in, or reproduce on Linux with Flutter 3.44.7 from a clean checkout of
@@ -1325,8 +1329,8 @@ below records what the pushed history contains.
     archive contents in `local_evaluation/` (aggregates only), and made read-only public GitHub API requests.
   - One agent wrote a temporary comparison file to the system temp directory, outside the repository.
   - No code, config or test file was changed by the audit.
-- **Audit changes (2026-10-21, all uncommitted then; committed on the local branch in `ecccf18` on 2026-10-22, so
-  the public `main` still has none of them):**
+- **Audit changes (2026-10-21, all uncommitted then; committed on the branch in `ecccf18` on 2026-10-22 and pushed
+  that day, but not merged, so the public `main` still has none of them):**
   - new, untracked: root `CLAUDE.md`, `docs/PROJECT_CONTEXT.md`, `docs/EVIDENCE_LEDGER.md`, `docs/FILE_MAP.md`
   - edits to `docs/README.md`, `pixelsearch_app/CLAUDE.md` and `model_kit/CLAUDE.md`
   - dated status notes at the top of the stale docs listed in §10, including the late additions `RESEARCH_LOG.md`
