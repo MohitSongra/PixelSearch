@@ -25,6 +25,51 @@ void main() {
 
   final url = Uri.parse('https://tile.openstreetmap.org/0/0/0.png');
 
+  test('tile bodies are bounded independently of Content-Length', () async {
+    final settings = await policy(allow: true);
+    final client = MapTileClient(
+      settings,
+      client: MockClient.streaming(
+        (_, _) async => http.StreamedResponse(
+          Stream.value(List.filled(MapTileClient.maxTileBytes + 1, 0)),
+          200,
+          contentLength: 1,
+        ),
+      ),
+    );
+    addTearDown(client.close);
+    await expectLater(client.get(url), throwsFormatException);
+    await expectLater(client.get(url), throwsStateError);
+  });
+
+  test('steady trickle cannot bypass the total tile deadline', () async {
+    final settings = await policy(allow: true);
+    var stopped = false;
+    Stream<List<int>> trickle() async* {
+      try {
+        for (var i = 0; i < 30; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+          yield [1];
+        }
+      } finally {
+        stopped = true;
+      }
+    }
+
+    final client = MapTileClient(
+      settings,
+      timeout: const Duration(milliseconds: 25),
+      client: MockClient.streaming(
+        (_, _) async => http.StreamedResponse(trickle(), 200),
+      ),
+    );
+    addTearDown(client.close);
+    await expectLater(client.get(url), throwsA(isA<TimeoutException>()));
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(stopped, isTrue);
+    await expectLater(client.get(url), throwsStateError);
+  });
+
   test('map sends zero requests until separately consented', () async {
     var calls = 0;
     final settings = await policy();

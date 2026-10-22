@@ -1,16 +1,22 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'online_policy.dart';
 
 /// One map-view lifetime, with immediate consent revocation and no HTTP retries.
 class MapTileClient extends http.BaseClient {
-  MapTileClient(this.policy, {http.Client? client})
-    : _client = client ?? http.Client() {
+  MapTileClient(
+    this.policy, {
+    http.Client? client,
+    this.timeout = const Duration(seconds: 20),
+  }) : _client = client ?? http.Client() {
     policy.addListener(_checkPolicy);
   }
 
   final OnlinePolicy policy;
   final http.Client _client;
+  final Duration timeout;
+  static const maxTileBytes = 2 * 1024 * 1024;
   bool _closed = false;
   static const userAgent =
       'PixelSearch/0.1 (com.pixelsearch.pixelsearch; '
@@ -38,20 +44,36 @@ class MapTileClient extends http.BaseClient {
     }
     request.followRedirects = false;
     request.headers['User-Agent'] = userAgent;
-    final response = await _client
-        .send(request)
-        .timeout(
-          const Duration(seconds: 20),
-          onTimeout: () {
-            close();
-            throw TimeoutException('Map tile request timed out.');
-          },
-        );
+    return _readTile(request).timeout(
+      timeout,
+      onTimeout: () {
+        close();
+        throw TimeoutException('Map tile request timed out.');
+      },
+    );
+  }
+
+  Future<http.StreamedResponse> _readTile(http.BaseRequest request) async {
+    final response = await _client.send(request);
+    if (_closed || !policy.allows(OnlineFeature.maps)) {
+      throw StateError('Map tile request cancelled.');
+    }
+    final body = BytesBuilder(copy: false);
+    await for (final chunk in response.stream) {
+      if (_closed || !policy.allows(OnlineFeature.maps)) {
+        throw StateError('Map tile request cancelled.');
+      }
+      if (body.length + chunk.length > maxTileBytes) {
+        close();
+        throw const FormatException('Map tile response too large.');
+      }
+      body.add(chunk);
+    }
     if (_closed || !policy.allows(OnlineFeature.maps)) {
       throw StateError('Map tile request cancelled.');
     }
     return http.StreamedResponse(
-      _guardBody(response.stream),
+      Stream.value(body.takeBytes()),
       response.statusCode,
       contentLength: response.contentLength,
       headers: response.headers,
@@ -60,20 +82,6 @@ class MapTileClient extends http.BaseClient {
       reasonPhrase: response.reasonPhrase,
       request: response.request,
     );
-  }
-
-  Stream<List<int>> _guardBody(Stream<List<int>> stream) async* {
-    try {
-      await for (final chunk in stream.timeout(const Duration(seconds: 20))) {
-        if (_closed || !policy.allows(OnlineFeature.maps)) {
-          throw StateError('Map tile request cancelled.');
-        }
-        yield chunk;
-      }
-    } on TimeoutException {
-      close();
-      rethrow;
-    }
   }
 
   @override
