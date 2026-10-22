@@ -32,6 +32,14 @@ after the formatting commits (`9bea6d4`). The KI-16 bug test is no longer skippe
   the Windows-only Segoe font as 'Roboto'; `test/modelkit_paths_test.dart` builds host-rooted paths (KI-17). Real
   names in fixtures were replaced with placeholders (ADR-025).
 
+**Device, 2026-10-22** (Vivo I2214, API 36; aggregate): the schema-v7 / FaceContract-v2 debug build was installed in
+place as the tenth install of the day. The v6 -> v7 migration filled both photo ids on 140 of 140 review rows (B12,
+integrity ok), and all 1,916 photos were re-scanned under v2: 2,642 of 2,642 faces kept (0 new, 0 dropped) and faces
+with a descriptor 397 -> 864. This is consistent with what the v7 migration test and the carry-over part of the
+contract-upgrade tests check; the "Face settings changed" message stays host-tested (B12 has no threshold, but the
+screen was not viewed on the phone). The "Same person?" answers given during the re-scan were the user's; the
+assistant answered nothing. See `PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22.md`, rows P25 to P27.
+
 ## People search (2026-10-22)
 
 Windows host, 2026-10-22: `flutter analyze --no-pub` reports no issues and `flutter test --no-pub test/`
@@ -98,8 +106,9 @@ values taken from backups. The "Same person?" screen was first only viewed (122 
 B3 to B5). The user then named faces and answered the questions on the phone (B5 to B6, checked through backup
 counts; "photos of me with" a named person then gave 2 results). The rounds build followed (no question left), the
 user resumed People processing (all 1,916 photos processed, 70 new questions, the main-screen prompt shown), and
-three builds with the later fixes were installed; nine in-place installs in all. Suggestion decisions, answering
-through the rounds and voice input remain host-tested only. Results:
+three builds with the later fixes were installed; nine in-place installs in all for this build series (a tenth, the
+schema-v7 / FaceContract-v2 build, followed the same day; see the review-ready section above). Suggestion decisions,
+answering through the rounds and voice input remain host-tested only. Results:
 `PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22.md`.
 
 ## Folder Selection (2026-09-08)

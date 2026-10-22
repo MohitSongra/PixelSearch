@@ -10,7 +10,8 @@ People processing was paused by the user at 485 of 1,916 photos until 2026-10-22
 all 1,916 photos are now processed (backup B8: 2,642 detections, 397 with descriptors). Root cause of the same
 person being listed many times: only 336 of 2,342 detections (at 485 photos) reach the 100 px SFace descriptor minimum
 (`FaceContract.minFacePixels`); the other 2,006 have no descriptor, so face contract v1 (the phone's installed
-build) can never group or suggest them. Duplicate detections are a minor factor (26 overlapping same-photo pairs, about 20
+build until the v2 install later on 2026-10-22) can never group or suggest them.
+Duplicate detections are a minor factor (26 overlapping same-photo pairs, about 20
 near-identical cross-photo pairs). The first review round failed (one false join); a backup taken on
 2026-10-22 shows the later fresh round passed (validation 16 same / 4 different pairs, 0 false joins,
 saved threshold about 0.462). That is a small holdout, not a general accuracy result.
@@ -18,20 +19,27 @@ On 2026-10-22 the user ran "Group similar faces" (ADR-020) with processing still
 assigned automatically (3 joined one named person; the rest formed 137 new unnamed groups, 142 groups in
 total).
 New faces went from 2,329 face entries to 1,402 to name, with 798 small or duplicate faces hidden behind
-"Show small faces" (not deleted, still nameable). The suggestions screen counts 1,994 unnamed faces as too
-small to compare; those still need manual naming. Grouping them needs a new `FaceContract.id` with a lower
-minimum, a full re-scan and a new review round (built later on 2026-10-22 as FaceContract v2; see the update
-below). The automatic grouping after a processing
+"Show small faces" (not deleted, still nameable). Under FaceContract v1 the suggestions screen then counted
+1,994 unnamed faces as too small to compare; those needed manual naming. Grouping them needs a new
+`FaceContract.id` with a lower minimum, a full re-scan and a new review round (built later on 2026-10-22 as
+FaceContract v2; see the update below). The automatic grouping after a processing
 pass (`applyGrouping`) never runs while paused; since the user resumed processing it runs after each full pass
 (after the first one: 85 more automatic assignments, 127 to 152 groups, none added to a named person; New faces
-shows 1,497 to name). Older docs that say the gate failed and the threshold is empty describe the first round.
+then showed 1,497 to name; at 13:51 on 2026-10-22, after the v2 re-scan and the user's answers, the home
+screen read 1,487 to name). Older docs that say the gate failed and the threshold is empty describe the
+first round; since the v2 re-scan (backup B12, 2026-10-22) the threshold is empty again, because v1 review
+rounds cannot validate a v2 cutoff (see the update below).
 The "Same person?" questions (ADR-021, 2026-10-22) also only cover faces with descriptors: the face asked
 about is always at least the minimum size (only the confirmed face shown beside it may be smaller), so an
 unnamed small face is never the subject of a question and still needs manual naming.
 **Update 2026-10-22 (ADR-023):** at the owner's request `FaceContract` v2 lowers the minimum to 64 px. After the
 re-scan, faces from 64 to 99 px get descriptors, so they can be suggested, asked about and, once a new review
-round passes, grouped; faces under 64 px still need manual naming. How many faces that adds on the phone is
-measured only after the device re-scan (pending when this was written; see the evidence ledger).
+round passes, grouped; faces under 64 px still need manual naming. Measured on the test phone (2026-10-22,
+backups B11 to B12, after the v2 build was installed in place and every photo re-scanned): all 2,642 faces kept
+their ids (0 new, 0 dropped); faces with a descriptor went from 397 to 864 (about 15 % to about 33 %), as 467
+faces of 64 to 99 px gained one; 1,778 faces under 64 px still have none. The saved threshold was cleared
+(about 0.462 under v1), so automatic grouping stays off until a review round under v2 passes; starting that
+round and rating its pairs is the user's decision. See the evidence ledger.
 
 ## KI-15 (Low, by design) - person-query wording limits (2026-10-22)
 "without X" excludes only photos where X's face is assigned. A saved name that is also a common word
@@ -45,7 +53,8 @@ cannot recognise it either.
 ## KI-16 (Fixed 2026-10-22, schema v7) - an edited reviewed photo can be sampled into a new review
 **Fixed (ADR-024):** review rows now store the reviewed photo ids (schema v7; the v6 -> v7 step fills them
 from the faces that still exist), and the reviewed-photo set unions those ids with the old face join. The
-former skipped bug test now runs and passes. Original description, kept as a record:
+former skipped bug test now runs and passes. On the test phone (2026-10-22) the migration filled both photo
+ids on all 140 review rows (backup B12). Original description, kept as a record:
 Pre-existing, found by the 2026-10-22 tests. `_reviewedPhotos` finds reviewed photos through their
 current face ids, and face ids include the photo revision. After a reviewed photo is edited (a new
 revision), that photo can be sampled again into a new review round (calibration or a fresh holdout),

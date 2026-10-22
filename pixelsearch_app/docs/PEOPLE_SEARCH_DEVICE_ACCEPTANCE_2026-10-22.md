@@ -33,16 +33,24 @@ The 2026-10-22 People search change set (see `CHANGELOG.md`):
 - Then (ADR-022): rounds of 20 questions per launch, never repeated, asked on
   the main screen (`SamePersonPrompt`), and the fixes from an independent
   review. At the end of the day the user resumed People processing.
+- Then (ADR-023, ADR-024): the schema-v7 / FaceContract v2 build, installed in
+  place as the tenth install of the day, its v6 to v7 migration and the re-scan
+  of every photo under v2 (below).
 
-Unchanged and out of scope: face detection and SFace, `FaceContract`, grouping
-and calibration rules, ranking constants, the CLIP model and schema v6.
+Unchanged and out of scope until the tenth install: face detection and SFace,
+`FaceContract`, grouping and calibration rules, ranking constants, the CLIP
+model and schema v6. The tenth install moves to schema v7 and FaceContract v2
+(minimum face 64 px), and review rows from an earlier contract make calibration
+report "Face settings changed", so automatic grouping stays off until a new
+review round under v2 passes. The CLIP model and ranking constants stay
+unchanged.
 
 ## Build (Windows host, 2026-10-22)
 
 | Check | Result |
 | --- | --- |
 | `flutter analyze --no-pub` | No issues |
-| `flutter test --no-pub test/` | 499 passed, 2 skipped on the grouping build (496 + 2 before the grouping change; 372 + 1 on 2026-10-21); 512 passed, 2 skipped on the first "Same person?" build; 526 passed, 2 skipped on the final build (see below) |
+| `flutter test --no-pub test/` | 499 passed, 2 skipped on the grouping build (496 + 2 before the grouping change; 372 + 1 on 2026-10-21); 512 passed, 2 skipped on the first "Same person?" build; 526 passed, 2 skipped on the ninth-install build (see below) |
 | `python -I tool/check_repository.py` | Passed |
 | `flutter build apk --debug --no-pub` | Built; versionCode 1, debuggable |
 | Signer of the built APK | Matches the app installed on the phone (apksigner comparison; digest not recorded) |
@@ -105,9 +113,9 @@ counts from the app database.
 - The People header after the install read 485 of 1916 photos processed,
   Paused, 2342 faces, 5 groups (unchanged).
 - Later builds were installed the same way (three installs for the search and
-  grouping builds; two more for "Same person?", below). **B2**, taken before
-  the second install, was identical to B1 in every table: the searches wrote
-  nothing.
+  grouping builds; two more for "Same person?"; five more after that, the tenth
+  with schema v7 and FaceContract v2; below). **B2**, taken before the second
+  install, was identical to B1 in every table: the searches wrote nothing.
 
 ### Searches
 
@@ -144,13 +152,15 @@ rejected: identity decisions are the user's.
 
 The root cause was shown to the user first (aggregate, from backup analysis):
 2,342 detected faces in 430 photos; 336 are large enough (at least 100 px) for
-an SFace descriptor and 2,006 are not, so the current face contract can never
+an SFace descriptor and 2,006 are not, so the then-current v1 contract can never
 group them. 67 photos have 10 or more faces. Duplicates are a minor factor: 26
 overlapping same-photo detection pairs and about 20 near-identical cross-photo
 pairs (the same image saved twice). The user's example, a group photo of the
 user with a named person, has 22 and 25 faces of 25-77 px: none is comparable,
 and the user's own face there is unnamed, so "photos of me with" that person is
-correctly empty until that face is named.
+correctly empty until that face is named. These sizes are under FaceContract
+v1 (100 px); after the v2 re-scan later that day (below), faces from 64 px get a
+descriptor.
 
 After the user approved the run:
 
@@ -188,7 +198,7 @@ signer.
 On the device (view only):
 
 - **Install and backups.** Two more builds were installed in place with
-  `adb install -r` (five installs by then; four more followed, below), each
+  `adb install -r` (five installs by then; five more followed, below), each
   after a fresh backup: **B4**
   before the fourth install and **B5** before the fifth. B3, B4 and B5 are
   identical in every database table: viewing the questions writes nothing.
@@ -309,7 +319,7 @@ tool/check_repository.py` passed; the debug APK built with the same signer.
   closest-face scores 0.399 to 0.983, 15 at 0.5 or more. "1497 to name" also
   matches.
 
-### Final builds (2026-10-22)
+### Final builds before FaceContract v2 (2026-10-22)
 
 A second verification pass over the code and these docs (four checkers, each
 finding checked by a skeptic) found three more code issues, all fixed with
@@ -328,26 +338,115 @@ search was labelled "Matched by on-device semantic search"; it now says
 - **Ninth install** (the tooltip), after **B10**: B10 differs from B9 only by
   one People processing-lease row, taken after launch and left by the
   force-stop for the backup (leases expire). Same checks passed.
-- On the final build: the main-screen prompt shows as above;
-  `photos of me with <A>` and `<A>` each give 2 results labelled "Matched by
-  assigned faces".
+- On the ninth-install build (before the v2 build below): the main-screen
+  prompt shows as above; `photos of me with <A>` and `<A>` each give 2 results
+  labelled "Matched by assigned faces".
+
+### FaceContract v2 install and re-scan (2026-10-22)
+
+This build adds schema v7 (the reviewed photo ids, KI-16, ADR-024) and
+FaceContract v2 (`sface-2021dec-mlkit-landmarks-v2`, minimum face 64 px,
+ADR-023). CLIP stays FP32 CPU, unchanged.
+
+- **The build.** A debug APK built at 13:12 from the branch tip `0f20b8c`
+  (clean working tree): versionCode 1, the same signer as the phone's install,
+  the five licence texts (SFace, CLIP tokenizer, Manrope OFL, Material Icons,
+  ONNX Runtime) and no MobileCLIP or fp16 ONNX file.
+- **B11** first (app force-stopped): B10 to B11 only `processing_leases`
+  differed (the lease row seen in B10 was gone); every other table identical.
+  B11: schema 6, integrity ok, 2,642 faces, 35 manual and 324 automatic
+  assignments, 7 "Not a face", decisions 35 accept / 736 reject, 152 persons
+  (5 named), "me" photos 11, threshold about 0.462, processing not paused.
+- **Tenth install** (`adb install -r`): Success, firstInstallTime unchanged,
+  installed binary identical to the built APK, `run-as` still works. No
+  uninstall, no data clear.
+- **Migration.** Schema 6 to 7 ran on the first launch. B12: schema 7,
+  integrity ok; 140 of 140 review rows have both photo ids (the KI-16 columns);
+  the 140 rows are identical to B11 on all shared columns, and all 280 review
+  face references still exist.
+- **The re-scan.** The app stayed open in the foreground with the screen on,
+  the phone charging over USB; processing was not paused (the user's earlier
+  decision). Progress was read every 2 minutes from read-only copies of the
+  database; selected readings of photos scanned under v2: 27 at 13:19:26, 438
+  at 13:29:39, 1,216 at 13:42:02, 1,700 at 13:48:16 and 1,916 of 1,916 by
+  13:51:09 (then 0 processing leases, idle). About 1,889 photos in under 32
+  minutes, about 1.0 photo per second.
+- **One unreadable progress copy.** A read-only copy taken while the app was
+  writing failed to open ("malformed"); the next three copies opened normally.
+  It was a copy taken mid-write, not damage: B12 (app stopped) passes the
+  integrity check.
+- **B12.** The first attempt was cut off when the phone disconnected during the
+  copy; that partial file was kept, marked incomplete and not used. B12 was
+  taken again after the phone reconnected, with the app force-stopped first.
+- **Carry-over of faces (B11 to B12, by face id).** Faces 2,642 to 2,642: every
+  earlier face kept its id and photo, 0 new detections, 0 dropped. All 2,642
+  faces and all 1,916 scans are now under v2. Faces with a descriptor
+  ("ready") 397 to 864: 467 earlier small faces (at least 64 px but under
+  100 px in the prepared image) gained one, the 397 earlier ready faces are
+  still ready, and 1,778 stay small (width or height under 64 px), so they
+  still have no descriptor. 864 of 2,642 faces (about 33 %) can now be
+  compared, against 397 (about 15 %) under v1.
+- **Carry-over of names and decisions.** The 366 earlier assigned or "Not a
+  face" faces are all still present: 333 unchanged (the 7 "Not a face" among
+  them), and the 33 that changed are all explained by the user's own answers
+  (below): each has a new decision for that face or belonged to a group the
+  user merged away, and 0 have neither. No earlier unassigned face became
+  assigned; unassigned stays 2,283. The 771 earlier decisions are all
+  unchanged (0 removed); the 5 named persons keep identical name, alias and
+  hidden rows; 0 decisions point at missing faces. Every must-be-zero check is
+  0 (assigned to a rejected person, orphan assignment, manual without person,
+  "Not a face" but assigned).
+- **Tables.** Changed B11 to B12: `people_decisions`, `people_faces`,
+  `people_persons`, `people_reviews` (only the two new photo-id columns) and
+  `people_scans`. Identical: `processing_leases` and the 8 tables outside
+  People, including photos and embeddings (1,916 each). In `people_state` the
+  threshold is now empty (below).
+- **The user's answers during the re-scan.** Between the 13:29:39 and
+  13:33:45 readings the user answered "Same person?" questions on the phone.
+  Identity decisions are the user's; the assistant answered nothing. Accept
+  35 to 62 (+27), reject 736 to 751 (+15); manual 35 to 62, automatic 324 to
+  297; groups 152 to 142 (10 unnamed groups merged away, 0 named removed); "me"
+  photos 11 to 20; one named person 1 to 4 photos. 27 automatic faces became
+  manual, each with a new accept decision for its person: 21 now belong to
+  another person because their earlier group was merged away (12 of them to
+  named people), and 6 kept their person. 6 other automatic faces moved with a
+  merged-away group and stay automatic. Of the 15 new rejects, 12 are on these
+  changed faces and 3 on unchanged faces; none rejects a face's current person. The user kept answering after B12 (about 14:01: 63 accept,
+  793 reject); no backup audits those answers.
+- **Grouping under v2.** B12: People enabled, not paused, threshold empty (it
+  was about 0.462 under v1). All 140 review rows are v1 rows, so calibration
+  reports "Face settings changed" (host-tested; the screen was not viewed on
+  the phone because the user was using it), and automatic grouping stays off
+  until the user starts a new review round under v2 and it passes. Starting
+  that round and rating its pairs are the user's identity judgements.
+- **Home screen at 13:51** (read-only accessibility dump, before B12): "New
+  faces found | 1487 to name"; no "Help improve face groups" prompt was shown
+  at that moment.
 
 ### Not done on the device
 
 - By the assistant: naming faces, confirming or rejecting suggestions and
   answering "Same person?" questions. These are identity decisions. The user
   named faces and answered questions themselves; their effect was checked only
-  through aggregate backup counts (B5 to B6 above).
+  through aggregate backup counts (B5 to B6 and B11 to B12 above).
 - Answering through the main-screen prompt and rounds: the prompt was shown
   after the resumed pass (70 questions), but answering is the user's; the
   round counting is host-tested only.
 - Voice input: only typed queries were run.
+- After the FaceContract v2 re-scan: the People screen and the "Face settings
+  changed" message were not viewed on the phone; the message is host-tested.
+- The review round under v2: starting it and rating its pairs are the user's
+  identity judgements. There is none yet, so v2 grouping quality is unmeasured
+  and automatic grouping stays off.
+- No backup after B12: the user's later answers (about 14:01) are not audited.
 
 ## Acceptance table
 
 `<scene>` is a scene word ("the beach" in this run). Rows P19 and P20 were
-added for the grouping change, row P21 for the "Same person?" change, and rows
-P22 to P24 for the user's answers, the rounds build and resumed processing.
+added for the grouping change, row P21 for the "Same person?" change, rows P22
+to P24 for the user's answers, the rounds build and resumed processing, and rows
+P25 to P27 for the schema-v7 / FaceContract v2 install, its re-scan and the
+user's answers during it.
 
 | ID | Case | Expected | Result |
 | --- | --- | --- | --- |
@@ -375,6 +474,9 @@ P22 to P24 for the user's answers, the rounds build and resumed processing.
 | P22 | The user's answers and naming (B5 to B6) | Only People faces, persons and decisions change; must-be-zero checks stay 0; `photos of me with <A>` finds shared photos once "me" is named there | PASS: 142 to 127 groups, 35 manual, 736 rejects, 0 in every must-be-zero check; `photos of me with <A>` 2 results |
 | P23 | Rounds and the main-screen prompt | Up to 20 questions per launch, never repeated; the prompt shows only while questions remain | PASS (view only): with 0 questions left (B7) no prompt was shown; after the resumed pass the prompt showed "Help improve face groups · 1 of 20" (70 questions). Answering and round counting host-tested |
 | P24 | Resumed processing (user's choice) | Scanning continues while the app is open; after the full pass the validated grouping runs; no manual assignment changes | PASS: 1,916 of 1,916 photos in about 20 minutes; grouping +85 automatic, 127 to 152 groups, nothing added to a named person; manual, decisions, reviews and threshold unchanged; only People faces, persons and scans changed (B7 to B8) |
+| P25 | In-place upgrade to schema v7 (tenth install) | firstInstallTime unchanged, installed APK = built APK, `run-as` works; the v6 to v7 migration fills both photo ids of every review row and changes no other review column | PASS: B10 to B11 only the lease row; install Success, firstInstallTime unchanged, installed binary = built APK, `run-as` works; B12 schema 7, integrity ok, 140 of 140 review rows with both photo ids, identical to B11 on shared columns, all 280 face references present |
+| P26 | FaceContract v2 re-scan carry-over | Every photo re-scanned under v2 while the app is open; earlier faces, assignments, decisions and named persons kept; photos and embeddings unchanged; must-be-zero checks stay 0; automatic grouping off until a v2 review round passes | PASS: 1,916 of 1,916 scans and 2,642 of 2,642 faces under v2 by 13:51:09 (about 1,889 photos in under 32 minutes after the first reading); 0 new or dropped faces; ready 397 to 864; 333 of 366 assigned or "Not a face" faces unchanged, the other 33 explained by the user's answers (P27); 771 of 771 earlier decisions unchanged; 5 named persons identical; photos and embeddings identical; must-be-zero checks 0; threshold empty, so grouping is off ("Face settings changed" host-tested, not viewed on the phone) |
+| P27 | The user's answers during the re-scan | Only the user's answers change assignments and decisions; must-be-zero checks stay 0 | PASS: accept 35 to 62, reject 736 to 751, manual 35 to 62, automatic 324 to 297, groups 152 to 142 (0 named removed), "me" photos 11 to 20; each changed earlier face has a new decision or a merged-away group (0 unexplained); the assistant answered nothing. Later answers (about 14:01) not audited by a backup |
 
 ## Procedure (planned before the run; followed on 2026-10-22)
 

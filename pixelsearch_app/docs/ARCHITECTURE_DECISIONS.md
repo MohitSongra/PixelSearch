@@ -2,7 +2,7 @@
 
 > **Status note (2026-10-21 audit):** Some records below no longer match the code. ADR-006 (two separate repositories) is superseded: the app, `model_kit` and the backend now live as sibling folders in one repository, with the same ownership rule. ADR-015's early-cancel replay is defeated, because `IndexingService.run()` clears the cancel flag on entry. ADR-016 (fp16 v3) remains unaccepted on Android. Current state: [`docs/PROJECT_CONTEXT.md`](../../docs/PROJECT_CONTEXT.md); measured numbers: [`docs/EVIDENCE_LEDGER.md`](../../docs/EVIDENCE_LEDGER.md). The decisions below are kept unchanged as the historical record.
 
-> **Status note (2026-10-22, later):** ADR-023 (FaceContract v2, on the branch `review-ready-2026-10-22`) lowers the descriptor minimum from 100 px to 64 px, so the "at least 100 px" statements in ADR-018, ADR-021 and ADR-020 describe FaceContract v1 (still the phone's installed build), and ADR-020's "Lowering `minFacePixels` … not done" is superseded. ADR-024 fixes KI-16 with schema v7. ADR-025 records the publication guardrails.
+> **Status note (2026-10-22, later):** ADR-023 (FaceContract v2, on the branch `review-ready-2026-10-22`) lowers the descriptor minimum from 100 px to 64 px, so the "at least 100 px" statements in ADR-018, ADR-021 and ADR-020 describe FaceContract v1 (the phone's build until the v2 build was installed and every photo re-scanned later on 2026-10-22), and ADR-020's "Lowering `minFacePixels` … not done" is superseded. ADR-024 fixes KI-16 with schema v7. ADR-025 records the publication guardrails.
 
 Format: each record is a decision, its context, and its consequences. Newest first.
 
@@ -31,8 +31,9 @@ and fills them from the faces that still exist; a database older than v6 creates
 carried review rows store their photo ids, and the reviewed-photo set is the union of stored ids and the old
 face join. `AppDatabase.schemaVersion` and `AiContract.schemaVersion` are 7.
 **Consequences:** additive; no other table changes (migration test). Rows written before v7 whose faces were
-already gone keep null ids, so such photos stay unprotected. A host rehearsal on a copy of the phone's latest
-backup (B10) filled all 140 review rows; the migration has not yet run on the phone.
+already gone keep null ids, so such photos stay unprotected. A host rehearsal on a copy of the phone's
+then-latest backup (B10) filled all 140 review rows. The migration ran on the phone on 2026-10-22 (backup B12:
+schema 7, integrity ok, both photo ids on all 140 review rows, which are otherwise identical to B11).
 
 ## ADR-023 - FaceContract v2: compare faces from 64 px, keeping identities across the re-scan (2026-10-22)
 **Context:** on the test phone only 397 of 2,642 detected faces (all photos processed) reached the 100 px SFace
@@ -50,10 +51,14 @@ under v1 cannot validate a v2 cutoff: calibration says "Face settings changed" a
 new round passes; existing automatic assignments are kept. While the new round is unjudged, the "Same person?"
 floor uses the archived rounds' "same" answers.
 **Consequences:** no schema change for v2 itself. Faces from 64 to 99 px are upscaled to 112x112; whether they
-group reliably is decided only by the user's new review round. A host rehearsal on a copy of the phone's latest
-backup showed nothing visible changes before the re-scan (2,642 faces, 35 manual, 324 automatic, 152 groups,
-70 questions; grouping off with the new message). The device re-scan results are recorded in the evidence
-ledger once measured.
+group reliably is decided only by the user's new review round. A host rehearsal on a copy of the phone's
+then-latest backup showed nothing visible changes before the re-scan (2,642 faces, 35 manual, 324 automatic,
+152 groups, 70 questions; grouping off with the new message). Measured on the phone on 2026-10-22 (backups B11
+to B12, around the in-place install and the full re-scan): all 2,642 faces kept their ids (0 new, 0 dropped) and
+faces with a descriptor went from 397 to 864; the 5 named persons, all 771 earlier decisions and the 7 "Not a
+face" marks carried over, and the only assignment changes come from the user's own "Same person?" answers during
+the re-scan. The saved threshold was cleared, so automatic grouping stays off until the user's review round
+under v2 passes. Details: the evidence ledger and `PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22.md`.
 
 ## ADR-022 - "Same person?" rounds on the main screen (2026-10-22)
 **Context:** the user asked for "Same person?" questions to come back every time the app opens, 20 at a time,

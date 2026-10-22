@@ -85,6 +85,10 @@ establish general accuracy or eliminate grouping mistakes.
   reached 100 pixels, so most faces could never be compared.
   Detection, alignment, the model and descriptor encoding are unchanged; a face of 100
   pixels or more gets a bit-identical descriptor under both versions.
+  Upgrade run on the test phone (2026-10-22, all 1,916 photos re-scanned): 2,642 of
+  2,642 faces carried over by box overlap, 0 new, 0 dropped; 467 faces of 64 to 99
+  pixels gained a descriptor (397 to 864). The saved cutoff was cleared; automatic
+  grouping stays off until the user's review round under v2 passes.
 
 Upgrade rules (`PeopleRepository.commitPhoto`): every photo is re-scanned under the new
 id. A new detection whose box overlaps an earlier observation of the same photo

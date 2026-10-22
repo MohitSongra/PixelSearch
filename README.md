@@ -81,13 +81,13 @@ Background: [docs/PROJECT_CONTEXT.md §1](docs/PROJECT_CONTEXT.md#1-what-pixelse
 | Map from EXIF GPS with consented OpenStreetMap tiles | Implemented; partly accepted | Tiles loaded, but the EXIF pass located 0 of 1,916 photos (not proof that the originals lack GPS), so no photo pin has been seen on a phone (2026-09-10). |
 | ML Kit image labels with a label editor | Implemented | Labels are kept only at confidence ≥ 0.5; otherwise a photo has no labels. |
 | Offline voice search (Android on-device recognizer, API 33 or later) | Implemented | Recognition accuracy never measured. |
-| **People:** ML Kit face detection, SFace 128-d descriptors, user-confirmed naming, aliases, "This is me" | Accepted on a phone (2026-10-22) | Opt-in. On 2026-10-22 all 1,916 photos were processed: 2,642 detected faces, 397 with descriptors (faces of at least 100 px under FaceContract v1). |
+| **People:** ML Kit face detection, SFace 128-d descriptors, user-confirmed naming, aliases, "This is me" | Accepted on a phone (2026-10-22) | Opt-in. On 2026-10-22 all 1,916 photos were processed: 2,642 detected faces, 397 with descriptors (faces of at least 100 px under FaceContract v1); 864 after the FaceContract v2 re-scan the same day. |
 | **Person search:** "photos of me with `<name>`", "`<A>` or `<B>`", "`<A>` without `<B>`", a name plus a scene | Accepted on a phone (typed queries, 2026-10-22) | 8 typed queries matched the values expected from a backup. Voice person queries not exercised on a phone. |
 | Similar-face suggestions | Implemented; viewed on a phone | Suggestions only order faces: no threshold, no score shown, and nothing is assigned until the user confirms that face. Confirm and reject are host-tested only. |
-| Validated automatic grouping behind a photo-disjoint review gate | Implemented; ran on a phone | Grouping runs only after the user's review round passes (zero false joins on held-out pairs). The round that passed had only 4 "different" pairs in its holdout. Grouping accuracy has never been measured. |
+| Validated automatic grouping behind a photo-disjoint review gate | Implemented; ran on a phone | Grouping runs only after the user's review round passes (zero false joins on held-out pairs). The round that passed (under FaceContract v1) had only 4 "different" pairs in its holdout. Since the v2 install (2026-10-22) grouping is off on the phone until the user's review round under v2 passes. Grouping accuracy has never been measured. |
 | "Same person?" questions (Yes / No / Not sure) | Implemented; answered by the user on a phone | Every answer is the user's decision; the software never answers for the user. |
-| FaceContract v2: faces compared from 64 px instead of 100 px (2026-10-22) | Implemented; host-tested only | Every photo is re-scanned and earlier names carry over. Automatic grouping stays off until a new review round passes. A host rehearsal on a copy of a phone backup (2026-10-22) showed no visible change before the re-scan. No phone run is recorded. |
-| Reviewed photos remembered by photo id (KI-16 fix, schema v7, 2026-10-22) | Implemented; host-tested only | Keeps review rounds photo-disjoint after a reviewed photo is edited. The same host rehearsal filled all 140 review rows with photo ids. Not yet installed on the phone. |
+| FaceContract v2: faces compared from 64 px instead of 100 px (2026-10-22) | Implemented; installed and re-scanned on a phone (2026-10-22) | Every photo is re-scanned and earlier names carry over. Automatic grouping stays off until a new review round passes. A host rehearsal on a copy of a phone backup (2026-10-22) showed no visible change before the re-scan. On the phone the same day all 1,916 photos were re-scanned with the app open; all 2,642 earlier faces kept their ids, 864 can now be compared (397 under v1), earlier decisions and names were unchanged, and the assignments that changed were all changed by the user's own answers during the re-scan. The grouping threshold was cleared; no review round under v2 had been started by the last backup that day, so v2 grouping quality is unmeasured. |
+| Reviewed photos remembered by photo id (KI-16 fix, schema v7, 2026-10-22) | Implemented; migration ran on a phone (2026-10-22) | Keeps review rounds photo-disjoint after a reviewed photo is edited. The same host rehearsal filled all 140 review rows with photo ids, and so did the migration on the phone (140 of 140, otherwise unchanged). |
 | Optional online features: AI captions, search assistant, cloud speech transcription | Implemented | The assistant was live-tested on 2026-09-09 (3 authenticated requests). Captions and cloud transcription were not independently live-tested. |
 
 **Not done:**
@@ -162,7 +162,7 @@ Inside the app, `lib/` is split into `features/` (screens), `state/` (Riverpod c
 search, people and timeline rules), `data/` (repositories, Drift, online clients), `indexing/` (a ports-and-adapters
 pipeline), `ai/` (tokenizer, preprocessing, encoders), `core/` (router, theme, contracts) and `evaluation/`
 (retrieval metrics). Heavy work (indexing, People scans) holds a SQLite processing lease; search never takes it.
-The code has been at Drift schema 7 since 2026-10-22; the build on the test phone still uses schema 6.
+The code has been at Drift schema 7 since 2026-10-22, and the build on the test phone has used it since the same day.
 
 The layer and state-ownership overview, with indexing and search flow diagrams, is
 [pixelsearch_app/docs/ARCHITECTURE.md](pixelsearch_app/docs/ARCHITECTURE.md).
@@ -219,6 +219,8 @@ arm64), running debug builds.
 | 2026-10-22 (read from a backup) | People review gate, fresh round (its own date is not recorded) | Passed: 0 false joins and 16 true joins on held-out pairs; threshold ≈ 0.462 | Phone, SFace FP32, pairs judged by the user | 60 calibration + 20 validation pairs; only 4 "different" pairs in the holdout |
 | 2026-10-22 | People processing pass | 1,431 photos in about 20 minutes (about 1.2 photos/s) | Phone, SFace FP32, app in the foreground, screen on, charging | One run |
 | 2026-10-22 | Faces large enough to compare (FaceContract v1, 100 px) | 397 of 2,642 detected faces | Phone, all 1,916 photos processed | One library |
+| 2026-10-22 | People re-scan under FaceContract v2 | All 1,916 photos; about 1,889 of them in under 32 minutes (about 1.0 photo/s) | Phone, SFace FP32, app in the foreground, screen on, charging | One run |
+| 2026-10-22 | Faces large enough to compare (FaceContract v2, 64 px) | 864 of 2,642 detected faces (about 33 %); all 2,642 earlier faces kept | Phone, all 1,916 photos re-scanned | One library |
 | — | Face-grouping accuracy | **Never measured** | — | Covers the 266 + 85 automatic assignments made on 2026-10-22 |
 
 Never measured (ledger §10): end-to-end query latency on a phone, full-library indexing, peak memory, anything with
@@ -411,8 +413,9 @@ From [docs/PROJECT_CONTEXT.md §12](docs/PROJECT_CONTEXT.md#12-next-steps-highes
    and a worker isolate for decoding and inference.
 6. A judged retrieval benchmark (20 to 50 scene queries with a held-out set) before any change to the gate, the
    weights or the lexical policy. Judgments stay private, because they name private photos.
-7. People: install the FaceContract v2 build on the phone, re-scan, run a larger review round, measure grouping
-   accuracy, and check suggestion confirm/reject, the "Same person?" rounds and voice person queries on the phone.
+7. People: the FaceContract v2 build is installed and every photo re-scanned (2026-10-22). Next: the user's larger
+   review round under v2, which turns automatic grouping back on if it passes; then measure grouping accuracy, and
+   check suggestion confirm/reject, the "Same person?" rounds and voice person queries on the phone.
 8. Refresh the stale documents and write the missing architecture decision records.
 
 ## Repository layout and documentation
