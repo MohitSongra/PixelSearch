@@ -58,7 +58,9 @@ to B12, around the in-place install and the full re-scan): all 2,642 faces kept 
 faces with a descriptor went from 397 to 864; the 5 named persons, all 771 earlier decisions and the 7 "Not a
 face" marks carried over, and the only assignment changes come from the user's own "Same person?" answers during
 the re-scan. The saved threshold was cleared, so automatic grouping stays off until the user's review round
-under v2 passes. Details: the evidence ledger and `PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22.md`.
+under v2 passes. Later that day the phone's review screen showed "80 of 80 reviewed" and the "Face settings
+changed" message (viewed read-only; "New review" was not tapped), and the threshold was still null in backups B13
+and B14, which are identical. Details: the evidence ledger and `PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22.md`.
 
 ## ADR-022 - "Same person?" rounds on the main screen (2026-10-22)
 **Context:** the user asked for "Same person?" questions to come back every time the app opens, 20 at a time,

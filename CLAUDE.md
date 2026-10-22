@@ -11,7 +11,8 @@ standards.
 test phone the same day), its "Same person?" confirmations and rounds, and the user's resumed People processing;
 later that day for the review-ready branch (schema v7 / KI-16, FaceContract v2, the KI-17 CI fix, the interim
 licence), and once more that day when the schema-v7 / FaceContract-v2 build was installed on the test phone and every
-photo was re-scanned under v2.** For the deep context read
+photo was re-scanned under v2, then for the later backups B13 and B14 and a read-only check of the People and review
+screens.** For the deep context read
 [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md).
 Measured numbers are in [`docs/EVIDENCE_LEDGER.md`](docs/EVIDENCE_LEDGER.md) and the per-file map is in
 [`docs/FILE_MAP.md`](docs/FILE_MAP.md). App-level engineering rules are in
@@ -167,8 +168,8 @@ handbook §5.1.
   v2, hygiene commits (dead code, FP32-only wording, map tiles never cached on disk, onboarding copy, in-app licences
   and explicit assets, the ML Kit metrics notice), the licence, README and docs commit, a formatting-only commit
   (`f1c7f9d`) with a CI `dart format` check (`9bea6d4`), then two docs commits, an LF line-ending commit
-  (`0f20b8c`, from which the phone's v2 APK was built) and a docs commit recording the phone's v2 install and
-  re-scan (26 commits, all on 2026-10-22). Each code commit was built and
+  (`0f20b8c`, from which the phone's v2 APK was built) and docs commits recording the phone's v2 install, re-scan
+  and later checks (all commits dated 2026-10-22). Each code commit was built and
   tested in a clean worktree. Run `git status` for any uncommitted doc edits. The pushed history still holds the
   personal data that the working tree no longer has (ADR-025).
 
@@ -177,15 +178,17 @@ handbook §5.1.
   APK built at 13:12 from the branch tip `0f20b8c` (versionCode 1, same signer; it has all five licence texts and no
   MobileCLIP or fp16 ONNX). The backups show that no earlier install, acceptance search or viewing of the questions
   changed a table (B0b, B1 and B2 identical; B3, B4 and B5 identical; B6 and B7 identical; B8 and B9 identical; B10
-  differs only by a processing-lease row, and B10 to B11 only by that row's removal). Tables changed only through
-  the user-requested grouping (B3), the user's own answers and naming (B5 to B6), the user's resumed processing pass
-  with its automatic grouping (B7 to B8), and, from B11 to B12, the schema-v7 migration, the v2 re-scan and the
-  user's own answers during it (People tables only). The backend hardening is **not deployed**.
+  differs only by a processing-lease row, and B10 to B11 only by that row's removal), and B13 and B14 are
+  identical: launching the app, its processing check and viewing the People and review screens wrote nothing.
+  Tables changed only through the user-requested grouping (B3); the user's own answers and naming (B5 to B6); the
+  user's resumed processing pass with its automatic grouping (B7 to B8); from B11 to B12, the schema-v7 migration,
+  the v2 re-scan and the user's own answers during it (People tables only); and from B12 to B13, the user's later
+  answers (People decisions, faces, persons and the generation counter). The backend hardening is **not deployed**.
 - **CI** failed on the last four pushes (Linux runner only). Cause (KI-17, found by simulation on the Windows host):
   widget tests loaded a Windows system font as 'Roboto' only when it existed, and one path test used Windows-only
   literals. Both are fixed on the branch (tests load the bundled Manrope; host-rooted paths) and the workflow is
   hardened, but the fix has **not yet run on GitHub**; a local Docker run failed because Docker Desktop did not start.
-- **Device** (backups B0 to B12, 2026-10-22, aggregate).
+- **Device** (backups B0 to B14, 2026-10-22, aggregate).
   - Vivo I2214 (API 36) runs FP32 CPU with 1,916 indexed photos and 1,916 embeddings (schema 7 since the v2 install,
     integrity ok in B12; the migration and the re-scan left photos and embeddings unchanged).
   - People is enabled and, since the user resumed it on 2026-10-22, **not paused**. All 1,916 photos are now
@@ -220,19 +223,29 @@ handbook §5.1.
   - During the re-scan the user answered "Same person?" questions on the phone: accepts 35 → 62, rejects 736 → 751,
     manual 35 → 62, automatic 324 → 297, persons 152 → 142 (10 unnamed groups merged away, no named person
     removed), "me" photos 11 → 20, one named person 1 → 4 photos. The 33 earlier assigned faces that changed are all
-    explained by these answers. The user kept answering after B12 (about 14:01: 63 accepts, 793 rejects); no backup
-    audits that. The assistant answered nothing.
+    explained by these answers. The user kept answering after B12; backup B13 (14:43, app stopped, integrity ok)
+    audits that. B12 → B13 changed only the People decisions, faces and persons (and the People generation counter,
+    255 → 275, so at most 20 user actions): accepts 62 → 63, reject rows 751 → 1,022 (a "No" to two groups writes a
+    reject row for every face of each group against the other, so rows are not answers), the 813 earlier decision
+    rows unchanged; 3 faces changed, each with a new decision of the user's (1 automatic → manual, 2 automatic →
+    unassigned); persons 142 → 141 (1 unnamed group merged away, the 5 named persons identical); "me" photos
+    20 → 21; must-be-zero checks 0; threshold still null. The assistant answered nothing.
   - Under v2 the stored threshold is cleared (B12: null; ≈ 0.462 under v1) because all 140 review rows are v1 rows,
-    so automatic grouping stays off until the user's review round under v2 passes. "Face settings changed" is
-    host-tested; neither it nor the People screen was viewed on the phone after the re-scan. At 13:51 the home
-    screen showed "New faces found | 1487 to name" and no "Help improve face groups" prompt.
+    so automatic grouping stays off until the user's review round under v2 passes. Seen on the phone at about 14:50
+    (the assistant launched the app and read the screens through read-only accessibility dumps; it tapped only
+    "People", the "Automatic assignment awaits validation" tile and Back, and answered and rated nothing): the home
+    screen asked "Help improve face groups · 1 of 17" about a named person; People showed 2,642 faces, 141 groups,
+    "Automatic assignment awaits validation", 17 "Same person?" questions and "New faces found | 1488 to name"; the
+    review screen showed "80 of 80 reviewed" and "Face settings changed: smaller faces can now be compared. Start a
+    new review to turn automatic grouping back on." ("New review" not tapped). Backup B14 (14:52) is identical to
+    B13 in every table.
   - Suggestion confirm/reject and voice input were not exercised on the phone.
   - 0 photos with GPS were found; no positive map pin has been seen.
   - Only 2 judged search queries exist (P@5 0.20 and 0.40).
 - **Not done:**
   - the user's new review round under v2 (the install and the re-scan are done, 2026-10-22), which turns automatic
     grouping back on for v2 if it passes; starting it and rating its pairs are the user's. v2 grouping quality is
-    unmeasured, and no backup after B12 audits the user's later answers.
+    unmeasured.
   - the first GitHub CI run of the KI-17 fix. CI runs only on pushes to `main`/`master` and on pull requests, so it
     needs a pull request from the branch or a push to `main` (the owner's decision)
   - M12 model manager. Provisioning is manual. The only in-app signal is a transient status line after an
@@ -265,7 +278,7 @@ handbook §5.1.
   passes. A new round needs photos never reviewed before. Do not judge the review pairs for the user. Measured on
   the phone for v1 → v2 (2026-10-22, B11 → B12): the re-scan of 1,916 photos finished with the app open, every
   earlier face kept its id and photo, earlier assignments changed only through the user's own answers, and the
-  threshold was cleared. The calibration message itself is host-tested only.
+  threshold was cleared. The calibration message was also seen on the phone's review screen (2026-10-22).
 - **Parity currency.** Host Flutter-ORT parity has not been re-run since `a76d3b6` (2026-08-08). The preprocessing
   fingerprint is Dart-captured, not PIL-derived.
 

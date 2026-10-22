@@ -26,9 +26,10 @@ FaceContract v2; see the update below). The automatic grouping after a processin
 pass (`applyGrouping`) never runs while paused; since the user resumed processing it runs after each full pass
 (after the first one: 85 more automatic assignments, 127 to 152 groups, none added to a named person; New faces
 then showed 1,497 to name; at 13:51 on 2026-10-22, after the v2 re-scan and the user's answers, the home
-screen read 1,487 to name). Older docs that say the gate failed and the threshold is empty describe the
-first round; since the v2 re-scan (backup B12, 2026-10-22) the threshold is empty again, because v1 review
-rounds cannot validate a v2 cutoff (see the update below).
+screen read 1,487 to name; a later viewing at about 14:50 the same day read 1,488 to name, and backup B14
+shows that the viewing wrote nothing). Older docs that say the gate failed and the threshold is empty
+describe the first round; since the v2 re-scan (backup B12, 2026-10-22; still empty at B13 and B14) the
+threshold is empty again, because v1 review rounds cannot validate a v2 cutoff (see the update below).
 The "Same person?" questions (ADR-021, 2026-10-22) also only cover faces with descriptors: the face asked
 about is always at least the minimum size (only the confirmed face shown beside it may be smaller), so an
 unnamed small face is never the subject of a question and still needs manual naming.

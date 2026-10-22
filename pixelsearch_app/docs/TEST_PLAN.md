@@ -36,9 +36,10 @@ after the formatting commits (`9bea6d4`). The KI-16 bug test is no longer skippe
 place as the tenth install of the day. The v6 -> v7 migration filled both photo ids on 140 of 140 review rows (B12,
 integrity ok), and all 1,916 photos were re-scanned under v2: 2,642 of 2,642 faces kept (0 new, 0 dropped) and faces
 with a descriptor 397 -> 864. This is consistent with what the v7 migration test and the carry-over part of the
-contract-upgrade tests check; the "Face settings changed" message stays host-tested (B12 has no threshold, but the
-screen was not viewed on the phone). The "Same person?" answers given during the re-scan were the user's; the
-assistant answered nothing. See `PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22.md`, rows P25 to P27.
+contract-upgrade tests check. The "Face settings changed" message, tested on the host, was also seen on the phone's
+review screen later that day (B12 and B13 have no threshold; backup B14 showed that the viewing wrote nothing). The
+"Same person?" answers given during and after the re-scan were the user's; the assistant answered nothing. See
+`PEOPLE_SEARCH_DEVICE_ACCEPTANCE_2026-10-22.md`, rows P25 to P27, and rows P28 and P29 for the later check.
 
 ## People search (2026-10-22)
 

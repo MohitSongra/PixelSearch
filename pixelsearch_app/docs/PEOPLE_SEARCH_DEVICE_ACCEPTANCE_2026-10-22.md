@@ -35,7 +35,8 @@ The 2026-10-22 People search change set (see `CHANGELOG.md`):
   review. At the end of the day the user resumed People processing.
 - Then (ADR-023, ADR-024): the schema-v7 / FaceContract v2 build, installed in
   place as the tenth install of the day, its v6 to v7 migration and the re-scan
-  of every photo under v2 (below).
+  of every photo under v2, then the B13 audit of the user's later answers and
+  a view-only check of the People and review screens (B14) (below).
 
 Unchanged and out of scope until the tenth install: face detection and SFace,
 `FaceContract`, grouping and calibration rules, ranking constants, the CLIP
@@ -411,42 +412,100 @@ ADR-023). CLIP stays FP32 CPU, unchanged.
   another person because their earlier group was merged away (12 of them to
   named people), and 6 kept their person. 6 other automatic faces moved with a
   merged-away group and stay automatic. Of the 15 new rejects, 12 are on these
-  changed faces and 3 on unchanged faces; none rejects a face's current person. The user kept answering after B12 (about 14:01: 63 accept,
-  793 reject); no backup audits those answers.
+  changed faces and 3 on unchanged faces; none rejects a face's current person.
+  The user kept answering after B12 (decision rows at about 14:01: 63 accept,
+  793 reject); at B12 no backup audited those answers. B13 does (below).
 - **Grouping under v2.** B12: People enabled, not paused, threshold empty (it
   was about 0.462 under v1). All 140 review rows are v1 rows, so calibration
-  reports "Face settings changed" (host-tested; the screen was not viewed on
-  the phone because the user was using it), and automatic grouping stays off
-  until the user starts a new review round under v2 and it passes. Starting
-  that round and rating its pairs are the user's identity judgements.
+  reports "Face settings changed" (host-tested at B12; the screen was not
+  viewed on the phone then because the user was using it; it was seen later,
+  below), and automatic grouping stays off until the user starts a new review
+  round under v2 and it passes. Starting that round and rating its pairs are
+  the user's identity judgements.
 - **Home screen at 13:51** (read-only accessibility dump, before B12): "New
   faces found | 1487 to name"; no "Help improve face groups" prompt was shown
-  at that moment.
+  at that moment. The later reading (about 14:50) is below.
+
+### After the re-scan: B13, the screens and B14 (2026-10-22)
+
+Later the same day. These checks supersede the B12 statements above that the
+"Face settings changed" message was not viewed on the phone and that the
+answers after B12 were not audited; those statements stay true as the state at
+B12 (13:56).
+
+- **B13** at 14:43 (app force-stopped; PixelSearch was not in front, and the
+  decision counts had not changed since about 14:10): integrity ok, schema 7.
+  B12 to B13 the tables `people_decisions`, `people_faces` and `people_persons`
+  changed, and in `people_state` only the People generation counter changed
+  (255 to 275). Reviews, scans, photos, embeddings and every other table are
+  identical.
+- **What the counter bounds.** Every saved answer or naming step advances that
+  counter at least once, and nothing else wrote People data in that interval
+  (scans identical, threshold empty), so these changes are at most 20 user
+  actions. They are the user's own; the assistant answered nothing.
+- **Decision rows, not answers.** Accept 62 to 63 (+1), reject 751 to 1,022
+  (+271). A "No" to two groups writes a reject row for every face of each group
+  against the other group (`answerSamePerson`), so 271 rows are not 271
+  answers. All 813 earlier decision rows are unchanged; 0 removed.
+- **Faces.** 2,642 to 2,642 with the same ids, all still under v2, 864 ready.
+  3 faces changed, each with a new decision of the user's: 1 automatic face
+  became manual with another person (its earlier unnamed group was merged
+  away) and 2 automatic faces became unassigned. Manual 62 to 63, automatic
+  297 to 294, unassigned 2,283 to 2,285.
+- **Persons.** 142 to 141 (1 unnamed group merged away; the 5 named persons
+  identical); "me" photos 20 to 21. Every must-be-zero check is 0, and the
+  threshold is still empty.
+- **The screens** (about 14:50). The assistant launched the app and read the
+  screens through read-only accessibility dumps. It tapped only "People", the
+  "Automatic assignment awaits validation" tile and Back, and answered and
+  rated nothing.
+- **Progress bar.** After launch the People screen showed a progress bar while
+  the app held a processing lease (a check pass); the screen could not be read
+  until it settled. That check wrote nothing (B14, below).
+- **Home screen.** "Help improve face groups · 1 of 17" with an "Is this …?"
+  question about a named person and "Group of 2 faces"; "New faces found |
+  1488 to name".
+- **People screen.** "1916 of 1916 photos processed | 2642 faces | 141
+  groups"; "Automatic assignment awaits validation"; "Same person? | 17 quick
+  questions to make grouping more accurate"; "New faces found | 1488 to name";
+  the named-people list (photo counts 21, 4, 4 and 2 visible in the dump).
+- **Review screen** ("Face grouping review"): "80 of 80 reviewed" and the
+  message "Face settings changed: smaller faces can now be compared. Start a
+  new review to turn automatic grouping back on.", with "Review results",
+  "Same person" / "Different people" / "Unsure", "Pair 1 of 80" and "New
+  review" (none of them tapped). So the calibration message is now seen on the
+  phone, not only host-tested.
+- **B14** at 14:52 (after the viewing; app force-stopped): identical to B13 in
+  every table, including the whole `people_state` row (generation 275 in
+  both). The launch, the app's processing check and the viewing of the People
+  and review screens wrote nothing.
 
 ### Not done on the device
 
 - By the assistant: naming faces, confirming or rejecting suggestions and
   answering "Same person?" questions. These are identity decisions. The user
   named faces and answered questions themselves; their effect was checked only
-  through aggregate backup counts (B5 to B6 and B11 to B12 above).
+  through aggregate backup counts (B5 to B6, B11 to B12 and B12 to B13 above).
 - Answering through the main-screen prompt and rounds: the prompt was shown
-  after the resumed pass (70 questions), but answering is the user's; the
-  round counting is host-tested only.
+  after the resumed pass (70 questions) and at about 14:50, after the v2
+  re-scan ("1 of 17"), but answering is the user's; the round counting is
+  host-tested only.
+- Confirming or rejecting a similar-face suggestion on the phone: not
+  exercised (host-tested).
 - Voice input: only typed queries were run.
-- After the FaceContract v2 re-scan: the People screen and the "Face settings
-  changed" message were not viewed on the phone; the message is host-tested.
 - The review round under v2: starting it and rating its pairs are the user's
-  identity judgements. There is none yet, so v2 grouping quality is unmeasured
-  and automatic grouping stays off.
-- No backup after B12: the user's later answers (about 14:01) are not audited.
+  identity judgements. There is none yet ("New review" was not tapped), so v2
+  grouping quality is unmeasured and automatic grouping stays off.
 
 ## Acceptance table
 
 `<scene>` is a scene word ("the beach" in this run). Rows P19 and P20 were
 added for the grouping change, row P21 for the "Same person?" change, rows P22
-to P24 for the user's answers, the rounds build and resumed processing, and rows
+to P24 for the user's answers, the rounds build and resumed processing, rows
 P25 to P27 for the schema-v7 / FaceContract v2 install, its re-scan and the
-user's answers during it.
+user's answers during it, and rows P28 and P29 for the user's answers after the
+re-scan (B12 to B13) and a view-only check of the People and review screens
+(B13 to B14).
 
 | ID | Case | Expected | Result |
 | --- | --- | --- | --- |
@@ -475,8 +534,10 @@ user's answers during it.
 | P23 | Rounds and the main-screen prompt | Up to 20 questions per launch, never repeated; the prompt shows only while questions remain | PASS (view only): with 0 questions left (B7) no prompt was shown; after the resumed pass the prompt showed "Help improve face groups · 1 of 20" (70 questions). Answering and round counting host-tested |
 | P24 | Resumed processing (user's choice) | Scanning continues while the app is open; after the full pass the validated grouping runs; no manual assignment changes | PASS: 1,916 of 1,916 photos in about 20 minutes; grouping +85 automatic, 127 to 152 groups, nothing added to a named person; manual, decisions, reviews and threshold unchanged; only People faces, persons and scans changed (B7 to B8) |
 | P25 | In-place upgrade to schema v7 (tenth install) | firstInstallTime unchanged, installed APK = built APK, `run-as` works; the v6 to v7 migration fills both photo ids of every review row and changes no other review column | PASS: B10 to B11 only the lease row; install Success, firstInstallTime unchanged, installed binary = built APK, `run-as` works; B12 schema 7, integrity ok, 140 of 140 review rows with both photo ids, identical to B11 on shared columns, all 280 face references present |
-| P26 | FaceContract v2 re-scan carry-over | Every photo re-scanned under v2 while the app is open; earlier faces, assignments, decisions and named persons kept; photos and embeddings unchanged; must-be-zero checks stay 0; automatic grouping off until a v2 review round passes | PASS: 1,916 of 1,916 scans and 2,642 of 2,642 faces under v2 by 13:51:09 (about 1,889 photos in under 32 minutes after the first reading); 0 new or dropped faces; ready 397 to 864; 333 of 366 assigned or "Not a face" faces unchanged, the other 33 explained by the user's answers (P27); 771 of 771 earlier decisions unchanged; 5 named persons identical; photos and embeddings identical; must-be-zero checks 0; threshold empty, so grouping is off ("Face settings changed" host-tested, not viewed on the phone) |
-| P27 | The user's answers during the re-scan | Only the user's answers change assignments and decisions; must-be-zero checks stay 0 | PASS: accept 35 to 62, reject 736 to 751, manual 35 to 62, automatic 324 to 297, groups 152 to 142 (0 named removed), "me" photos 11 to 20; each changed earlier face has a new decision or a merged-away group (0 unexplained); the assistant answered nothing. Later answers (about 14:01) not audited by a backup |
+| P26 | FaceContract v2 re-scan carry-over | Every photo re-scanned under v2 while the app is open; earlier faces, assignments, decisions and named persons kept; photos and embeddings unchanged; must-be-zero checks stay 0; automatic grouping off until a v2 review round passes | PASS: 1,916 of 1,916 scans and 2,642 of 2,642 faces under v2 by 13:51:09 (about 1,889 photos in under 32 minutes after the first reading); 0 new or dropped faces; ready 397 to 864; 333 of 366 assigned or "Not a face" faces unchanged, the other 33 explained by the user's answers (P27); 771 of 771 earlier decisions unchanged; 5 named persons identical; photos and embeddings identical; must-be-zero checks 0; threshold empty, so grouping is off ("Face settings changed" host-tested at B12; seen on the phone later, P29) |
+| P27 | The user's answers during the re-scan | Only the user's answers change assignments and decisions; must-be-zero checks stay 0 | PASS: accept 35 to 62, reject 736 to 751, manual 35 to 62, automatic 324 to 297, groups 152 to 142 (0 named removed), "me" photos 11 to 20; each changed earlier face has a new decision or a merged-away group (0 unexplained); the assistant answered nothing. Later answers audited by B13 (P28) |
+| P28 | The user's answers after the re-scan (B12 to B13) | Only the user's answers change decisions, assignments and persons; earlier decision rows kept; must-be-zero checks stay 0 | PASS: only People decisions, faces and persons changed, plus the generation counter (255 to 275; at most 20 user actions); accept 62 to 63, reject rows 751 to 1,022 (rows, not answers); 813 of 813 earlier decision rows unchanged; 3 faces changed, each with a new decision of the user's (manual 62 to 63, automatic 297 to 294, unassigned 2,283 to 2,285); persons 142 to 141, the 5 named persons identical; "me" photos 20 to 21; must-be-zero checks 0; threshold still empty; the assistant answered nothing |
+| P29 | People and review screens after the re-scan (view only) | The People screen and the "Face settings changed" message show on the phone; viewing writes nothing | PASS (view only): People "1916 of 1916 photos processed", 2642 faces, 141 groups, "Automatic assignment awaits validation", 17 questions, 1488 to name; review screen "80 of 80 reviewed" with "Face settings changed: smaller faces can now be compared. Start a new review to turn automatic grouping back on."; the assistant tapped only "People", that tile and Back, and answered and rated nothing; B14 identical to B13 in every table, including `people_state` (generation 275) |
 
 ## Procedure (planned before the run; followed on 2026-10-22)
 

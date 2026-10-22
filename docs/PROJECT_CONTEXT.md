@@ -18,7 +18,9 @@ B0 to B10; §5.4).
 **Update 2026-10-22, afternoon:** the schema-v7 / FaceContract-v2 debug build installed in place on the Vivo (the
 tenth install that day), its migration, the re-scan of all 1,916 photos under v2, the carry-over check and the
 user's own answers during the re-scan (backups B11 and B12; §2, §3.2, §4.4, §5.4, §7, ADR-023, ADR-024, §9, §12,
-§13).
+§13). Later that afternoon backup B13 audited the user's later "Same person?" answers (B12 → B13), the People
+screen and the review screen ("Face settings changed") were viewed read-only on the phone, and backup B14 showed
+that the viewing wrote nothing (B13 → B14 identical; §2, §5.4, §8, §12, §13).
 
 Companion documents:
 
@@ -79,7 +81,7 @@ Legend:
 | Map (EXIF GPS + consented OSM tiles) | ✅ | C+U | P | Tiles worked. 0/1,916 photos located, so no positive pin was ever seen. |
 | Viewer (labels editor, caption, explanation) | ✅ | C+U | P | Live cloud caption never tested |
 | Offline People (SFace, New Faces, naming, name search) | ✅ | C+U | P | Gate: the first round **failed** (2026-09-18); a fresh 20-pair round **passed** (backup B0, 2026-10-22; threshold ≈ 0.462). On 2026-10-22 the user ran "Group similar faces" once (266 automatic assignments, 137 new unnamed groups, backup B3), then resumed processing: all 1,916 photos processed and the validated automatic grouping ran after the pass (backup B8). After the FaceContract v2 install the same day the threshold is null (backup B12), so automatic grouping is off until the user's new review round under v2 passes. |
-| People search (query grammar, similar-face suggestions, multi-select naming, delete person, user-requested grouping, smaller naming list, "Same person?" confirmations and rounds), 2026-10-22 | ✅ | U | P | Host: 526 + 2 skipped tests on the 2026-10-22 working tree; 535 + 1 skipped at the branch tip. Installed in place on the Vivo 2026-10-22; typed person searches, hidden person, suggestions view, grouping and persistence accepted; the "Same person?" card rendered (122 questions); the user named faces and answered the questions on the phone (B5 to B6); after the resumed pass the main-screen prompt showed (70 questions, none answered by the assistant); the user answered more during the FaceContract v2 re-scan (B11 to B12). Suggestion confirm/reject and voice input not exercised on the phone. |
+| People search (query grammar, similar-face suggestions, multi-select naming, delete person, user-requested grouping, smaller naming list, "Same person?" confirmations and rounds), 2026-10-22 | ✅ | U | P | Host: 526 + 2 skipped tests on the 2026-10-22 working tree; 535 + 1 skipped at the branch tip. Installed in place on the Vivo 2026-10-22; typed person searches, hidden person, suggestions view, grouping and persistence accepted; the "Same person?" card rendered (122 questions); the user named faces and answered the questions on the phone (B5 to B6); after the resumed pass the main-screen prompt showed (70 questions, none answered by the assistant); the user answered more during the FaceContract v2 re-scan (B11 to B12) and after it (B12 to B13, audited by aggregate backup counts). Suggestion confirm/reject and voice input not exercised on the phone. |
 | Online assistant / captions / transcription | ✅ | C+U | P | Assistant live-tested 2026-09-09. Others never live-tested. The client credential binding (`backend_credentials.dart`) and the backend hardening are on the branch only; the deployed backend runs the `f38a72c` code. |
 | Backend security hardening (2026-09-18 review) | ✅ | U | N | On the branch only (`b8c3310`), not deployed |
 | Release signing with an operator key | ✅ | U | N | `main` still signs release builds with the debug key; the branch requires an operator key (`c49f2d2`). No release-signed build made. |
@@ -95,8 +97,8 @@ Legend:
 > FP16 wording, onboarding claims, map tile cache, explicit assets, in-app licences), an interim LICENSE with
 > THIRD_PARTY_NOTICES.md, a rewritten README and community files, then a formatting-only commit (`f1c7f9d`, listed
 > in `.git-blame-ignore-revs`) and a CI `dart format` check (`9bea6d4`), then two docs commits, an LF line-ending
-> commit (`0f20b8c`, from which the phone's v2 APK was built) and a docs commit recording the phone's v2 install and
-> re-scan; 26 commits in all on 2026-10-22. `git log 4a7c81f..review-ready-2026-10-22` is the
+> commit (`0f20b8c`, from which the phone's v2 APK was built) and docs commits recording the phone's v2 install,
+> re-scan and later checks; all commits are dated 2026-10-22. `git log 4a7c81f..review-ready-2026-10-22` is the
 > authoritative list. The rest of this section is kept as the 2026-10-21 audit record.
 
 ### 3.1 Layout (monorepo)
@@ -151,7 +153,9 @@ Milestones in plain terms:
 - **2026-10-22:** People search (uncommitted), installed in place and accepted on the Vivo; at the user's request,
   one validated grouping run on the phone, then "Same person?" confirmations (answered by the user) and rounds of
   20 questions on the main screen; later the user resumed People processing. In the afternoon the schema-v7 /
-  FaceContract-v2 build was installed in place (the tenth install) and every photo was re-scanned under v2.
+  FaceContract-v2 build was installed in place (the tenth install) and every photo was re-scanned under v2. Later
+  that afternoon backup B13 audited the user's "Same person?" answers after B12, and a read-only check of the People
+  and review screens wrote nothing (B14 identical to B13).
 
 Against the original handbook: M9–M11 and M13 are implemented. M14 (faces) is implemented. Automatic grouping is
 gated by a photo-disjoint review: on the Vivo the first round failed (2026-09-18) and a fresh round passed (backup
@@ -676,12 +680,34 @@ time, and only with judged held-out evidence.**
   - During the re-scan the user answered "Same person?" questions on the phone (the assistant answered none): accept
     35 → 62, reject 736 → 751, manual 35 → 62, automatic 324 → 297, groups 152 → 142 (10 unnamed groups merged
     away, no named person removed), "me" photos 11 → 20. The user kept answering after B12 (about 14:01: 63 accept,
-    793 reject); no backup has audited that.
+    793 reject); backup B13 audited that later (below).
   - Grouping under v2 (B12): People enabled and not paused, **threshold null** (≈ 0.462 under v1). All 140 review
-    rows are v1 rows, so calibration reports "Face settings changed" (host-tested; not viewed on the phone) and
-    automatic grouping stays off until the user starts a new review round under v2, rates its pairs and it passes.
-    At 13:51 the main screen read "New faces found | 1487 to name", with no "Help improve face groups" prompt at
-    that moment.
+    rows are v1 rows, so calibration reports "Face settings changed" (at B12 known only from host tests; seen on the
+    phone at about 14:50, below) and automatic grouping stays off until the user starts a new review round under v2,
+    rates its pairs and it passes. At 13:51 the main screen read "New faces found | 1487 to name", with no "Help
+    improve face groups" prompt at that moment (1488 to name at the later viewing, below).
+  - **Later the same day: B13.** Backup B13 at 14:43 (app force-stopped; integrity ok, schema 7) audited the user's
+    answers after B12. B12 → B13 changed only the People decisions, faces and persons tables; reviews, scans,
+    photos, embeddings and every other table are unchanged, except that the People generation counter rose 255 → 275.
+    Every saved answer or naming step advances it at least once and nothing else wrote People data, so the B12 → B13
+    changes come from at most 20 user actions (answers or naming steps). Decision rows: accept 62 → 63,
+    reject 751 → 1,022 (+271; a "No" to two groups writes a reject row for every face of each group against the
+    other group, so 271 rows are not 271 answers); all 813 earlier decision rows unchanged, 0 removed.
+    Faces 2,642 → 2,642 (same ids, all v2, 864 with a descriptor); 3 changed, each with a new decision of the user's
+    (1 automatic → manual with another person after its unnamed group was merged away, 2 automatic → unassigned):
+    manual 62 → 63, automatic 297 → 294, unassigned 2,283 → 2,285. Persons 142 → 141 (1 unnamed group merged away;
+    the 5 named persons identical), "me" photos 20 → 21; every must-be-zero check 0; threshold still null.
+  - **The screens and B14.** At about 14:50 the assistant launched the app and read the screens through read-only
+    accessibility dumps; it tapped only "People", the "Automatic assignment awaits validation" tile and Back, and
+    answered and rated nothing. After launch the People screen showed a progress bar while a processing check held
+    a lease. Main screen: "Help improve face groups · 1 of 17" (a question about a named person) and
+    "New faces found | 1488 to name". People: "1916 of 1916 photos processed | 2642 faces | 141 groups",
+    "Automatic assignment awaits validation" and "Same person? | 17 quick questions". Review screen:
+    "80 of 80 reviewed" and "Face settings changed: smaller faces can now be compared. Start a new review to
+    turn automatic grouping back on."; "New review" was not tapped. Backup B14 at 14:52 (app force-stopped) is
+    identical to B13 in every table, the generation counter (275) included, so the launch, its processing check
+    and the viewing wrote nothing. The user's new review round under v2 has not started, so v2 grouping
+    quality is unmeasured.
 - **Naming.** The New Faces picker supports assign or new person, remove assignment, and dismiss ("Not a face").
   The name dialog offers "This is me" (adds the aliases `me`/`myself`). The person screen (`PersonScreen`) offers
   merge (the source name becomes an alias of the target), hide/unhide and choose cover. Manual decisions are
@@ -967,8 +993,8 @@ The ADR log is [`pixelsearch_app/docs/ARCHITECTURE_DECISIONS.md`](../pixelsearch
 | 018 | Similar-face suggestions are ranking-only and confirmed per face; deleting photos keeps review pairs (2026-10-22) | Current (branch `review-ready-2026-10-22`). Suggestions screen viewed on the Vivo 2026-10-22; confirm/reject host-tested only. |
 | 019 | Person-query grammar ("me", "or", "without") and hidden-people semantics (2026-10-22) | Current (branch `review-ready-2026-10-22`). Accepted on the Vivo 2026-10-22 with typed queries; voice input not exercised. |
 | 020 | User-requested validated grouping (`groupNow`, runs while paused but only after a passed gate) and a smaller naming list that hides small or duplicate faces without deleting them (2026-10-22) | Current (branch `review-ready-2026-10-22`). Run once on the Vivo at the user's request (266 automatic assignments, backup B3). |
-| 021 | "Same person?" confirmations: verify automatic faces in named people and ask about group pairs, with Yes / No / Not sure; answers are the user's decisions; `unsure` is a new decision value (no schema change) that never overwrites and that grouping ignores; pairs below the user's lowest "same" review score are not asked (2026-10-22) | Current (branch `review-ready-2026-10-22`). Improves grouping accuracy only through the user's answers; only faces with descriptors are asked about (≥ 100 px under FaceContract v1, ≥ 64 px once a photo is re-scanned under v2; all 1,916 photos on the Vivo since 2026-10-22, B12). Shown on the Vivo 2026-10-22 (122 questions); the user answered on the phone (B5 to B6, and again during the v2 re-scan, B11 to B12; checked through aggregate backup counts). |
-| 022 | "Same person?" rounds: 20 per launch with in-memory counters, never repeated, a Search-home prompt (`SamePersonPrompt`) and a full screen; answers disabled while one saves and until the next question loads (2026-10-22) | Current (branch `review-ready-2026-10-22`). On the Vivo after the resumed pass: 70 questions and "Help improve face groups · 1 of 20" on the main screen; no answer given by the assistant. During the FaceContract v2 re-scan (2026-10-22, B11 to B12) the user answered "Same person?" questions on the phone (checked only through aggregate backup counts). Whether the answers went through the main-screen prompt or the full screen was not recorded, and the round counting itself is host-tested only. |
+| 021 | "Same person?" confirmations: verify automatic faces in named people and ask about group pairs, with Yes / No / Not sure; answers are the user's decisions; `unsure` is a new decision value (no schema change) that never overwrites and that grouping ignores; pairs below the user's lowest "same" review score are not asked (2026-10-22) | Current (branch `review-ready-2026-10-22`). Improves grouping accuracy only through the user's answers; only faces with descriptors are asked about (≥ 100 px under FaceContract v1, ≥ 64 px once a photo is re-scanned under v2; all 1,916 photos on the Vivo since 2026-10-22, B12). Shown on the Vivo 2026-10-22 (122 questions); the user answered on the phone (B5 to B6, again during the v2 re-scan, B11 to B12, and after it, B12 to B13; checked through aggregate backup counts). |
+| 022 | "Same person?" rounds: 20 per launch with in-memory counters, never repeated, a Search-home prompt (`SamePersonPrompt`) and a full screen; answers disabled while one saves and until the next question loads (2026-10-22) | Current (branch `review-ready-2026-10-22`). On the Vivo after the resumed pass: 70 questions and "Help improve face groups · 1 of 20" on the main screen; no answer given by the assistant. During the FaceContract v2 re-scan (2026-10-22, B11 to B12) and after it (B12 to B13) the user answered "Same person?" questions on the phone (checked only through aggregate backup counts). Whether the answers went through the main-screen prompt or the full screen was not recorded, and the round counting itself is host-tested only. |
 | 023 | FaceContract v2: faces from 64 px; a re-scan continues matching v1 faces (id, name, decisions) by box overlap; v1 reviews cannot validate v2, so grouping waits for a new round (2026-10-22) | Current (branch). Rehearsed on a copy of backup B10; installed on the Vivo 2026-10-22 and all 1,916 photos re-scanned (B11 → B12): all 2,642 earlier faces kept their ids and photos; the 771 earlier decisions, the 5 named persons and "Not a face" carried over (the 33 changed assignments all come from the user's own answers); descriptors 397 → 864. Grouping waits for the user's new review round under v2. |
 | 024 | Reviewed photo ids on review rows, schema v7 (KI-16, 2026-10-22) | Current (branch). Migration rehearsed on a copy of backup B10 (140 of 140 rows filled), then ran on the Vivo 2026-10-22 (B12: schema 7, integrity ok, 140 of 140 rows filled, identical to B11 on shared columns). |
 | 025 | Publication guardrails: forward redaction, private-data scan, interim licence, in-app licences, no map tile disk cache (2026-10-22) | Current (branch). History not rewritten. |
@@ -1229,23 +1255,25 @@ below records what the pushed history contains.
      added to a named person, and moves or removes wrong faces; the assistant never judges identities.
    - **Answering the "Same person?" questions** is also the user's step. The user answered the first 122 on
      2026-10-22 (none left on B7); after the resumed pass the phone offered 70 new group-pair questions (B8), 20 per
-     launch on the main screen, and the user answered more during the v2 re-scan (B11 to B12) and after it (not yet
-     audited by a backup). Answer Not sure when in doubt; the floor that selects the questions is not an identity
-     threshold.
+     launch on the main screen, and the user answered more during the v2 re-scan (B11 to B12) and after it (B12 to
+     B13, audited by aggregate counts: at most 20 user actions). A read-only viewing (about 14:50, §5.4) showed
+     17 questions. Answer Not sure when in doubt; the floor that selects the questions is not an identity threshold.
    - **Smaller faces (FaceContract v2, ADR-023; owner chose 64 px).** Installed in place and re-scanned on
      2026-10-22 (B11 → B12): names, decisions and "Not a face" carried over, and 864 faces now have descriptors
      (397 under v1). Remaining: the user starts and rates a new review round under v2 (identity decisions are the
-     user's; it needs photos never reviewed before) so grouping can use faces from 64 px, and a new backup audits
-     the answers given after B12.
+     user's; it needs photos never reviewed before) so grouping can use faces from 64 px. The review screen on the
+     phone shows "Face settings changed"; no new review has been started (review rows unchanged through B14; the
+     assistant did not tap "New review" during its read-only viewing).
    - **Processing resumed (user's decision, 2026-10-22).** The first full pass is done (backup B8), and the v2
      re-scan covered all 1,916 photos (B12). `applyGrouping` ran after the v1 pass on a holdout with only 4 Different
      pairs; under v2 it stays off until the new round passes, and a larger round would make the cutoff more
      trustworthy. Never alter ratings.
    - Device checks still open: confirming and rejecting suggestions, the round counting and the main-screen prompt
-     path (the prompt was shown on the phone; which screen the user answered on was not recorded), voice input, and
-     viewing the People screen and its "Face settings changed" message after the v2 re-scan. Naming and "Same
-     person?" answers were done by the user on the phone (B5 to B6); more "Same person?" answers followed during the
-     v2 re-scan (B11 to B12).
+     path (the prompt was shown on the phone; which screen the user answered on was not recorded), and voice input.
+     The People screen and the review screen, with its "Face settings changed" message, were viewed read-only on the
+     phone after the v2 re-scan (about 14:50; B14 identical to B13). Naming and "Same person?" answers were done by
+     the user on the phone (B5 to B6); more "Same person?" answers followed during the v2 re-scan (B11 to B12) and
+     after it (B12 to B13).
 9. **Refresh the stale living docs** (§10) and write the missing ADRs (§8).
 
 ## 13. Unknowns and limits of this audit
@@ -1253,19 +1281,20 @@ below records what the pushed history contains.
 - **Not run:** integration tests, the SFace-enabled suite, any Android build or install, adb or logcat. The current
   device state (installed APK, provisioned files, People paused) is known only from the 2026-09-18 records.
   (2026-10-22, after the audit: debug APKs were built on the host and installed in place over adb, ten times in
-  all, and backups B0 to B12 give the aggregate device state; see §5.4 and ledger §4.2.)
+  all, and backups B0 to B14 give the aggregate device state; see §5.4 and ledger §4.2.)
 - **Unknown:**
   - the accuracy of the 266 automatic face assignments (never measured; the holdout behind the cutoff has only 4
     Different pairs)
   - suggestion confirm/reject and voice person queries on the phone (host-tested only); the user's naming and "Same
-    person?" answers were checked only through aggregate backup counts (B5 to B6, and the answers during the v2
-    re-scan B11 to B12)
+    person?" answers were checked only through aggregate backup counts (B5 to B6, the answers during the v2 re-scan
+    B11 to B12, and those after it B12 to B13)
   - the accuracy of the 85 automatic assignments made after the resumed pass (B8)
   - whether the KI-17 fix makes CI pass on GitHub (the 3 failures were explained only by a Windows-host simulation
     on 2026-10-22; the job logs were never read and no Linux run was possible)
   - the grouping quality under FaceContract v2 on the phone (installed and re-scanned 2026-10-22, 864 faces with
-    descriptors at B12; no review round under v2 yet, so unmeasured)
-  - the user's "Same person?" answers after B12 (no backup since)
+    descriptors at B12 and B13; no review round under v2 yet at B14, so unmeasured)
+  - how many "Same person?" answers the 271 reject rows added from B12 to B13 stand for (a "No" to two groups writes
+    a reject row for every face of each group against the other group; at most 20 user actions in all)
   - which commit Render serves, and whether the service is live
   - whether Groq ZDR is still enabled and the preview Qwen model still available
   - whether the Vivo originals actually contain GPS
