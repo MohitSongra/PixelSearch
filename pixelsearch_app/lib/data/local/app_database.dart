@@ -282,10 +282,35 @@ class AppDatabase extends _$AppDatabase {
   Future<void> upsertEmbeddings(List<EmbeddingRowsCompanion> rows) =>
       batch((b) => b.insertAllOnConflictUpdate(embeddingRows, rows));
 
-  /// Remove assets and their embeddings atomically (deleted-photo handling).
+  /// Remove assets and derived observations atomically (deleted-photo handling).
   Future<void> deleteAssets(List<String> ids) async {
     if (ids.isEmpty) return;
     await transaction(() async {
+      final removedFaces = await (delete(
+        peopleFaces,
+      )..where((t) => t.photoId.isIn(ids))).go();
+      await (delete(peopleScans)..where((t) => t.photoId.isIn(ids))).go();
+      await customUpdate(
+        'DELETE FROM people_decisions WHERE NOT EXISTS '
+        '(SELECT 1 FROM people_faces f WHERE f.id = people_decisions.face_id)',
+        updates: {peopleDecisions},
+      );
+      // Review pairs are kept on purpose (ids, cosine and judgment only). A
+      // pair whose face is gone makes calibration fail closed until a new
+      // review; deleting it could let the remaining pairs pass the gate.
+      await customUpdate(
+        'UPDATE people_persons SET cover_face_id = NULL WHERE cover_face_id IS NOT NULL '
+        'AND NOT EXISTS (SELECT 1 FROM people_faces f WHERE f.id = people_persons.cover_face_id)',
+        updates: {peoplePersons},
+      );
+      if (removedFaces > 0) {
+        await update(peopleState).write(
+          const PeopleStateCompanion(
+            threshold: Value(null),
+            calibrationJson: Value('{}'),
+          ),
+        );
+      }
       await (delete(memoryMembers)..where((t) => t.photoId.isIn(ids))).go();
       await (delete(savedCaptions)..where((t) => t.photoId.isIn(ids))).go();
       await (delete(photoLocations)..where((t) => t.photoId.isIn(ids))).go();

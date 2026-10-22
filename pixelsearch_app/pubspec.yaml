@@ -49,6 +49,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope.ttf
   assets:
     - assets/branding/
     - assets/samples/

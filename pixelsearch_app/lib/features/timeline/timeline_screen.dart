@@ -6,6 +6,7 @@ import '../../domain/timeline/memory_grouping.dart';
 import '../../domain/timeline/memory_stories.dart';
 import '../../state/providers.dart';
 import '../../widgets/photo_grid.dart';
+import '../../widgets/empty_state.dart';
 import 'memory_story_viewer.dart';
 import 'timeline_photo_image.dart';
 
@@ -81,7 +82,7 @@ class _TimelineState extends ConsumerState<TimelineScreen> {
     );
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 420 ||
+        if (constraints.maxWidth < 330 ||
             MediaQuery.textScalerOf(context).scale(16) > 24) {
           return Column(
             children: [yearPicker, const SizedBox(height: 12), monthPicker],
@@ -108,7 +109,12 @@ class _TimelineState extends ConsumerState<TimelineScreen> {
           error: (e, _) => Center(child: Text('Timeline unavailable: $e')),
           data: (timeline) {
             if (timeline.years.isEmpty) {
-              return const Center(child: Text('No indexed memories yet'));
+              return const EmptyState(
+                icon: Icons.photo_library_outlined,
+                title: 'Memories, ready to rediscover',
+                message:
+                    'Index your photos to see them grouped into moments and yearly highlights.',
+              );
             }
             final year = timeline.years.contains(_year)
                 ? _year!
@@ -125,17 +131,30 @@ class _TimelineState extends ConsumerState<TimelineScreen> {
               key: ValueKey('timeline-$year-$month'),
               slivers: [
                 SliverPadding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
                   sliver: SliverToBoxAdapter(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (MediaQuery.textScalerOf(context).scale(16) <=
+                            24) ...[
+                          Text(
+                            'Moments, rediscovered.',
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'The days worth another look.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
                         _navigation(timeline, year, month),
-                        const SizedBox(height: 24),
-                        Text(
-                          '$year',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
                         const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
@@ -171,7 +190,7 @@ class _TimelineState extends ConsumerState<TimelineScreen> {
                 ),
                 for (final section in sections) ...[
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
                     sliver: SliverToBoxAdapter(
                       child: Semantics(
                         header: true,
@@ -183,53 +202,92 @@ class _TimelineState extends ConsumerState<TimelineScreen> {
                     ),
                   ),
                   SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
                     sliver: SliverList.builder(
                       itemCount: section.memories.length,
                       itemBuilder: (context, i) {
                         final memory = section.memories[i];
                         final event = memory.event;
-                        return Card(
-                          key: ValueKey('memory-${event.id}'),
-                          margin: const EdgeInsets.only(bottom: 16),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute<void>(
-                                builder: (_) => MemoryDetail(eventId: event.id),
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Material(
+                            key: ValueKey('memory-${event.id}'),
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      MemoryDetail(eventId: event.id),
+                                ),
                               ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                SizedBox(
-                                  height: 180,
-                                  width: double.infinity,
-                                  child: TimelinePhotoImage(photo: event.cover),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
                                 ),
-                                Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _memoryTitle(event),
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.titleMedium,
+                                child: Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: SizedBox(
+                                        width: 104,
+                                        height: 104,
+                                        child: TimelinePhotoImage(
+                                          photo: event.cover,
+                                        ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        _dateRange(memory.start, memory.end),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            _memoryTitle(event),
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.titleMedium,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            _dateRange(
+                                              memory.start,
+                                              memory.end,
+                                            ),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
+                                                ),
+                                          ),
+                                          if (event.title.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                top: 4,
+                                              ),
+                                              child: Text(
+                                                _photoCount(
+                                                  event.photos.length,
+                                                ),
+                                                style: Theme.of(
+                                                  context,
+                                                ).textTheme.bodySmall,
+                                              ),
+                                            ),
+                                        ],
                                       ),
-                                      if (event.title.isNotEmpty)
-                                        Text(_photoCount(event.photos.length)),
-                                    ],
-                                  ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.chevron_right, size: 20),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           ),
                         );
@@ -248,56 +306,81 @@ class _TimelineState extends ConsumerState<TimelineScreen> {
 class _StoryCard extends StatelessWidget {
   const _StoryCard({required this.story});
   final MemoryStory story;
-
   @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      key: const ValueKey('open-memory-story'),
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute<void>(
-          builder: (_) => MemoryStoryViewer(story: story),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: 200,
-            width: double.infinity,
-            child: TimelinePhotoImage(photo: story.photos.first),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final large = MediaQuery.textScalerOf(context).scale(16) > 24;
+    return Material(
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      color: theme.colorScheme.surfaceContainer,
+      child: InkWell(
+        key: const ValueKey('open-memory-story'),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => MemoryStoryViewer(story: story),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        story.title,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(_photoCount(story.photos.length)),
-                    ],
+        ),
+        child: SizedBox(
+          height: large ? 300 : 248,
+          width: double.infinity,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              TimelinePhotoImage(photo: story.photos.first),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Color(0xDB001B16)],
                   ),
                 ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.play_circle_outline,
-                  semanticLabel: 'Open story',
+              ),
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 20,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            story.title,
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _photoCount(story.photos.length),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Icon(
+                      Icons.play_circle_outline,
+                      semanticLabel: 'Open story',
+                      color: Colors.white,
+                      size: 40,
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class MemoryDetail extends ConsumerWidget {

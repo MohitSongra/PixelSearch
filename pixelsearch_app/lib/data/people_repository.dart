@@ -1,10 +1,15 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
 import '../domain/people/face_contract.dart';
 import '../domain/people/face_grouping.dart';
+import '../domain/people/face_suggestions.dart';
+import '../domain/people/people_membership.dart';
+import '../domain/people/people_query.dart';
+import '../domain/people/same_person.dart';
 import 'local/app_database.dart';
 
 String peopleRevision(PhotoRow photo) =>
@@ -50,11 +55,13 @@ class PersonView {
 }
 
 class PeopleSnapshot {
-  const PeopleSnapshot({
+  PeopleSnapshot({
     required this.state,
     this.people = const [],
     this.faces = const [],
     this.reviews = const [],
+    this.photoDates = const {},
+    this.photoSizes = const {},
     this.total = 0,
     this.processed = 0,
     this.inaccessible = 0,
@@ -64,9 +71,120 @@ class PeopleSnapshot {
   final List<PersonView> people;
   final List<PeopleFaceRecord> faces;
   final List<PeopleReviewRecord> reviews;
+
+  /// Photo id → capture time (ms) for the accessible indexed photos.
+  final Map<String, int> photoDates;
+
+  /// Photo id → (width, height) in pixels, for face-size estimates.
+  final Map<String, (int, int)> photoSizes;
   final int total, processed, inaccessible, failed;
+
+  /// Approximate side length in pixels of [face] in the prepared image
+  /// (long side at most 2048 px). Face boxes are fractions of the upright
+  /// image; their area is the same whichever way the photo was rotated.
+  double facePixels(PeopleFaceRecord face) {
+    final size = photoSizes[face.photoId];
+    if (size == null || size.$1 <= 0 || size.$2 <= 0) return double.infinity;
+    // Same arithmetic as the Android decoder: halve until the long side fits.
+    var sample = 1;
+    final longest = math.max(size.$1, size.$2);
+    while (longest / sample > 2048) {
+      sample *= 2;
+    }
+    return math.sqrt(face.w * face.h * size.$1 * size.$2) / sample;
+  }
+
+  /// Faces kept out of the naming list by default: tiny background faces, and
+  /// second detections overlapping a larger face in the same photo. Only
+  /// unassigned faces and automatic faces in unnamed groups are considered;
+  /// nothing the user named is ever hidden.
+  /// They are not deleted and can still be named from the photo. Computed once
+  /// per snapshot: the People and Search screens ask for it on every build.
+  late final Set<String> smallOrDuplicateFaces = _smallOrDuplicateFaces();
+
+  Set<String> _smallOrDuplicateFaces() {
+    final byPhoto = <String, List<PeopleFaceRecord>>{};
+    for (final face in faces) {
+      if (!face.dismissed) {
+        byPhoto.putIfAbsent(face.photoId, () => []).add(face);
+      }
+    }
+    final named = {
+      for (final p in people)
+        if (p.record.name.trim().isNotEmpty) p.record.id,
+    };
+    final hidden = <String>{};
+    for (final group in byPhoto.values) {
+      for (final face in group) {
+        if (face.personId != null &&
+            (face.assignment != 'automatic' || named.contains(face.personId))) {
+          continue;
+        }
+        if (facePixels(face) < tinyFacePixels) {
+          hidden.add(face.id);
+          continue;
+        }
+        final area = face.w * face.h;
+        for (final other in group) {
+          final otherArea = other.w * other.h;
+          final larger =
+              otherArea > area ||
+              (otherArea == area && other.id.compareTo(face.id) < 0);
+          if (other.id != face.id && larger && _overlap(face, other) > 0.5) {
+            hidden.add(face.id);
+            break;
+          }
+        }
+      }
+    }
+    return hidden;
+  }
+
+  /// New faces to name: all unassigned faces, or only the clearly visible ones.
+  List<PeopleFaceRecord> namingQueue({bool includeSmall = false}) {
+    final ordered = newFacesInPhotoOrder;
+    if (includeSmall) return ordered;
+    final hidden = smallOrDuplicateFaces;
+    return ordered.where((f) => !hidden.contains(f.id)).toList();
+  }
+
+  /// Unnamed groups to name; a single-face group whose face is tiny or a
+  /// duplicate detection is hidden like that face would be.
+  List<PersonView> namingGroups({bool includeSmall = false}) {
+    if (includeSmall) return unnamedPeople;
+    final hidden = smallOrDuplicateFaces;
+    return unnamedPeople
+        .where(
+          (p) => !(p.faces.length == 1 && hidden.contains(p.faces.single.id)),
+        )
+        .toList();
+  }
+
+  /// Entries to name: each unnamed group counts once, like one person.
+  int toName({bool includeSmall = false}) =>
+      namingGroups(includeSmall: includeSmall).length +
+      namingQueue(includeSmall: includeSmall).length;
   List<PeopleFaceRecord> get unassigned =>
       faces.where((f) => f.personId == null && !f.dismissed).toList();
+
+  /// Unassigned faces with one event's faces together: newest photo first.
+  List<PeopleFaceRecord> get newFacesInPhotoOrder => unassigned
+    ..sort((a, b) {
+      final byDate = (photoDates[b.photoId] ?? 0).compareTo(
+        photoDates[a.photoId] ?? 0,
+      );
+      if (byDate != 0) return byDate;
+      final byPhoto = a.photoId.compareTo(b.photoId);
+      if (byPhoto != 0) return byPhoto;
+      final byX = a.x.compareTo(b.x);
+      return byX != 0 ? byX : a.id.compareTo(b.id);
+    });
+  List<PeopleFaceRecord> get dismissedFaces =>
+      faces.where((f) => f.dismissed).toList();
+
+  /// The person marked "This is me" (at most one after any edit).
+  PersonView? get self =>
+      people.where((p) => p.aliases.any(isSelfAlias)).firstOrNull;
   List<PersonView> get unnamedPeople => people
       .where(
         (p) =>
@@ -78,6 +196,24 @@ class PeopleSnapshot {
   int get facesToName =>
       unassigned.length +
       unnamedPeople.fold(0, (count, p) => count + p.faces.length);
+}
+
+/// Faces smaller than this (side length in the prepared image) are hidden
+/// from the naming list by default.
+const tinyFacePixels = 40.0;
+
+double _overlap(PeopleFaceRecord a, PeopleFaceRecord b) {
+  final width = math.max(
+    0.0,
+    math.min(a.x + a.w, b.x + b.w) - math.max(a.x, b.x),
+  );
+  final height = math.max(
+    0.0,
+    math.min(a.y + a.h, b.y + b.h) - math.max(a.y, b.y),
+  );
+  final intersection = width * height;
+  final union = a.w * a.h + b.w * b.h - intersection;
+  return union <= 0 ? 0 : intersection / union;
 }
 
 class PeopleRepository {
@@ -231,14 +367,20 @@ class PeopleRepository {
         ),
       );
     }
-    final reviews = await (db.select(
-      db.peopleReviews,
-    )..where((r) => r.subset.isIn(['calibration', 'validation']))).get();
+    final reviews =
+        await (db.select(db.peopleReviews)
+              ..where((r) => r.subset.isIn(['calibration', 'validation']))
+              ..orderBy([
+                (_) => OrderingTerm.asc(const CustomExpression<int>('rowid')),
+              ]))
+            .get();
     return PeopleSnapshot(
       state: current,
       people: people,
       faces: faces,
       reviews: reviews,
+      photoDates: {for (final p in photos.values) p.id: p.dateMs},
+      photoSizes: {for (final p in photos.values) p.id: (p.width, p.height)},
       total: photos.length,
       processed: done.length,
       inaccessible: inaccessible,
@@ -309,14 +451,26 @@ class PeopleRepository {
     return true;
   });
 
-  Future<PeopleFaceRecord> _face(String id) async {
+  /// Validates every face against one snapshot (one [load], not one per face).
+  Future<Map<String, PeopleFaceRecord>> _faces(
+    Iterable<String> ids, {
+    PeopleSnapshot? snapshot,
+  }) async {
     if (!(await state()).enabled) {
       throw StateError('People grouping is disabled.');
     }
-    final face = (await load()).faces.where((f) => f.id == id).firstOrNull;
-    if (face == null) throw StateError('This face is no longer available.');
-    return face;
+    final wanted = ids.toSet();
+    final found = {
+      for (final f in (snapshot ?? await load()).faces)
+        if (wanted.contains(f.id)) f.id: f,
+    };
+    if (found.length != wanted.length) {
+      throw StateError('This face is no longer available.');
+    }
+    return found;
   }
+
+  Future<PeopleFaceRecord> _face(String id) async => (await _faces([id]))[id]!;
 
   Future<String> createPerson(
     List<String> faceIds, {
@@ -324,9 +478,7 @@ class PeopleRepository {
     List<String> aliases = const [],
   }) => db.transaction(() async {
     if (faceIds.isEmpty) throw ArgumentError('Select at least one face.');
-    for (final id in faceIds) {
-      await _face(id);
-    }
+    final faces = await _faces(faceIds);
     final id = 'manual:${DateTime.now().microsecondsSinceEpoch}';
     await db
         .into(db.peoplePersons)
@@ -335,11 +487,12 @@ class PeopleRepository {
             id: id,
             createdMs: DateTime.now().millisecondsSinceEpoch,
             name: Value(_name(name)),
-            aliasesJson: Value(_aliases(aliases)),
+            aliasesJson: Value(_aliases(aliases, name: name)),
             coverFaceId: Value(faceIds.first),
           ),
         );
-    await _assign(faceIds, id);
+    if (aliases.any(isSelfAlias)) await _releaseSelfAliases(id);
+    await _assign(faceIds, id, faces: faces);
     await _advance();
     return id;
   });
@@ -352,9 +505,39 @@ class PeopleRepository {
     return trimmed;
   }
 
-  String _aliases(List<String> aliases) => jsonEncode(
-    aliases.map(_name).where((s) => s.isNotEmpty).toSet().toList(),
-  );
+  /// Trims, drops entries equal to the name, keeps self aliases lower-case and
+  /// removes duplicates ignoring case (first spelling wins).
+  String _aliases(Iterable<String> aliases, {String name = ''}) {
+    final seen = {name.trim().toLowerCase()};
+    final kept = <String>[];
+    for (final alias in aliases) {
+      var value = _name(alias);
+      if (value.isEmpty) continue;
+      if (isSelfAlias(value)) value = value.toLowerCase();
+      if (seen.add(value.toLowerCase())) kept.add(value);
+    }
+    return jsonEncode(kept);
+  }
+
+  /// "This is me" belongs to one person: remove the self aliases elsewhere.
+  Future<void> _releaseSelfAliases(String keepPersonId) async {
+    final others = await (db.select(
+      db.peoplePersons,
+    )..where((p) => p.id.equals(keepPersonId).not())).get();
+    for (final person in others) {
+      final aliases = (jsonDecode(person.aliasesJson) as List).cast<String>();
+      if (!aliases.any(isSelfAlias)) continue;
+      await (db.update(
+        db.peoplePersons,
+      )..where((p) => p.id.equals(person.id))).write(
+        PeoplePersonsCompanion(
+          aliasesJson: Value(
+            _aliases(aliases.where((a) => !isSelfAlias(a)), name: person.name),
+          ),
+        ),
+      );
+    }
+  }
 
   Future<void> editPerson(
     String id, {
@@ -369,25 +552,34 @@ class PeopleRepository {
     if (coverFaceId != null && (await _face(coverFaceId)).personId != id) {
       throw ArgumentError('Choose a face belonging to this person.');
     }
+    final existing = await (db.select(
+      db.peoplePersons,
+    )..where((p) => p.id.equals(id))).getSingleOrNull();
     await (db.update(db.peoplePersons)..where((p) => p.id.equals(id))).write(
       PeoplePersonsCompanion(
         name: name == null ? const Value.absent() : Value(_name(name)),
         aliasesJson: aliases == null
             ? const Value.absent()
-            : Value(_aliases(aliases)),
+            : Value(_aliases(aliases, name: name ?? existing?.name ?? '')),
         coverFaceId: coverFaceId == null
             ? const Value.absent()
             : Value(coverFaceId),
         hidden: hidden == null ? const Value.absent() : Value(hidden),
       ),
     );
+    if (existing != null && aliases != null && aliases.any(isSelfAlias)) {
+      await _releaseSelfAliases(id);
+    }
     await _advance();
   });
 
+  /// Writes explicit user assignments in one batch. A move away from a person
+  /// records that person as rejected for the face.
   Future<void> _assign(
     List<String> faceIds,
     String? personId, {
     bool dismiss = false,
+    Map<String, PeopleFaceRecord>? faces,
   }) async {
     if (personId != null &&
         await (db.select(
@@ -396,38 +588,47 @@ class PeopleRepository {
             null) {
       throw StateError('Person no longer exists.');
     }
-    for (final id in faceIds) {
-      final face = await _face(id);
-      if (face.personId != null && face.personId != personId) {
-        await db
-            .into(db.peopleDecisions)
-            .insertOnConflictUpdate(
-              PeopleDecisionsCompanion.insert(
-                faceId: id,
-                personId: face.personId!,
-                decision: 'reject',
-              ),
-            );
-      }
-      if (personId != null) {
-        await db
-            .into(db.peopleDecisions)
-            .insertOnConflictUpdate(
-              PeopleDecisionsCompanion.insert(
-                faceId: id,
-                personId: personId,
-                decision: 'accept',
-              ),
-            );
-      }
-      await (db.update(db.peopleFaces)..where((f) => f.id.equals(id))).write(
-        PeopleFacesCompanion(
-          personId: Value(personId),
-          assignment: Value(personId == null ? 'unassigned' : 'manual'),
-          dismissed: Value(dismiss),
-        ),
-      );
+    final ids = faceIds.toSet().toList();
+    final records = faces ?? await _faces(ids);
+    if (ids.any((id) => !records.containsKey(id))) {
+      throw StateError('This face is no longer available.');
     }
+    await db.batch((b) {
+      for (final id in ids) {
+        final face = records[id]!;
+        if (face.personId != null && face.personId != personId) {
+          b.insert(
+            db.peopleDecisions,
+            PeopleDecisionsCompanion.insert(
+              faceId: id,
+              personId: face.personId!,
+              decision: 'reject',
+            ),
+            mode: InsertMode.insertOrReplace,
+          );
+        }
+        if (personId != null) {
+          b.insert(
+            db.peopleDecisions,
+            PeopleDecisionsCompanion.insert(
+              faceId: id,
+              personId: personId,
+              decision: 'accept',
+            ),
+            mode: InsertMode.insertOrReplace,
+          );
+        }
+        b.update(
+          db.peopleFaces,
+          PeopleFacesCompanion(
+            personId: Value(personId),
+            assignment: Value(personId == null ? 'unassigned' : 'manual'),
+            dismissed: Value(dismiss),
+          ),
+          where: (f) => f.id.equals(id),
+        );
+      }
+    });
   }
 
   Future<void> assign(
@@ -439,7 +640,19 @@ class PeopleRepository {
     await _advance();
   });
 
-  Future<void> merge(String source, String target) => db.transaction(() async {
+  /// Merges two people the user chose to merge: every face becomes a manual
+  /// assignment of [target].
+  Future<void> merge(String source, String target) => _merge(source, target);
+
+  /// [keepAutomatic]: faces grouped automatically stay automatic (so they can
+  /// still be checked with "Is this X?"), except the faces in [confirm], which
+  /// the user actually saw and confirmed.
+  Future<void> _merge(
+    String source,
+    String target, {
+    bool keepAutomatic = false,
+    Set<String> confirm = const {},
+  }) => db.transaction(() async {
     if (source == target) return;
     final snapshot = await load();
     final from = snapshot.people
@@ -449,24 +662,53 @@ class PeopleRepository {
     if (from == null || to == null) {
       throw StateError('Person no longer exists.');
     }
-    await _assign(from.faces.map((f) => f.id).toList(), target);
-    final aliases = {
+    bool staysAutomatic(PeopleFaceRecord f) =>
+        keepAutomatic && f.assignment == 'automatic' && !confirm.contains(f.id);
+    final confirmed = from.faces.where((f) => !staysAutomatic(f)).toList();
+    final automatic = from.faces
+        .where(staysAutomatic)
+        .map((f) => f.id)
+        .toList();
+    if (confirmed.isNotEmpty) {
+      await _assign(
+        confirmed.map((f) => f.id).toList(),
+        target,
+        faces: {for (final f in confirmed) f.id: f},
+      );
+    }
+    if (automatic.isNotEmpty) {
+      await (db.update(db.peopleFaces)..where((f) => f.id.isIn(automatic)))
+          .write(PeopleFacesCompanion(personId: Value(target)));
+    }
+    // An unnamed group adopts the name; otherwise the old name becomes an alias.
+    final adoptName =
+        to.record.name.trim().isEmpty && from.record.name.trim().isNotEmpty;
+    final targetName = adoptName ? from.record.name : to.record.name;
+    final aliases = [
       ...to.aliases,
       ...from.aliases,
-      if (from.record.name.isNotEmpty && from.record.name != to.record.name)
+      if (!adoptName &&
+          from.record.name.trim().isNotEmpty &&
+          from.record.name.trim().toLowerCase() !=
+              to.record.name.trim().toLowerCase())
         from.record.name,
-    };
+    ];
     await (db.update(
       db.peoplePersons,
     )..where((p) => p.id.equals(target))).write(
       PeoplePersonsCompanion(
-        aliasesJson: Value(_aliases(aliases.toList())),
+        name: adoptName ? Value(_name(from.record.name)) : const Value.absent(),
+        aliasesJson: Value(_aliases(aliases, name: targetName)),
         coverFaceId: Value(to.record.coverFaceId ?? from.record.coverFaceId),
       ),
     );
+    // Carry the user's earlier answers about the source over to the target:
+    // rejects (never regroup) and "not sure" (never ask again).
     final rejected =
         await (db.select(db.peopleDecisions)..where(
-              (d) => d.personId.equals(source) & d.decision.equals('reject'),
+              (d) =>
+                  d.personId.equals(source) &
+                  d.decision.isIn(['reject', 'unsure']),
             ))
             .get();
     for (final r in rejected) {
@@ -475,15 +717,19 @@ class PeopleRepository {
                 (d) => d.faceId.equals(r.faceId) & d.personId.equals(target),
               ))
               .getSingleOrNull();
-      if (targetDecision == null) {
+      // A reject outranks an earlier "not sure"; "not sure" never replaces
+      // a real answer.
+      if (targetDecision == null ||
+          (r.decision == 'reject' && targetDecision.decision == 'unsure')) {
         await db
             .into(db.peopleDecisions)
             .insert(
               PeopleDecisionsCompanion.insert(
                 faceId: r.faceId,
                 personId: target,
-                decision: 'reject',
+                decision: r.decision,
               ),
+              mode: InsertMode.insertOrReplace,
             );
       }
     }
@@ -493,26 +739,407 @@ class PeopleRepository {
     )..where((f) => f.personId.equals(source))).write(
       PeopleFacesCompanion(
         personId: Value(target),
-        assignment: const Value('manual'),
+        assignment: keepAutomatic
+            ? const Value.absent()
+            : const Value('manual'),
       ),
     );
     await (db.delete(db.peoplePersons)..where((p) => p.id.equals(source))).go();
     await _advance();
   });
 
+  /// Removes a person. Its faces return to New faces with this person id
+  /// recorded as rejected for them. A later validated grouping run may still
+  /// group those faces again under a new id; it cannot revive this one.
+  Future<void> deletePerson(String personId) => db.transaction(() async {
+    if (!(await state()).enabled) {
+      throw StateError('People grouping is disabled.');
+    }
+    final person = await (db.select(
+      db.peoplePersons,
+    )..where((p) => p.id.equals(personId))).getSingleOrNull();
+    if (person == null) throw StateError('Person no longer exists.');
+    // Includes faces in photos that are currently inaccessible.
+    final faces = await (db.select(
+      db.peopleFaces,
+    )..where((f) => f.personId.equals(personId))).get();
+    await db.batch((b) {
+      for (final face in faces) {
+        b.insert(
+          db.peopleDecisions,
+          PeopleDecisionsCompanion.insert(
+            faceId: face.id,
+            personId: personId,
+            decision: 'reject',
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
+      }
+      b.update(
+        db.peopleFaces,
+        const PeopleFacesCompanion(
+          personId: Value(null),
+          assignment: Value('unassigned'),
+        ),
+        where: (f) => f.personId.equals(personId),
+      );
+      b.deleteWhere(db.peoplePersons, (p) => p.id.equals(personId));
+    });
+    await _advance();
+  });
+
+  /// Unnamed faces ordered by similarity to the person's manually confirmed
+  /// faces. Read-only: nothing is assigned until [confirmSuggestions].
+  Future<FaceSuggestionResult> suggestionsFor(
+    String personId, {
+    PeopleSnapshot? snapshot,
+    int limit = 60,
+  }) async {
+    snapshot ??= await load();
+    if (!snapshot.state.enabled) return const FaceSuggestionResult();
+    final rejected =
+        (await (db.select(db.peopleDecisions)..where(
+                  (d) =>
+                      d.personId.equals(personId) & d.decision.equals('reject'),
+                ))
+                .get())
+            .map((d) => d.faceId)
+            .toSet();
+    const descriptor = _descriptor;
+
+    final input = FaceSuggestionInput(
+      references: [
+        for (final face in snapshot.faces)
+          if (face.personId == personId && face.assignment == 'manual')
+            descriptor(face),
+      ].whereType<FaceVector>().toList(),
+      candidates: [
+        for (final face in snapshot.unassigned) descriptor(face),
+      ].whereType<FaceVector>().toList(),
+      occupiedPhotoIds: {
+        for (final face in snapshot.faces)
+          if (face.personId == personId && !face.dismissed) face.photoId,
+      },
+      rejectedFaceIds: rejected,
+      limit: limit,
+    );
+    // Small inputs run inline (fast, and deterministic in tests).
+    if (input.references.length * input.candidates.length <= 50000) {
+      return rankFaceSuggestions(input);
+    }
+    return compute(rankFaceSuggestions, input);
+  }
+
+  /// Assigns exactly the faces the user confirmed. Fails closed, writing
+  /// nothing, if any face changed or two faces would put the person twice in
+  /// one photo.
+  Future<void> confirmSuggestions(String personId, List<String> faceIds) =>
+      db.transaction(() async {
+        if (faceIds.isEmpty) throw ArgumentError('Select at least one face.');
+        final snapshot = await load();
+        if (!snapshot.state.enabled) {
+          throw StateError('People grouping is disabled.');
+        }
+        if (!snapshot.people.any((p) => p.record.id == personId)) {
+          throw StateError('Person no longer exists.');
+        }
+        final ids = faceIds.toSet();
+        final faces = {
+          for (final f in snapshot.faces)
+            if (ids.contains(f.id)) f.id: f,
+        };
+        if (faces.length != ids.length ||
+            faces.values.any((f) => f.personId != null || f.dismissed)) {
+          throw StateError('Some faces changed. Review the suggestions again.');
+        }
+        final occupied = {
+          for (final f in snapshot.faces)
+            if (f.personId == personId && !f.dismissed) f.photoId,
+        };
+        final photos = <String>{};
+        for (final face in faces.values) {
+          if (occupied.contains(face.photoId) || !photos.add(face.photoId)) {
+            throw ArgumentError('A person can be confirmed once per photo.');
+          }
+        }
+        await _assign(ids.toList(), personId, faces: faces);
+        await _advance();
+      });
+
+  /// Records "not this person" for unassigned faces. The faces stay in New
+  /// faces and are never suggested for this person again.
+  Future<void> rejectSuggestions(String personId, List<String> faceIds) =>
+      db.transaction(() async {
+        if (faceIds.isEmpty) throw ArgumentError('Select at least one face.');
+        final snapshot = await load();
+        if (!snapshot.state.enabled) {
+          throw StateError('People grouping is disabled.');
+        }
+        if (!snapshot.people.any((p) => p.record.id == personId)) {
+          throw StateError('Person no longer exists.');
+        }
+        final ids = faceIds.toSet();
+        final faces = [
+          for (final f in snapshot.faces)
+            if (ids.contains(f.id)) f,
+        ];
+        if (faces.length != ids.length) {
+          throw StateError('Some faces changed. Review the suggestions again.');
+        }
+        if (faces.any((f) => f.personId == personId)) {
+          throw StateError(
+            'This face is assigned to the person. Use Remove assignment.',
+          );
+        }
+        await db.batch((b) {
+          for (final id in ids) {
+            b.insert(
+              db.peopleDecisions,
+              PeopleDecisionsCompanion.insert(
+                faceId: id,
+                personId: personId,
+                decision: 'reject',
+              ),
+              mode: InsertMode.insertOrReplace,
+            );
+          }
+        });
+        await _advance();
+      });
+
+  /// Restores the state before a suggestion decision (SnackBar Undo).
+  Future<void> undoSuggestionDecisions(
+    String personId, {
+    List<String> confirmed = const [],
+    List<String> rejected = const [],
+  }) => db.transaction(() async {
+    if (!(await state()).enabled) {
+      throw StateError('People grouping is disabled.');
+    }
+    await db.batch((b) {
+      for (final id in confirmed) {
+        b.update(
+          db.peopleFaces,
+          const PeopleFacesCompanion(
+            personId: Value(null),
+            assignment: Value('unassigned'),
+          ),
+          where: (f) =>
+              f.id.equals(id) &
+              f.personId.equals(personId) &
+              f.assignment.equals('manual'),
+        );
+        b.deleteWhere(
+          db.peopleDecisions,
+          (d) =>
+              d.faceId.equals(id) &
+              d.personId.equals(personId) &
+              d.decision.equals('accept'),
+        );
+      }
+      for (final id in rejected) {
+        b.deleteWhere(
+          db.peopleDecisions,
+          (d) =>
+              d.faceId.equals(id) &
+              d.personId.equals(personId) &
+              d.decision.equals('reject'),
+        );
+      }
+    });
+    await _advance();
+  });
+
+  /// "Same person?" questions (read-only): faces automatic grouping added to
+  /// named people first, then groups that may be one person, closest first.
+  Future<List<SamePersonQuestion>> samePersonQuestions({
+    PeopleSnapshot? snapshot,
+    int limit = 20,
+  }) async {
+    snapshot ??= await load();
+    if (!snapshot.state.enabled) return const [];
+    final decided = <String, Set<String>>{};
+    for (final d in await (db.select(
+      db.peopleDecisions,
+    )..where((d) => d.decision.isIn(['reject', 'unsure']))).get()) {
+      decided.putIfAbsent(d.faceId, () => {}).add(d.personId);
+    }
+    final visible = snapshot.people
+        .where((p) => !p.record.hidden && p.faces.isNotEmpty)
+        .toList();
+    // A named person whose faces were all grouped automatically has no face
+    // the user confirmed; the cover (the face shown when it was named) is
+    // the anchor, and is never asked about itself.
+    final anchors = <String, List<String>>{};
+    for (final p in visible) {
+      final manual = [
+        for (final f in p.faces)
+          if (f.assignment == 'manual') f.id,
+      ];
+      if (manual.isEmpty && p.record.name.trim().isNotEmpty) {
+        final cover = p.faces
+            .where((f) => f.id == p.record.coverFaceId)
+            .firstOrNull;
+        manual.add((cover ?? p.faces.first).id);
+      }
+      anchors[p.record.id] = manual;
+    }
+    final input = SamePersonInput(
+      groups: [
+        for (final p in visible)
+          FaceGroupInput(
+            personId: p.record.id,
+            named: p.record.name.trim().isNotEmpty,
+            faces: p.faces.map(_descriptor).whereType<FaceVector>().toList(),
+            photoIds: {for (final f in p.faces) f.photoId},
+            confirmedFaceIds: anchors[p.record.id]!,
+            size: p.faces.length,
+          ),
+      ],
+      automaticFaces: [
+        for (final p in visible)
+          if (p.record.name.trim().isNotEmpty)
+            for (final f in p.faces)
+              if (f.assignment == 'automatic' &&
+                  !anchors[p.record.id]!.contains(f.id) &&
+                  _descriptor(f) != null)
+                (p.record.id, _descriptor(f)!),
+      ],
+      decided: decided,
+      minSimilarity: _lowestSameScore(snapshot),
+      limit: limit,
+    );
+    // Every pair of groups is compared, so estimate the work: small libraries
+    // run inline (fast, deterministic in tests), larger ones off the UI isolate.
+    var work = 0, seen = 0;
+    for (final g in input.groups) {
+      work += seen * g.faces.length;
+      seen += g.faces.length;
+    }
+    if (work <= 20000) return buildSamePersonQuestions(input);
+    return compute(buildSamePersonQuestions, input);
+  }
+
+  /// The lowest score among review pairs the user judged the same person.
+  /// Pairs scoring below every judged "same" pair are not worth asking about.
+  double? _lowestSameScore(PeopleSnapshot snapshot) {
+    final scores = [
+      for (final r in snapshot.reviews)
+        if (r.judgment == 'same') r.cosine,
+    ];
+    return scores.isEmpty ? null : scores.reduce(math.min);
+  }
+
+  /// Records the user's answer. Yes joins (or confirms), No keeps apart and is
+  /// remembered, Not sure is remembered so the pair is not asked again.
+  Future<void> answerSamePerson(
+    SamePersonQuestion question,
+    SamePersonAnswer answer,
+  ) async {
+    final snapshot = await load();
+    if (!snapshot.state.enabled) {
+      throw StateError('People grouping is disabled.');
+    }
+    PersonView? person(String? id) =>
+        snapshot.people.where((p) => p.record.id == id).firstOrNull;
+    final left = person(question.leftPersonId);
+    if (left == null) {
+      throw StateError('These faces changed. Try the next question.');
+    }
+    if (question.kind == SamePersonKind.verifyAutomatic) {
+      final face = left.faces
+          .where((f) => f.id == question.rightFaceId)
+          .firstOrNull;
+      if (face == null) {
+        throw StateError('This face changed. Try the next question.');
+      }
+      return db.transaction(() async {
+        switch (answer) {
+          case SamePersonAnswer.yes:
+            // Confirmed: becomes a manual assignment with an accept decision.
+            await _assign([face.id], left.record.id, faces: {face.id: face});
+          case SamePersonAnswer.no:
+            // Removed from the person; the reject stops it coming back.
+            await _assign([face.id], null, faces: {face.id: face});
+          case SamePersonAnswer.notSure:
+            await _remember([face.id], left.record.id, 'unsure');
+        }
+        await _advance();
+      });
+    }
+    final right = person(question.rightPersonId);
+    // The answer is about the two faces the user compared; if either has left
+    // its group since, the question is stale.
+    final leftFace = left.faces
+        .where((f) => f.id == question.leftFaceId)
+        .firstOrNull;
+    if (right == null ||
+        leftFace == null ||
+        !right.faces.any((f) => f.id == question.rightFaceId)) {
+      throw StateError('These faces changed. Try the next question.');
+    }
+    if (answer == SamePersonAnswer.yes) {
+      // The left group is the named (or larger) one and keeps its identity.
+      // Only the two faces the user compared become confirmed; other faces
+      // grouped automatically stay automatic and can be checked later.
+      if (leftFace.assignment == 'automatic') {
+        await db.transaction(() async {
+          await _assign(
+            [leftFace.id],
+            left.record.id,
+            faces: {leftFace.id: leftFace},
+          );
+          await _advance();
+        });
+      }
+      return _merge(
+        right.record.id,
+        left.record.id,
+        keepAutomatic: true,
+        confirm: {question.rightFaceId},
+      );
+    }
+    return db.transaction(() async {
+      if (answer == SamePersonAnswer.no) {
+        await _remember(right.faces.map((f) => f.id), left.record.id, 'reject');
+        await _remember(left.faces.map((f) => f.id), right.record.id, 'reject');
+      } else {
+        await _remember(right.faces.map((f) => f.id), left.record.id, 'unsure');
+      }
+      await _advance();
+    });
+  }
+
+  /// Writes a decision for each face about [personId]. A reject replaces an
+  /// earlier answer; "unsure" never overwrites an existing decision.
+  Future<void> _remember(
+    Iterable<String> faceIds,
+    String personId,
+    String decision,
+  ) => db.batch((b) {
+    for (final id in faceIds.toSet()) {
+      b.insert(
+        db.peopleDecisions,
+        PeopleDecisionsCompanion.insert(
+          faceId: id,
+          personId: personId,
+          decision: decision,
+        ),
+        mode: decision == 'reject'
+            ? InsertMode.insertOrReplace
+            : InsertMode.insertOrIgnore,
+      );
+    }
+  });
+
   Future<Set<String>> photoIdsFor(Set<String> personIds) async {
     if (personIds.isEmpty) throw ArgumentError('Person selection is empty.');
     final snapshot = await load();
     if (!snapshot.state.enabled) return {};
-    Set<String>? matches;
-    for (final id in personIds) {
-      final photos = snapshot.faces
-          .where((f) => f.personId == id && !f.dismissed)
-          .map((f) => f.photoId)
-          .toSet();
-      matches = matches == null ? photos : matches.intersection(photos);
-    }
-    return matches ?? {};
+    return matchPeoplePhotos(
+      PeoplePhotoIndex.of(snapshot).photosByPerson,
+      required: personIds,
+    );
   }
 
   List<FaceVector> vectors(
@@ -541,10 +1168,14 @@ class PeopleRepository {
       throw StateError('Enable People grouping first.');
     }
     if (snapshot.reviews.isNotEmpty) return snapshot.reviews.length;
-    final pairs = await compute(buildFaceReview, vectors(snapshot));
+    final excluded = await _reviewedPhotos();
+    final pairs = await compute(
+      buildFaceReview,
+      vectors(snapshot).where((f) => !excluded.contains(f.photoId)).toList(),
+    );
     if (pairs.length < 40) {
       throw StateError(
-        'Not enough detailed faces for a 40-pair review yet. Manual naming remains available.',
+        'Not enough unreviewed detailed faces for a 40-pair review yet. Manual naming remains available.',
       );
     }
     return db.transaction(() async {
@@ -574,8 +1205,104 @@ class PeopleRepository {
     });
   }
 
-  Future<FaceCalibration> calibration() async {
+  Future<Set<String>> _reviewedPhotos() async {
+    final rows = await db
+        .customSelect(
+          'SELECT DISTINCT f.photo_id FROM people_faces f JOIN people_reviews r '
+          'ON f.id=r.left_face_id OR f.id=r.right_face_id',
+        )
+        .get();
+    return rows.map((r) => r.read<String>('photo_id')).toSet();
+  }
+
+  /// A failed holdout becomes training evidence only for a NEW round. The next
+  /// holdout uses previously unseen photos and is frozen before any new labels.
+  Future<int> prepareFreshValidation() async {
     final snapshot = await load();
+    final result = await calibration(snapshot: snapshot);
+    if (!snapshot.state.enabled ||
+        result.passed ||
+        result.candidateThreshold == null ||
+        snapshot.reviews.any((p) => p.judgment == 'pending')) {
+      throw StateError(
+        'Complete the current review before starting a fresh check.',
+      );
+    }
+    final differentScores = snapshot.reviews
+        .where((p) => p.judgment == 'different')
+        .map((p) => p.cosine)
+        .toList();
+    if (!snapshot.reviews.any(
+      (p) =>
+          p.judgment == 'same' &&
+          differentScores.every((score) => p.cosine > score),
+    )) {
+      throw StateError(
+        'These ratings cannot calibrate a safe cutoff. '
+        'Manual naming remains available; a face-quality investigation is needed.',
+      );
+    }
+    final excluded = await _reviewedPhotos();
+    final pairs = await compute(
+      buildFreshFaceValidation,
+      vectors(snapshot).where((f) => !excluded.contains(f.photoId)).toList(),
+    );
+    if (pairs.length < 20) {
+      throw StateError(
+        'Not enough unreviewed detailed faces for 20 new pairs. '
+        'Continue People processing, then try again. Your ratings are saved.',
+      );
+    }
+    return db.transaction(() async {
+      final current = await state();
+      if (!current.enabled || current.generation != snapshot.state.generation) {
+        throw StateError('People data changed. Try again.');
+      }
+      // Metadata may change without advancing the People generation.
+      final live = await load();
+      final liveIds = {for (final f in live.faces) f.id};
+      if ([
+            for (final p in pairs) ...[p.left, p.right],
+          ].any((id) => !liveIds.contains(id)) ||
+          (await calibration(snapshot: live)).candidateThreshold == null) {
+        throw StateError('A reviewed photo changed. Your ratings are saved.');
+      }
+      await archiveReview();
+      final prefix = DateTime.now().microsecondsSinceEpoch;
+      await db.batch(
+        (b) => b.insertAll(db.peopleReviews, [
+          for (final p in snapshot.reviews)
+            PeopleReviewsCompanion.insert(
+              id: '$prefix:carried:${p.id}',
+              leftFaceId: p.leftFaceId,
+              rightFaceId: p.rightFaceId,
+              subset: 'calibration',
+              cosine: p.cosine,
+              judgment: Value(p.judgment),
+              contract: p.contract,
+            ),
+          for (final p in pairs)
+            PeopleReviewsCompanion.insert(
+              id: '$prefix:${p.id}',
+              leftFaceId: p.left,
+              rightFaceId: p.right,
+              subset: 'validation',
+              cosine: p.cosine,
+              contract: FaceContract.id,
+            ),
+        ]),
+      );
+      final pending = await calibration();
+      await _advance(
+        threshold: const Value(null),
+        calibration: jsonEncode(pending.toJson()),
+      );
+      return pairs.length;
+    });
+  }
+
+  Future<FaceCalibration> calibration({PeopleSnapshot? snapshot}) async {
+    snapshot ??= await load();
     final faces = {for (final f in snapshot.faces) f.id: f};
     final calPhotos = <String>{}, valPhotos = <String>{};
     for (final p in snapshot.reviews) {
@@ -649,13 +1376,30 @@ class PeopleRepository {
     await _advance(threshold: const Value(null), calibration: '{}');
   });
 
-  Future<int> applyGrouping() async {
+  /// Automatic grouping after a full processing pass. Never runs while the
+  /// user has paused processing.
+  Future<int> applyGrouping() => _applyGrouping(allowWhilePaused: false);
+
+  /// Grouping the user asked for explicitly ("Group similar faces"). It uses
+  /// the same validated cutoff and refuses unless the review gate passed, but
+  /// does not need processing to be resumed.
+  Future<int> groupNow() => _applyGrouping(allowWhilePaused: true);
+
+  Future<int> _applyGrouping({required bool allowWhilePaused}) async {
     final snapshot = await load();
-    if (!snapshot.state.enabled || snapshot.state.paused) return 0;
+    if (!snapshot.state.enabled ||
+        (snapshot.state.paused && !allowWhilePaused)) {
+      return 0;
+    }
     final result = await calibration();
     if (!result.passed) return 0;
     final decisions = await db.select(db.peopleDecisions).get();
-    final input = vectors(snapshot, decisions);
+    // A second detection of the same face would only become a stray group.
+    final duplicates = snapshot.smallOrDuplicateFaces;
+    final input = vectors(
+      snapshot,
+      decisions,
+    ).where((f) => f.personId != null || !duplicates.contains(f.id)).toList();
     final threshold = result.threshold!;
     final occupied = <String, Set<String>>{};
     for (final face in snapshot.faces) {
@@ -667,7 +1411,7 @@ class PeopleRepository {
     return db.transaction(() async {
       final current = await state();
       if (!current.enabled ||
-          current.paused ||
+          (current.paused && !allowWhilePaused) ||
           current.generation != snapshot.state.generation) {
         return 0;
       }
@@ -677,17 +1421,7 @@ class PeopleRepository {
       var count = 0;
       for (final entry in assignments.entries) {
         if (entry.value == null) continue;
-        await db
-            .into(db.peoplePersons)
-            .insert(
-              PeoplePersonsCompanion.insert(
-                id: entry.value!,
-                coverFaceId: Value(entry.key),
-                createdMs: DateTime.now().millisecondsSinceEpoch,
-              ),
-              mode: InsertMode.insertOrIgnore,
-            );
-        count +=
+        final updated =
             await (db.update(db.peopleFaces)..where(
                   (f) =>
                       f.id.equals(entry.key) &
@@ -700,12 +1434,95 @@ class PeopleRepository {
                     assignment: const Value('automatic'),
                   ),
                 );
+        // Create a new group only when a face actually joined it.
+        if (updated == 0) continue;
+        count += updated;
+        await db
+            .into(db.peoplePersons)
+            .insert(
+              PeoplePersonsCompanion.insert(
+                id: entry.value!,
+                coverFaceId: Value(entry.key),
+                createdMs: DateTime.now().millisecondsSinceEpoch,
+              ),
+              mode: InsertMode.insertOrIgnore,
+            );
       }
+      // A run computed from an older snapshot must now fail its check.
+      if (count > 0) await _advance();
       return count;
     });
   }
 }
 
+FaceVector? _descriptor(PeopleFaceRecord face) {
+  if (face.dismissed || face.quality != 'ready') return null;
+  final vector = decodeFaceVector(face.vector);
+  return vector == null
+      ? null
+      : FaceVector(
+          id: face.id,
+          photoId: face.photoId,
+          vector: vector,
+          personId: face.personId,
+        );
+}
+
 Map<String, String?> _group(
   (List<FaceVector>, double, Map<String, Set<String>>) input,
 ) => groupFaces(input.$1, input.$2, personPhotos: input.$3);
+
+/// Person → photos from assigned, non-dismissed faces, built once per People
+/// snapshot so a search does not reload the People tables.
+class PeoplePhotoIndex {
+  const PeoplePhotoIndex({
+    required this.enabled,
+    this.photosByPerson = const {},
+    this.assignments = const {},
+    this.labels = const {},
+    this.hidden = const {},
+  });
+
+  factory PeoplePhotoIndex.of(PeopleSnapshot snapshot) {
+    if (!snapshot.state.enabled) return const PeoplePhotoIndex(enabled: false);
+    final photos = <String, Set<String>>{};
+    final assignments = <String, Map<String, String>>{};
+    for (final face in snapshot.faces) {
+      final person = face.personId;
+      if (person == null || face.dismissed) continue;
+      photos.putIfAbsent(person, () => {}).add(face.photoId);
+      final kinds = assignments.putIfAbsent(face.photoId, () => {});
+      if (kinds[person] != 'manual') kinds[person] = face.assignment;
+    }
+    return PeoplePhotoIndex(
+      enabled: true,
+      photosByPerson: photos,
+      assignments: assignments,
+      labels: {for (final p in snapshot.people) p.record.id: p.label},
+      hidden: {
+        for (final p in snapshot.people)
+          if (p.record.hidden) p.record.id,
+      },
+    );
+  }
+
+  final bool enabled;
+  final Map<String, Set<String>> photosByPerson;
+
+  /// Photo id → person id → 'manual' | 'automatic'.
+  final Map<String, Map<String, String>> assignments;
+  final Map<String, String> labels;
+  final Set<String> hidden;
+}
+
+/// People that typed names can resolve to. Hidden people are left out unless
+/// [includeHidden] (the online privacy guard must still see every name).
+List<NamedPerson> peopleDirectory(
+  PeopleSnapshot? snapshot, {
+  bool includeHidden = false,
+}) => [
+  for (final p in snapshot?.people ?? const <PersonView>[])
+    if ((includeHidden || !p.record.hidden) &&
+        (p.record.name.trim().isNotEmpty || p.aliases.isNotEmpty))
+      NamedPerson(p.record.id, p.record.name, aliases: p.aliases),
+];

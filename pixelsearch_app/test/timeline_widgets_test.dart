@@ -152,7 +152,7 @@ void main() {
     tester,
   ) async {
     await mount(tester, timeline([]));
-    expect(find.text('No indexed memories yet'), findsOneWidget);
+    expect(find.text('Memories, ready to rediscover'), findsOneWidget);
     expect(find.text('Back in 2024'), findsNothing);
     expect(find.byType(DropdownButtonFormField<int>), findsNothing);
   });
@@ -337,7 +337,7 @@ void main() {
       events = [];
       container.invalidate(memoriesProvider);
       await tester.pumpAndSettle();
-      expect(find.text('No indexed memories yet'), findsOneWidget);
+      expect(find.text('Memories, ready to rediscover'), findsOneWidget);
     },
   );
 

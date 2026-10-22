@@ -109,6 +109,100 @@ void main() {
   tearDown(() => db.close());
 
   test(
+    'deleting an asset removes face data even while People is paused',
+    () async {
+      await repo.enable();
+      await addFaces(repo, 'removed', ['a']);
+      await addFaces(repo, 'kept', ['b']);
+      final person = await repo.createPerson([
+        'a',
+        'b',
+      ], name: 'Synthetic Person');
+      await repo.editPerson(person, coverFaceId: 'a');
+      await db
+          .into(db.peopleReviews)
+          .insert(
+            PeopleReviewsCompanion.insert(
+              id: 'review',
+              leftFaceId: 'a',
+              rightFaceId: 'b',
+              subset: 'calibration',
+              cosine: .9,
+              contract: FaceContract.id,
+            ),
+          );
+      await db
+          .update(db.peopleState)
+          .write(
+            const PeopleStateCompanion(
+              threshold: Value(.9),
+              calibrationJson: Value('{"threshold":0.9}'),
+            ),
+          );
+      await repo.pause(true);
+      await db.deleteAssets(['removed']);
+      expect((await db.select(db.peopleFaces).get()).map((f) => f.id), ['b']);
+      expect((await db.select(db.peopleScans).get()).map((s) => s.photoId), [
+        'kept',
+      ]);
+      expect(
+        (await db.select(db.peopleDecisions).get()).every(
+          (d) => d.faceId == 'b',
+        ),
+        isTrue,
+      );
+      // The review row is kept so calibration fails closed instead of
+      // re-scoring the remaining pairs.
+      expect((await db.select(db.peopleReviews).get()).map((r) => r.id), [
+        'review',
+      ]);
+      final calibration = await repo.calibration();
+      expect(calibration.passed, isFalse);
+      expect(calibration.reason, contains('unavailable'));
+      final saved = (await db.select(db.peoplePersons).get()).single;
+      expect(saved.name, 'Synthetic Person');
+      expect(saved.coverFaceId, isNull);
+      expect((await repo.state()).paused, isTrue);
+      expect((await repo.state()).threshold, isNull);
+      expect((await repo.state()).calibrationJson, '{}');
+    },
+  );
+
+  test(
+    'post-index pruning removes deleted face crops without loading a model',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'pixelsearch-retention-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final removed = File('${directory.path}/removed.jpg');
+      final kept = File('${directory.path}/kept.jpg');
+      await removed.writeAsBytes([1]);
+      await kept.writeAsBytes([2]);
+      await repo.enable();
+      for (final id in ['removed', 'kept']) {
+        await seedPhoto(db, id);
+        await repo.commitPhoto(
+          photoId: id,
+          revision: '1:0:500:500',
+          generation: (await repo.state()).generation,
+          faces: [observation(id, id, crop: '${directory.path}/$id.jpg')],
+        );
+      }
+      await repo.pause(true);
+      await db.deleteAssets(['removed']);
+      await repo.reconcile();
+      await PeopleService(
+        repo,
+        processor: () => throw StateError('Cleanup must not load a face model'),
+        cropDirectory: () async => directory,
+      ).pruneCrops();
+      expect(await removed.exists(), isFalse);
+      expect(await kept.exists(), isTrue);
+    },
+  );
+
+  test(
     'new and revised indexed photos are detected without enumerating the gallery',
     () async {
       await seedPhoto(db, '1');
@@ -144,12 +238,12 @@ void main() {
       await addFaces(repo, '2', ['c']);
       final id = await repo.createPerson(
         ['a', 'b', 'c'],
-        name: 'Mohit',
+        name: 'Alice',
         aliases: ['Mo'],
       );
       final restored = await PeopleRepository(db).load();
       expect(restored.people.single.record.id, id);
-      expect(restored.people.single.label, 'Mohit');
+      expect(restored.people.single.label, 'Alice');
       expect(restored.people.single.aliases, ['Mo']);
       expect(restored.people.single.photoCount, 2);
       expect(restored.state.threshold, isNull);
@@ -212,7 +306,7 @@ void main() {
       expect(snapshot.facesToName, 3);
       expect(snapshot.unnamedPeople.single.record.id, unnamed);
       expect(snapshot.unassigned.single.id, 'c');
-      await repo.editPerson(unnamed, name: 'Rudra');
+      await repo.editPerson(unnamed, name: 'Bob');
       snapshot = await PeopleRepository(db).load();
       expect(snapshot.facesToName, 1);
       expect(snapshot.unnamedPeople, isEmpty);

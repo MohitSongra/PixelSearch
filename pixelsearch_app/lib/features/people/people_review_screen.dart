@@ -1,9 +1,8 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/app_database.dart';
+import '../../domain/people/face_grouping.dart';
 import '../../state/people_providers.dart';
 import '../../state/providers.dart';
 import '../viewer/photo_viewer.dart';
@@ -18,8 +17,118 @@ class PeopleReviewScreen extends ConsumerStatefulWidget {
 class _ReviewState extends ConsumerState<PeopleReviewScreen> {
   int _at = 0;
   bool _busy = false;
-  String? _summary;
   bool _restored = false;
+  String? _roundKey;
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  Future<void> _freshValidation() async {
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Check 20 new pairs?'),
+        content: const Text(
+          'Your saved ratings will calibrate the next cutoff. '
+          'The next test uses previously unreviewed photos. '
+          'Automatic grouping stays off until that separate test passes.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Prepare pairs'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
+    setState(() => _busy = true);
+    final saved = await peopleAction(context, ref, () async {
+      await ref.read(peopleRepositoryProvider).prepareFreshValidation();
+    });
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (saved) _restored = false;
+    });
+    if (saved && _scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  Future<void> _results(
+    FaceCalibration result,
+    List<PeopleReviewRecord> pairs,
+  ) async {
+    final selected = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .8,
+          ),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(24),
+            children: [
+              Text(
+                'Review results',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 12),
+              Text(result.reason),
+              const SizedBox(height: 16),
+              Text(
+                'Calibration: ${result.calibrationTrueJoins} of ${result.calibrationSame} same-person pairs matched.',
+              ),
+              Text(
+                'Separate test: ${result.validationTrueJoins} of ${result.validationSame} same-person pairs matched.',
+              ),
+              Text(
+                'Incorrect test joins: ${result.validationFalseJoins} of ${result.validationDifferent} different-person pairs.',
+              ),
+              if (result.candidateThreshold != null)
+                Text(
+                  'Tested cosine cutoff: ${result.candidateThreshold!.toStringAsFixed(4)}',
+                ),
+              if (!result.passed) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Your ratings are saved. Manual naming remains available.',
+                ),
+              ],
+              for (var i = 0; i < pairs.length; i++)
+                if (result.falseJoinPairIds.contains(
+                  '${pairs[i].leftFaceId}|${pairs[i].rightFaceId}',
+                ))
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('Inspect pair ${i + 1}'),
+                    subtitle: Text(
+                      'Rated Different people; cosine ${pairs[i].cosine.toStringAsFixed(4)}',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pop(context, i),
+                  ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected != null && mounted) {
+      setState(() => _at = selected);
+      if (_scroll.hasClients) _scroll.jumpTo(0);
+    }
+  }
+
   Future<void> _prepare() async {
     setState(() => _busy = true);
     await peopleAction(context, ref, () async {
@@ -34,7 +143,6 @@ class _ReviewState extends ConsumerState<PeopleReviewScreen> {
       final repository = ref.read(peopleRepositoryProvider);
       await repository.judge(pair.id, value);
       final result = await repository.calibration();
-      _summary = result.reason;
       if (result.passed) await repository.applyGrouping();
     });
     if (mounted) {
@@ -63,6 +171,7 @@ class _ReviewState extends ConsumerState<PeopleReviewScreen> {
   @override
   Widget build(BuildContext context) {
     final data = ref.watch(peopleSnapshotProvider);
+    final result = ref.watch(peopleCalibrationProvider).valueOrNull;
     return Scaffold(
       appBar: AppBar(title: const Text('Face grouping review')),
       body: data.when(
@@ -88,10 +197,11 @@ class _ReviewState extends ConsumerState<PeopleReviewScreen> {
                     ),
             );
           }
-          if (!_restored) {
+          if (!_restored || _roundKey != pairs.first.id) {
             final pending = pairs.indexWhere((p) => p.judgment == 'pending');
             _at = pending < 0 ? 0 : pending;
             _restored = true;
+            _roundKey = pairs.first.id;
           }
           final pair = pairs[_at.clamp(0, pairs.length - 1)];
           final left = snapshot.faces
@@ -102,10 +212,23 @@ class _ReviewState extends ConsumerState<PeopleReviewScreen> {
               .firstOrNull;
           final complete = pairs.where((p) => p.judgment != 'pending').length;
           return ListView(
+            controller: _scroll,
             padding: const EdgeInsets.all(16),
             children: [
               Text('$complete of ${pairs.length} reviewed'),
               LinearProgressIndicator(value: complete / pairs.length),
+              if (complete == pairs.length && result != null) ...[
+                const SizedBox(height: 12),
+                Text(result.reason),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _busy ? null : () => _results(result, pairs),
+                    icon: const Icon(Icons.fact_check_outlined),
+                    label: const Text('Review results'),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               Text(
                 'Same person?',
@@ -175,12 +298,14 @@ class _ReviewState extends ConsumerState<PeopleReviewScreen> {
                 ],
               ),
               if (_busy) const LinearProgressIndicator(),
-              if (_summary != null) Text(_summary!),
-              if (complete == pairs.length && _summary == null)
-                Text(
-                  (jsonDecode(snapshot.state.calibrationJson) as Map)['reason']
-                          as String? ??
-                      'Review saved.',
+              if (complete == pairs.length &&
+                  result != null &&
+                  !result.passed &&
+                  result.candidateThreshold != null)
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _freshValidation,
+                  icon: const Icon(Icons.playlist_add_check),
+                  label: const Text('Check 20 new pairs'),
                 ),
               const SizedBox(height: 16),
               TextButton.icon(
@@ -192,7 +317,7 @@ class _ReviewState extends ConsumerState<PeopleReviewScreen> {
                           builder: (context) => AlertDialog(
                             title: const Text('Start a new review?'),
                             content: const Text(
-                              'Previous judgments stay archived. Automatic assignment is paused until the new review passes.',
+                              'Previous judgments stay archived. The new review needs different photos. Automatic assignment stays off until it passes.',
                             ),
                             actions: [
                               TextButton(
@@ -217,7 +342,6 @@ class _ReviewState extends ConsumerState<PeopleReviewScreen> {
                         if (mounted) {
                           setState(() {
                             _at = 0;
-                            _summary = null;
                             _restored = false;
                           });
                         }

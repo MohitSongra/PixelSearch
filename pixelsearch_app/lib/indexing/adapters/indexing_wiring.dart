@@ -4,6 +4,8 @@ import '../../ai/image_embedder.dart';
 import '../../core/model_locator.dart';
 import '../../data/local/app_database.dart';
 import '../../data/local/processing_lease.dart';
+import '../../data/people_repository.dart';
+import '../../data/people/people_service.dart';
 import '../../data/indexing_preferences_repository.dart';
 import '../asset_processor.dart';
 import '../index_store.dart';
@@ -43,9 +45,17 @@ Future<IndexingService> buildDeviceIndexingService({
     versionManager: const ModelVersionManager(),
     onDispose: () async {
       try {
-        await enricher.dispose();
+        // The indexing lease excludes face scanning. Cleanup must not depend
+        // on the user enabling/resuming People or producing new face results.
+        final people = PeopleRepository(db);
+        await people.reconcile();
+        await PeopleService(people).pruneCrops();
       } finally {
-        await embedder.dispose();
+        try {
+          await enricher.dispose();
+        } finally {
+          await embedder.dispose();
+        }
       }
     },
   );

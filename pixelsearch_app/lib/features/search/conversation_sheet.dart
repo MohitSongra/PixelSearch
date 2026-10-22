@@ -9,9 +9,11 @@ import 'package:record/record.dart';
 import '../../data/enhancements/enhancement_client.dart';
 import '../../data/enhancements/online_policy.dart';
 import '../../data/offline_speech.dart';
+import '../../data/people_repository.dart';
 import '../../domain/search/assistant_result.dart';
 import '../../domain/people/people_query.dart';
 import '../../state/people_providers.dart';
+import '../../domain/search/query_text.dart';
 import '../../domain/search/search_response.dart';
 import '../../state/providers.dart';
 import 'offline_speech_setup.dart';
@@ -387,14 +389,17 @@ class _ConversationState extends ConsumerState<ConversationSheet>
       final filters = ref.read(searchFiltersProvider);
       final people = await ref.read(peopleRepositoryProvider).load();
       if (!_active(op)) return;
-      final directory = [for (final p in people.people)
-        NamedPerson(p.record.id, p.record.name, aliases: p.aliases)];
+      // Hidden people are still private: the guard checks every saved name.
+      final directory = peopleDirectory(people, includeHidden: true);
       final currentQuery = ref.read(searchQueryProvider);
       final references = [
         resolvePeopleQuery(_message.text, directory, filters: filters),
         resolvePeopleQuery(currentQuery, directory, filters: filters),
       ];
-      if (references.any((q) => q.filters.personIds.isNotEmpty || q.needsChoice)) {
+      if (filters.hasPeople ||
+          references.any(
+            (q) => q.hasPeople || q.needsChoice || q.mentions.isNotEmpty,
+          )) {
         throw StateError('Named people searches stay on this device. Use Search locally with the editable English query.');
       }
       final data = await ref
@@ -409,7 +414,7 @@ class _ConversationState extends ConsumerState<ConversationSheet>
               'language': _language,
               'today': DateTime.now().toIso8601String().substring(0, 10),
               'filters': {
-                ...filters.toJson(),
+                ...filters.toJson(includePeople: false),
                 if (filters.from != null)
                   'from': filters.from!.toIso8601String().substring(0, 10),
                 if (filters.until != null)
@@ -630,7 +635,8 @@ class _ConversationState extends ConsumerState<ConversationSheet>
                           ? null
                           : () => _apply(
                               SearchRequest(
-                                _message.text,
+                                // Recognisers add sentence punctuation.
+                                cleanSpokenQuery(_message.text),
                                 filters: ref.read(searchFiltersProvider),
                               ),
                             ),
