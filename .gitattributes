@@ -1,0 +1,27 @@
+# Text files are stored with LF line endings in the repository.
+* text=auto eol=lf
+
+# Windows scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files: never converted or diffed as text.
+*.onnx binary
+*.gz binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.docx binary
+*.jar binary
+*.keystore binary
+*.jks binary
+
+# Generated code and archived documents are not counted as source by GitHub.
+*.g.dart linguist-generated=true
+docs/archive/** linguist-documentation
