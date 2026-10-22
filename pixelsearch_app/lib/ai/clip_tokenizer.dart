@@ -8,6 +8,8 @@ import '../core/ai_contract.dart';
 
 /// Exact Dart port of open_clip's `SimpleTokenizer` (CLIP byte-pair encoding),
 /// verified id-for-id against Python (see `test/clip_tokenizer_test.dart`).
+/// OpenCLIP and the OpenAI CLIP vocabulary are MIT-licensed; their notices are
+/// in `assets/licenses/CLIP_TOKENIZER_LICENSE.txt` and on the in-app licence page.
 ///
 /// Pure and deterministic. The vocab (`bpe_simple_vocab_16e6.txt.gz`) is supplied
 /// once at construction — from the bundled asset in the app, or from a file in

@@ -180,10 +180,16 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
             ),
-          const ListTile(
-            leading: Icon(Icons.info_outline),
-            title: Text('PixelSearch'),
-            subtitle: Text('On-device AI photo search\nVersion 0.1.0'),
+          const AboutListTile(
+            key: ValueKey('about-pixelsearch'),
+            icon: Icon(Icons.info_outline),
+            applicationName: 'PixelSearch',
+            applicationVersion: '0.1.0',
+            applicationLegalese:
+                '© 2025–2026 the PixelSearch authors. All rights reserved; '
+                'published for academic evaluation. Third-party components '
+                'keep their own licences.',
+            child: Text('On-device AI photo search · version 0.1.0 · licences'),
           ),
         ],
       ),
