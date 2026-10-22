@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:pixelsearch/data/enhancements/map_tile_client.dart';
 import 'package:pixelsearch/data/enhancements/online_policy.dart';
 import 'package:pixelsearch/data/user_preferences.dart';
+import 'package:pixelsearch/features/map/map_screen.dart';
 
 void main() {
   Future<OnlinePolicy> policy({bool allow = false}) async {
@@ -24,6 +27,19 @@ void main() {
   }
 
   final url = Uri.parse('https://tile.openstreetmap.org/0/0/0.png');
+
+  test('consented map tiles are never cached on disk', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final tiles = container.read(mapTileFactoryProvider)(
+      await policy(allow: true),
+    );
+    addTearDown(tiles.dispose);
+    expect(tiles, isA<NetworkTileProvider>());
+    final caching = (tiles as NetworkTileProvider).cachingProvider;
+    expect(caching, isA<DisabledMapCachingProvider>());
+    expect(caching!.isSupported, isFalse);
+  });
 
   test('tile bodies are bounded independently of Content-Length', () async {
     final settings = await policy(allow: true);

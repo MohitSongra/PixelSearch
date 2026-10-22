@@ -31,10 +31,16 @@ final mapTileFactoryProvider = Provider<MapTileFactory>(
       (policy) => _ConsentedTiles(policy),
 );
 
+/// Tiles fetched only with consent, and never written to disk: flutter_map's
+/// built-in cache (up to 1 GB) would outlive a revoked map consent.
 class _ConsentedTiles extends NetworkTileProvider {
   _ConsentedTiles(OnlinePolicy policy) : this._(MapTileClient(policy));
   _ConsentedTiles._(this.client)
-    : super(httpClient: client, attemptDecodeOfHttpErrorResponses: false);
+    : super(
+        httpClient: client,
+        attemptDecodeOfHttpErrorResponses: false,
+        cachingProvider: const DisabledMapCachingProvider(),
+      );
   final MapTileClient client;
   @override
   Future<void> dispose() async {
