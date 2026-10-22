@@ -20,7 +20,7 @@ class ResolvedModel {
   final String path;
   final String fileName;
 
-  /// `'fp16'` (production) or `'fp32'` (development / CPU fallback).
+  /// `'fp16'` or `'fp32'` (the only precision accepted on a device so far).
   final String precision;
   final int bytes;
 
@@ -32,12 +32,12 @@ class ResolvedModel {
 
 /// Finds the CLIP encoders provisioned under `<app support>/models/`.
 ///
-/// **fp16 is the production artifact** (ADR-004, `INTERFACE_CONTRACT.md` §2) and
-/// is always preferred. The fp32 export is accepted as a **development /
-/// CPU-testing fallback**, because fp16 needs an fp16-capable execution provider
-/// (NNAPI/XNNPACK) and will not run on plain CPU fp32 kernels — see KI-2. Both
-/// precisions are numerically verified against the same reference, so falling
-/// back changes speed and memory, not results.
+/// The resolver prefers fp16 when both are present (ADR-004 named fp16 the
+/// Android target). But fp16 has never been accepted on Android: it needs an
+/// fp16-capable execution provider (NNAPI/XNNPACK), the app registers none, and
+/// fp16 parity was never measured (KI-2, KI-9). **FP32 on CPU is the only
+/// accepted configuration, so provision only the fp32 files**; while no fp16
+/// file is present, fp32 is selected.
 ///
 /// The selected artifact is always logged, so a device run states on the record
 /// which file it actually used.
@@ -46,7 +46,8 @@ class ModelLocator {
 
   final AiLog log;
 
-  /// Preference order — production fp16 first, development fp32 second.
+  /// Preference order: fp16 first if provisioned (unaccepted on Android), then
+  /// fp32.
   static const List<String> imageCandidates = [
     'mobileclip_image_fp16.onnx',
     'mobileclip_image.onnx',

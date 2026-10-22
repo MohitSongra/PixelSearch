@@ -4,13 +4,13 @@ PixelSearch — MobileCLIP model preparation & verification.
 
 Downloads MobileCLIP-S1, exports the image + text encoders to ONNX, verifies the
 export is numerically faithful to PyTorch, runs a real semantic-retrieval self-test
-on bundled photos, and produces fp16 models for on-device (Android) deployment.
+on bundled photos, and also produces fp16 models.
 
 Outputs (in ./out):
-  mobileclip_image.onnx        fp32 image encoder  (verification)
-  mobileclip_text.onnx         fp32 text encoder   (verification)
-  mobileclip_image_fp16.onnx   fp16 image encoder  (ship this to the device)
-  mobileclip_text_fp16.onnx    fp16 text encoder   (ship this to the device)
+  mobileclip_image.onnx        fp32 image encoder  (the only device-accepted file)
+  mobileclip_text.onnx         fp32 text encoder   (the only device-accepted file)
+  mobileclip_image_fp16.onnx   fp16 image encoder  (unaccepted on Android; do not provision)
+  mobileclip_text_fp16.onnx    fp16 text encoder   (unaccepted on Android; do not provision)
   bpe_simple_vocab_16e6.txt.gz CLIP BPE tokenizer vocab (bundle in the app)
   preprocess_config.json       preprocessing + tokenizer constants (bundle in app)
 
@@ -115,6 +115,7 @@ json.dump({"model": MODEL, "pretrained": PRE,
            "context_length": 77, "sot": 49406, "eot": 49407, "pad": 0},
           open(f"{OUT}/preprocess_config.json", "w"), indent=2)
 
-print("\nDone. Ship the *_fp16.onnx files + bpe vocab + preprocess_config.json to the app.")
+print("\nDone. Provision only the fp32 .onnx files to a device (FP16 is unaccepted on Android);\n"
+      "the bpe vocab and preprocess_config.json are bundled with the app.")
 for f in sorted(os.listdir(OUT)):
     print(f"   {f:32s} {mb(os.path.join(OUT, f))} MB")

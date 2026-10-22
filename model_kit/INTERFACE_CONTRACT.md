@@ -1,8 +1,13 @@
 # INTERFACE_CONTRACT.md — PixelSearch ↔ ModelKit
 
 **Status:** FROZEN v1.1 · Model: MobileCLIP-S1 / `datacompdr`
-**Owner:** ModelKit (source of truth). The Flutter repo carries a mirror at `PixelSearch/docs/INTERFACE_CONTRACT.md`; keep them identical.
+**Owner:** ModelKit (source of truth). The app carries a mirror at `pixelsearch_app/docs/INTERFACE_CONTRACT.md`; keep them identical.
 **Change control:** any change to a value marked *frozen* requires explicit human approval, a version bump, and re-verification on both sides. v1.1 = documentation clarification only (resize semantics + antialias made explicit; versioning section added). **No frozen value changed from v1.0; reference vectors remain valid.**
+
+> **Status note (2026-10-22; documentation only, no frozen value changed):** on Android only the FP32 CPU
+> configuration has been accepted on a device. The `*_fp16.onnx` files below have never run on Android, and the
+> app registers no NNAPI or XNNPACK execution provider, so do not provision them to a device. Until FP16 is
+> accepted, read the "Disposition" column of section 2 with that in mind: the FP32 files are the configuration in use.
 
 ## Why this file exists
 ModelKit produces the model artifacts; the Flutter app consumes them. If the app's
@@ -89,7 +94,7 @@ Do **not** normalize a second time in the app.
 
 ## 6. Parity test — definition of "Dart matches the model"
 Two levels, both runnable off-device except where noted:
-1. **Tokenizer parity (in-sandbox):** Dart token ids == open_clip ids for a fixed sample set (see `PixelSearch/test/parity/`).
+1. **Tokenizer parity (in-sandbox):** Dart token ids == open_clip ids for a fixed sample set (fixtures `model_kit/parity/reference_tokens.json`, test `pixelsearch_app/test/clip_tokenizer_test.dart`).
 2. **Preprocessing parity (in-sandbox):** Dart input tensor ≈ Python reference tensor for fixed images, max-abs-diff within a documented tolerance (interpolation delta).
 3. **Retrieval parity (`reference_vectors.json`):** for each query row *i*, `argmax` over images == *i* (diagonal → **6/6**). Absolute magnitudes are not the target; the argmax structure is.
 4. **On-device golden (device only):** the Flutter ONNX Runtime session, given a reference input tensor, returns the reference embedding within ~1e-3. Provided as a bundled golden test; executed on a real device/desktop, since the Flutter ORT plugin does not run in `flutter test`.
