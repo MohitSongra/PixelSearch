@@ -19,5 +19,12 @@ void main() {
     expect(find.textContaining('Search your'), findsOneWidget);
     // At least one call-to-action button exists.
     expect(find.byType(OutlinedButton), findsWidgets);
+    // Onboarding makes no unmeasured speed claim, and says how online
+    // features change the "nothing is uploaded" promise.
+    expect(find.textContaining('seconds'), findsNothing);
+    expect(
+      find.textContaining('unless you turn on an online feature'),
+      findsOneWidget,
+    );
   });
 }
